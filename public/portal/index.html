@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tool-Portal</title>
+<style>
+@font-face { font-family:'SF'; src: local('SF Pro Display'),local('-apple-system'),local('BlinkMacSystemFont'),local('Helvetica Neue'); }
+:root {
+  --glass-bg: rgba(255,255,255,0.12);
+  --glass-bg-heavy: rgba(255,255,255,0.18);
+  --glass-border: rgba(255,255,255,0.22);
+  --glass-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 12px rgba(0,0,0,0.1);
+  --glass-inset: inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(255,255,255,0.05);
+  --text: rgba(0,0,0,0.85); --text-secondary: rgba(0,0,0,0.55); --text-tertiary: rgba(0,0,0,0.35);
+  --blue: #007AFF; --green: #30D158; --red: #FF3B30; --purple: #AF52DE; --indigo: #5856D6;
+  --radius: 20px; --radius-lg: 26px; --radius-xl: 32px; --radius-sm: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; -webkit-font-smoothing:antialiased; color:var(--text); overflow-x:hidden; }
+
+.bg { position:fixed; inset:0; z-index:0; background:linear-gradient(135deg,#a8c8f0 0%,#d4b8e8 25%,#f0c8c8 50%,#b8d8f0 75%,#c8e8d0 100%); background-size:400% 400%; animation:bgShift 20s ease infinite; }
+.bg::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 600px 600px at 20% 20%,rgba(168,200,240,0.6),transparent),radial-gradient(ellipse 500px 500px at 80% 30%,rgba(212,184,232,0.5),transparent),radial-gradient(ellipse 400px 400px at 50% 80%,rgba(184,216,240,0.5),transparent); }
+@keyframes bgShift { 0%,100%{background-position:0% 50%} 25%{background-position:100% 0%} 50%{background-position:100% 100%} 75%{background-position:0% 100%} }
+
+.glass { background:var(--glass-bg); backdrop-filter:blur(40px) saturate(1.8); -webkit-backdrop-filter:blur(40px) saturate(1.8); border:1px solid var(--glass-border); box-shadow:var(--glass-shadow),var(--glass-inset); }
+.glass-heavy { background:var(--glass-bg-heavy); backdrop-filter:blur(50px) saturate(2); -webkit-backdrop-filter:blur(50px) saturate(2); border:1px solid var(--glass-border); box-shadow:0 12px 60px rgba(0,0,0,0.2),0 4px 20px rgba(0,0,0,0.15),var(--glass-inset); }
+
+/* ===== AUTH ===== */
+.auth-screen { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; transition:opacity 0.4s,transform 0.4s; }
+.auth-screen.hidden { opacity:0; pointer-events:none; transform:scale(1.02); }
+.auth-card { width:100%; max-width:420px; border-radius:var(--radius-xl); padding:48px 40px 40px; text-align:center; }
+.auth-logo { font-size:32px; font-weight:700; letter-spacing:-0.03em; margin-bottom:4px; }
+.auth-logo span { background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.auth-subtitle { font-size:14px; color:var(--text-secondary); margin-bottom:32px; }
+.auth-form { display:flex; flex-direction:column; gap:14px; }
+.auth-input { width:100%; padding:14px 16px; border:1px solid var(--glass-border); border-radius:var(--radius-sm); background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); font-family:inherit; font-size:15px; color:var(--text); outline:none; transition:border-color 0.2s,background 0.2s; }
+.auth-input:focus { border-color:var(--blue); background:rgba(255,255,255,0.25); }
+.auth-input::placeholder { color:var(--text-tertiary); }
+.auth-btn { width:100%; padding:14px; border:none; border-radius:var(--radius-sm); background:linear-gradient(135deg,var(--blue),var(--indigo)); color:#fff; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; transition:opacity 0.2s,transform 0.1s; margin-top:4px; }
+.auth-btn:hover { opacity:0.9; } .auth-btn:active { transform:scale(0.98); } .auth-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.auth-switch { margin-top:20px; font-size:13px; color:var(--text-secondary); }
+.auth-switch a { color:var(--blue); cursor:pointer; text-decoration:none; font-weight:500; }
+.auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--red); font-size:13px; padding:10px 14px; border-radius:var(--radius-sm); display:none; }
+.auth-error.show { display:block; }
+
+/* ===== PORTAL ===== */
+.portal { position:relative; z-index:1; min-height:100vh; padding:40px; opacity:0; pointer-events:none; transition:opacity 0.4s; }
+.portal.active { opacity:1; pointer-events:all; }
+
+.portal-header { display:flex; justify-content:space-between; align-items:center; max-width:1000px; margin:0 auto 48px; }
+.portal-brand { font-size:28px; font-weight:700; letter-spacing:-0.03em; }
+.portal-brand span { background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.portal-user { display:flex; align-items:center; gap:12px; }
+.portal-user-name { font-size:14px; font-weight:600; }
+.portal-logout { padding:8px 16px; border:none; border-radius:var(--radius-sm); background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; border:1px solid rgba(255,255,255,0.15); }
+.portal-logout:hover { background:rgba(255,59,48,0.1); color:var(--red); border-color:rgba(255,59,48,0.2); }
+
+.portal-welcome { text-align:center; max-width:600px; margin:0 auto 48px; }
+.portal-welcome h1 { font-size:36px; font-weight:700; letter-spacing:-0.03em; margin-bottom:8px; }
+.portal-welcome p { font-size:16px; color:var(--text-secondary); line-height:1.5; }
+
+.tools-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px; max-width:1000px; margin:0 auto; }
+
+.tool-card {
+  border-radius:var(--radius-lg); padding:28px 24px; cursor:pointer;
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s;
+  text-decoration:none; color:inherit; display:block;
+}
+.tool-card:hover { transform:translateY(-4px); box-shadow:0 16px 60px rgba(0,0,0,0.2),0 6px 24px rgba(0,0,0,0.15),var(--glass-inset); }
+
+.tool-icon {
+  width:56px; height:56px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; margin-bottom:16px;
+}
+.tool-name { font-size:18px; font-weight:700; margin-bottom:6px; }
+.tool-desc { font-size:13px; color:var(--text-secondary); line-height:1.5; }
+.tool-badge { display:inline-block; margin-top:12px; padding:4px 10px; border-radius:99px; font-size:11px; font-weight:600; }
+.tool-badge.active { background:rgba(48,209,88,0.12); color:var(--green); }
+.tool-badge.soon { background:rgba(255,204,0,0.12); color:#b8960a; }
+
+/* Loading */
+.loading-overlay { position:fixed; inset:0; z-index:150; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); transition:opacity 0.3s; }
+.loading-overlay.hidden { opacity:0; pointer-events:none; }
+.spinner { width:40px; height:40px; border:3px solid rgba(0,0,0,0.1); border-top-color:var(--blue); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Toast */
+.toast-box { position:fixed; bottom:24px; right:24px; z-index:300; display:flex; flex-direction:column; gap:8px; }
+.toast { display:flex; align-items:center; gap:8px; padding:12px 20px; border-radius:var(--radius-sm); font-size:13px; font-weight:600; animation:toastIn 0.3s,toastOut 0.3s 2.8s forwards; backdrop-filter:blur(30px) saturate(1.5); }
+.toast.success { background:rgba(48,209,88,0.2); border:1px solid rgba(48,209,88,0.3); color:#1a7a2e; }
+.toast.error { background:rgba(255,59,48,0.2); border:1px solid rgba(255,59,48,0.3); color:#c0392b; }
+@keyframes toastIn { from{transform:translateX(40px);opacity:0} }
+@keyframes toastOut { to{transform:translateX(40px);opacity:0} }
+
+@media (max-width:600px) {
+  .portal { padding:20px; }
+  .portal-welcome h1 { font-size:26px; }
+  .auth-card { padding:32px 24px 28px; margin:0 16px; }
+  .portal-header { flex-direction:column; gap:16px; text-align:center; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<!-- AUTH -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card glass-heavy">
+    <div class="auth-logo"><span>ToolBox</span></div>
+    <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
+    <div class="auth-error" id="authError"></div>
+    <form class="auth-form" id="authForm" onsubmit="handleAuth(event)">
+      <input class="auth-input" id="authName" type="text" placeholder="Name" autocomplete="name" style="display:none">
+      <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
+      <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
+      <button class="auth-btn" type="submit" id="authBtn">Anmelden</button>
+    </form>
+    <div class="auth-switch">
+      <span id="authSwitchText">Noch kein Konto?</span>
+      <a onclick="toggleAuthMode()" id="authSwitchLink">Registrieren</a>
+    </div>
+  </div>
+</div>
+
+<!-- PORTAL -->
+<div class="portal" id="portal">
+  <header class="portal-header">
+    <div class="portal-brand"><span>ToolBox</span></div>
+    <div class="portal-user">
+      <span class="portal-user-name" id="portalUserName">—</span>
+      <button class="portal-logout" onclick="logout()">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="portal-welcome">
+    <h1>Willkommen, <span id="portalGreeting">—</span></h1>
+    <p>Wähle ein Tool aus, um loszulegen. Neue Tools werden regelmäßig hinzugefügt.</p>
+  </div>
+
+  <div class="tools-grid">
+
+    <!-- FINANZ-APP -->
+    <a href="/app/finanzen" class="tool-card glass">
+      <div class="tool-icon" style="background:rgba(0,122,255,0.12);color:var(--blue)">💰</div>
+      <div class="tool-name">Finanzen</div>
+      <div class="tool-desc">Verwalte deine Einnahmen, Ausgaben und Kategorien. Mit verschlüsselter Datenspeicherung und monatlicher Übersicht.</div>
+      <span class="tool-badge active">✓ Verfügbar</span>
+    </a>
+
+    <!-- PLATZHALTER: Zukünftige Tools -->
+    <div class="tool-card glass" style="opacity:0.6;cursor:default">
+      <div class="tool-icon" style="background:rgba(175,82,222,0.12);color:var(--purple)">📝</div>
+      <div class="tool-name">Notizen</div>
+      <div class="tool-desc">Verschlüsselte Notizen und Dokumente. Markdown-Unterstützung mit Kategorien und Volltextsuche.</div>
+      <span class="tool-badge soon">Demnächst</span>
+    </div>
+
+    <div class="tool-card glass" style="opacity:0.6;cursor:default">
+      <div class="tool-icon" style="background:rgba(255,149,0,0.12);color:#FF9500">🔑</div>
+      <div class="tool-name">Passwort-Manager</div>
+      <div class="tool-desc">Sichere Verwaltung von Zugangsdaten. Verschlüsselt mit deinem Master-Passwort, Passwort-Generator inklusive.</div>
+      <span class="tool-badge soon">Demnächst</span>
+    </div>
+
+    <div class="tool-card glass" style="opacity:0.6;cursor:default">
+      <div class="tool-icon" style="background:rgba(48,209,88,0.12);color:var(--green)">✅</div>
+      <div class="tool-name">Aufgaben</div>
+      <div class="tool-desc">To-Do-Listen mit Projekten, Deadlines und Prioritäten. Einfach und übersichtlich.</div>
+      <span class="tool-badge soon">Demnächst</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-box" id="toasts"></div>
+
+<script>
+const API = '/api';
+let isLoginMode = true;
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `${type==='success'?'✓':'✕'} ${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 3100);
+}
+
+function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+function toggleAuthMode() {
+  isLoginMode = !isLoginMode;
+  document.getElementById('authName').style.display = isLoginMode ? 'none' : '';
+  document.getElementById('authSubtitle').textContent = isLoginMode ? 'Melde dich an, um fortzufahren' : 'Erstelle ein neues Konto';
+  document.getElementById('authBtn').textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
+  document.getElementById('authSwitchText').textContent = isLoginMode ? 'Noch kein Konto?' : 'Bereits registriert?';
+  document.getElementById('authSwitchLink').textContent = isLoginMode ? 'Registrieren' : 'Anmelden';
+  document.getElementById('authError').classList.remove('show');
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('authError');
+  errEl.classList.remove('show');
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const name = document.getElementById('authName').value.trim();
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true; btn.textContent = 'Laden...';
+
+  try {
+    const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
+    const body = isLoginMode ? { email, password } : { email, password, name };
+    if (!isLoginMode && !name) throw { errors: ['Bitte gib deinen Namen ein.'] };
+
+    const res = await fetch(API + endpoint, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw data;
+
+    await checkAuth();
+  } catch (err) {
+    errEl.innerHTML = err.errors?.join('<br>') || err.error || 'Ein Fehler ist aufgetreten.';
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
+  }
+}
+
+async function logout() {
+  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+  document.getElementById('portal').classList.remove('active');
+  document.getElementById('authScreen').classList.remove('hidden');
+}
+
+async function checkAuth() {
+  showLoading();
+  try {
+    const res = await fetch(API + '/auth/me', { credentials: 'include' });
+    if (!res.ok) throw new Error();
+    const { user } = await res.json();
+
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('portal').classList.add('active');
+    document.getElementById('portalUserName').textContent = user.name;
+    document.getElementById('portalGreeting').textContent = user.name.split(' ')[0];
+  } catch {
+    document.getElementById('authScreen').classList.remove('hidden');
+    document.getElementById('portal').classList.remove('active');
+  } finally {
+    hideLoading();
+  }
+}
+
+checkAuth();
+</script>
+</body>
+</html>
