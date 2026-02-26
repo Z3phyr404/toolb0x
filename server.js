@@ -17,7 +17,6 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 const { setupSecurity } = require('./src/middleware/security');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -35,11 +34,9 @@ const PORT = process.env.PORT || 3000;
 // ============================================================
 function serveHtmlWithNonce(filePath) {
   return (req, res) => {
-    const nonce = crypto.randomBytes(16).toString('base64');
-    res.locals.cspNonce = nonce;
     fs.readFile(filePath, 'utf8', (err, html) => {
       if (err) return res.status(500).send('Fehler beim Laden der Seite.');
-      const nonced = html.replace(/__CSP_NONCE__/g, nonce);
+      const nonced = html.replace(/__CSP_NONCE__/g, res.locals.cspNonce);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(nonced);
     });
