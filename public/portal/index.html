@@ -114,7 +114,7 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
     <div class="auth-logo"><span>ToolBox</span></div>
     <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
     <div class="auth-error" id="authError"></div>
-    <form class="auth-form" id="authForm" onsubmit="handleAuth(event)">
+    <form class="auth-form" id="authForm">
       <input class="auth-input" id="authName" type="text" placeholder="Name" autocomplete="name" style="display:none">
       <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
       <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
@@ -122,7 +122,7 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
     </form>
     <div class="auth-switch">
       <span id="authSwitchText">Noch kein Konto?</span>
-      <a onclick="toggleAuthMode()" id="authSwitchLink">Registrieren</a>
+      <a id="authSwitchLink">Registrieren</a>
     </div>
   </div>
 </div>
@@ -133,7 +133,7 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
     <div class="portal-brand"><span>ToolBox</span></div>
     <div class="portal-user">
       <span class="portal-user-name" id="portalUserName">—</span>
-      <button class="portal-logout" onclick="logout()">Abmelden</button>
+      <button class="portal-logout" id="logoutBtn">Abmelden</button>
     </div>
   </header>
 
@@ -179,8 +179,13 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
 
 <div class="toast-box" id="toasts"></div>
 
-<script>
+<script nonce="__CSP_NONCE__">
 const API = '/api';
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('authForm').addEventListener('submit', handleAuth);
+  document.getElementById('authSwitchLink').addEventListener('click', toggleAuthMode);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+});
 let isLoginMode = true;
 
 function toast(msg, type='success') {
