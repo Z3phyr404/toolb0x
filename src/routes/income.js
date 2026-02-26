@@ -20,7 +20,20 @@ function decryptIncome(inc, key) {
   };
 }
 
+// Hilfsfunktion: Vormonat berechnen
+function prevMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const newM = m === 1 ? 12 : m - 1;
+  const newY = m === 1 ? y - 1 : y;
+  return `${newY}-${String(newM).padStart(2, '0')}`;
+}
+
+// ============================================================
 // GET /api/income
+// Lädt Einnahmen für den Monat.
+// Falls keine existieren: wiederkehrende aus dem letzten
+// bekannten Monat automatisch kopieren.
+// ============================================================
 router.get('/', async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
@@ -28,9 +41,45 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
 
-    const raw = await prisma.income.findMany({
+    let raw = await prisma.income.findMany({
       where: { userId: req.userId, month },
     });
+
+    // Wenn keine Einnahmen für diesen Monat: wiederkehrende kopieren
+    if (raw.length === 0) {
+      // Letzten Monat mit Einnahmen finden (max. 24 Monate zurück)
+      let sourceMonth = prevMonth(month);
+      let sourceIncomes = [];
+
+      for (let i = 0; i < 24; i++) {
+        const found = await prisma.income.findMany({
+          where: { userId: req.userId, month: sourceMonth, isRecurring: true },
+        });
+        if (found.length > 0) {
+          sourceIncomes = found;
+          break;
+        }
+        sourceMonth = prevMonth(sourceMonth);
+      }
+
+      // Wiederkehrende in den neuen Monat kopieren
+      if (sourceIncomes.length > 0) {
+        await prisma.income.createMany({
+          data: sourceIncomes.map(i => ({
+            name: i.name,       // bleibt verschlüsselt
+            amount: i.amount,   // bleibt verschlüsselt
+            userId: i.userId,
+            month,
+            isRecurring: true,
+          })),
+        });
+
+        // Neu erstellte laden
+        raw = await prisma.income.findMany({
+          where: { userId: req.userId, month },
+        });
+      }
+    }
 
     const incomes = raw.map(i => decryptIncome(i, req.encryptionKey));
     incomes.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));

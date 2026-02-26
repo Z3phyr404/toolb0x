@@ -25,6 +25,14 @@ function decryptExpense(exp, key) {
   };
 }
 
+// Hilfsfunktion: Vormonat berechnen
+function prevMonth(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const newM = m === 1 ? 12 : m - 1;
+  const newY = m === 1 ? y - 1 : y;
+  return `${newY}-${String(newM).padStart(2, '0')}`;
+}
+
 // GET /api/expenses/summary — MUSS vor /:id stehen!
 router.get('/summary', async (req, res) => {
   try {
@@ -64,14 +72,9 @@ router.get('/summary', async (req, res) => {
       byCategory[catId].count += 1;
     }
 
-    // Fix #10: Vormonat-Berechnung robust
-    const [year, mon] = month.split('-').map(Number);
-    const prevMonth = mon === 1
-      ? `${year - 1}-12`
-      : `${year}-${String(mon - 1).padStart(2, '0')}`;
-
+    const pm = prevMonth(month);
     const prevRaw = await prisma.expense.findMany({
-      where: { userId: req.userId, month: prevMonth },
+      where: { userId: req.userId, month: pm },
     });
     const prevTotal = prevRaw.reduce((s, e) => {
       const decrypted = decrypt(e.amount, key);
@@ -86,7 +89,7 @@ router.get('/summary', async (req, res) => {
       remaining: Math.round((totalIncome - totalExpenses) * 100) / 100,
       byCategory: Object.values(byCategory).sort((a, b) => b.total - a.total),
       comparison: {
-        previousMonth: prevMonth,
+        previousMonth: pm,
         previousTotal: Math.round(prevTotal * 100) / 100,
         change: Math.round((totalExpenses - prevTotal) * 100) / 100,
         changePercent: prevTotal > 0
@@ -100,7 +103,12 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+// ============================================================
 // GET /api/expenses
+// Lädt Ausgaben für den Monat.
+// Falls keine existieren: wiederkehrende aus dem letzten
+// bekannten Monat automatisch kopieren.
+// ============================================================
 router.get('/', async (req, res) => {
   try {
     const month = req.query.month || new Date().toISOString().slice(0, 7);
@@ -108,10 +116,48 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
 
-    const rawExpenses = await prisma.expense.findMany({
+    let rawExpenses = await prisma.expense.findMany({
       where: { userId: req.userId, month },
       include: { category: { select: { id: true, name: true, color: true } } },
     });
+
+    // Wenn keine Ausgaben für diesen Monat: wiederkehrende kopieren
+    if (rawExpenses.length === 0) {
+      // Letzten Monat mit Ausgaben finden (max. 24 Monate zurück)
+      let sourceMonth = prevMonth(month);
+      let sourceExpenses = [];
+
+      for (let i = 0; i < 24; i++) {
+        const found = await prisma.expense.findMany({
+          where: { userId: req.userId, month: sourceMonth, isRecurring: true },
+        });
+        if (found.length > 0) {
+          sourceExpenses = found;
+          break;
+        }
+        sourceMonth = prevMonth(sourceMonth);
+      }
+
+      // Wiederkehrende in den neuen Monat kopieren
+      if (sourceExpenses.length > 0) {
+        await prisma.expense.createMany({
+          data: sourceExpenses.map(e => ({
+            name: e.name,           // bleibt verschlüsselt
+            amount: e.amount,       // bleibt verschlüsselt
+            categoryId: e.categoryId,
+            userId: e.userId,
+            month,
+            isRecurring: true,
+          })),
+        });
+
+        // Neu erstellte laden
+        rawExpenses = await prisma.expense.findMany({
+          where: { userId: req.userId, month },
+          include: { category: { select: { id: true, name: true, color: true } } },
+        });
+      }
+    }
 
     const expenses = rawExpenses.map(e => decryptExpense(e, req.encryptionKey));
     expenses.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
@@ -125,7 +171,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Fix #11: GET /api/expenses/:id — Einzelne Ausgabe
+// GET /api/expenses/:id
 router.get('/:id', async (req, res) => {
   try {
     const expense = await prisma.expense.findFirst({
