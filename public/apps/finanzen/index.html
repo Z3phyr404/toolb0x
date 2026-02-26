@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Finanz — Liquid Glass</title>
-<link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ============================================================
    iOS 26 LIQUID GLASS — FINANZ APP
@@ -773,7 +772,7 @@ main {
 
     <div class="auth-error" id="authError"></div>
 
-    <form class="auth-form" id="authForm" onsubmit="handleAuth(event)">
+    <form class="auth-form" id="authForm">
       <input class="auth-input" id="authName" type="text" placeholder="Name" autocomplete="name" style="display:none">
       <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
       <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
@@ -782,7 +781,7 @@ main {
 
     <div class="auth-switch">
       <span id="authSwitchText">Noch kein Konto?</span>
-      <a onclick="toggleAuthMode();" id="authSwitchLink">Registrieren</a>
+      <a id="authSwitchLink">Registrieren</a>
     </div>
   </div>
 </div>
@@ -796,21 +795,21 @@ main {
       <div class="sidebar-logo"><span>Finanz</span></div>
 
       <div class="nav-group-label">Übersicht</div>
-      <button class="nav-btn active" data-page="dashboard" onclick="go('dashboard')">
+      <button class="nav-btn active" data-page="dashboard">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         Dashboard
       </button>
 
       <div class="nav-group-label">Verwaltung</div>
-      <button class="nav-btn" data-page="expenses" onclick="go('expenses')">
+      <button class="nav-btn" data-page="expenses">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         Ausgaben
       </button>
-      <button class="nav-btn" data-page="income" onclick="go('income')">
+      <button class="nav-btn" data-page="income">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         Einnahmen
       </button>
-      <button class="nav-btn" data-page="categories" onclick="go('categories')">
+      <button class="nav-btn" data-page="categories">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
         Kategorien
       </button>
@@ -827,7 +826,7 @@ main {
           <div class="sidebar-user-name" id="userName">—</div>
           <div class="sidebar-user-email" id="userEmail">—</div>
         </div>
-        <button class="sidebar-logout" onclick="logout()" title="Abmelden">
+        <button class="sidebar-logout" id="logoutBtn" title="Abmelden">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         </button>
       </div>
@@ -838,9 +837,9 @@ main {
   <main>
     <!-- MONTH SELECTOR (global) -->
     <div class="month-selector glass" id="monthSelector">
-      <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+      <button class="month-btn" id="monthPrev">‹</button>
       <div class="month-display" id="monthDisplay">—</div>
-      <button class="month-btn" onclick="changeMonth(1)">›</button>
+      <button class="month-btn" id="monthNext">›</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -873,7 +872,7 @@ main {
     <div class="page" id="page-expenses">
       <div class="page-header">
         <div><div class="page-title">Ausgaben</div><div class="page-subtitle" id="expCount">—</div></div>
-        <button class="btn btn-primary" onclick="openExpenseModal()">
+        <button class="btn btn-primary" id="addExpenseBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Hinzufügen
         </button>
@@ -887,7 +886,7 @@ main {
     <div class="page" id="page-income">
       <div class="page-header">
         <div><div class="page-title">Einnahmen</div><div class="page-subtitle" id="incCount">—</div></div>
-        <button class="btn btn-primary" onclick="openIncomeModal()">
+        <button class="btn btn-primary" id="addIncomeBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Hinzufügen
         </button>
@@ -905,7 +904,7 @@ main {
     <div class="page" id="page-categories">
       <div class="page-header">
         <div><div class="page-title">Kategorien</div><div class="page-subtitle" id="catCount">—</div></div>
-        <button class="btn btn-primary" onclick="openCatModal()">
+        <button class="btn btn-primary" id="addCatBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Hinzufügen
         </button>
@@ -917,10 +916,10 @@ main {
 
   <!-- Mobile Tab Bar -->
   <div class="mobile-tabs glass-heavy">
-    <button class="mobile-tab active" data-page="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</button>
-    <button class="mobile-tab" data-page="expenses" onclick="go('expenses')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Ausgaben</button>
-    <button class="mobile-tab" data-page="income" onclick="go('income')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Einnahmen</button>
-    <button class="mobile-tab" data-page="categories" onclick="go('categories')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>Kategorien</button>
+    <button class="mobile-tab active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</button>
+    <button class="mobile-tab" data-page="expenses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Ausgaben</button>
+    <button class="mobile-tab" data-page="income"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Einnahmen</button>
+    <button class="mobile-tab" data-page="categories"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>Kategorien</button>
   </div>
 
 </div>
@@ -928,7 +927,7 @@ main {
 <!-- MODAL: EXPENSE -->
 <div class="modal-overlay" id="mExpense">
   <div class="modal glass-heavy">
-    <div class="modal-header"><h3 id="mExpTitle">Ausgabe hinzufügen</h3><button class="modal-close" onclick="closeM('mExpense')">×</button></div>
+    <div class="modal-header"><h3 id="mExpTitle">Ausgabe hinzufügen</h3><button class="modal-close" data-close-modal="mExpense">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Bezeichnung</label><input class="form-input" id="fExpName" placeholder="z.B. Miete, Spotify, ..."></div>
       <div class="form-row">
@@ -940,14 +939,14 @@ main {
         <label class="form-check-label" for="fExpRecurring">Wiederkehrend (monatlich)</label>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-glass" onclick="closeM('mExpense')">Abbrechen</button><button class="btn btn-primary" onclick="saveExpense()">Speichern</button></div>
+    <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mExpense">Abbrechen</button><button class="btn btn-primary" id="saveExpenseBtn">Speichern</button></div>
   </div>
 </div>
 
 <!-- MODAL: INCOME -->
 <div class="modal-overlay" id="mIncome">
   <div class="modal glass-heavy">
-    <div class="modal-header"><h3 id="mIncTitle">Einnahme hinzufügen</h3><button class="modal-close" onclick="closeM('mIncome')">×</button></div>
+    <div class="modal-header"><h3 id="mIncTitle">Einnahme hinzufügen</h3><button class="modal-close" data-close-modal="mIncome">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Bezeichnung</label><input class="form-input" id="fIncName" placeholder="z.B. Gehalt, Nebenjob, ..."></div>
       <div class="form-group"><label class="form-label">Betrag (€)</label><input class="form-input" id="fIncAmt" type="number" step="0.01" min="0" placeholder="0.00"></div>
@@ -956,14 +955,14 @@ main {
         <label class="form-check-label" for="fIncRecurring">Wiederkehrend (monatlich)</label>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-glass" onclick="closeM('mIncome')">Abbrechen</button><button class="btn btn-primary" onclick="saveIncome()">Speichern</button></div>
+    <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mIncome">Abbrechen</button><button class="btn btn-primary" id="saveIncomeBtn">Speichern</button></div>
   </div>
 </div>
 
 <!-- MODAL: CATEGORY -->
 <div class="modal-overlay" id="mCat">
   <div class="modal glass-heavy">
-    <div class="modal-header"><h3 id="mCatTitle">Neue Kategorie</h3><button class="modal-close" onclick="closeM('mCat')">×</button></div>
+    <div class="modal-header"><h3 id="mCatTitle">Neue Kategorie</h3><button class="modal-close" data-close-modal="mCat">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Name</label><input class="form-input" id="fCatName" placeholder="z.B. Freizeit, Bildung, ..."></div>
       <div class="form-group">
@@ -971,14 +970,14 @@ main {
         <div class="color-picker-row" id="colorPicker"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-glass" onclick="closeM('mCat')">Abbrechen</button><button class="btn btn-primary" onclick="saveCat()">Speichern</button></div>
+    <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mCat">Abbrechen</button><button class="btn btn-primary" id="saveCatBtn">Speichern</button></div>
   </div>
 </div>
 
 <!-- MODAL: DELETE -->
 <div class="modal-overlay" id="mDel">
   <div class="modal glass-heavy">
-    <div class="modal-header"><h3 id="mDelTitle">Löschen</h3><button class="modal-close" onclick="closeM('mDel')">×</button></div>
+    <div class="modal-header"><h3 id="mDelTitle">Löschen</h3><button class="modal-close" data-close-modal="mDel">×</button></div>
     <div class="modal-body">
       <div class="confirm-content">
         <p id="mDelDesc">Möchtest du das wirklich löschen?</p>
@@ -986,19 +985,16 @@ main {
         <div class="item-amount" id="mDelAmt"></div>
       </div>
     </div>
-    <div class="modal-footer"><button class="btn btn-glass" onclick="closeM('mDel')">Abbrechen</button><button class="btn btn-danger" id="mDelBtn">Löschen</button></div>
+    <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mDel">Abbrechen</button><button class="btn btn-danger" id="mDelBtn">Löschen</button></div>
   </div>
 </div>
 
 <!-- TOASTS -->
 <div class="toast-box" id="toasts"></div>
 
-<script>
+<script nonce="__CSP_NONCE__">
 // ============================================================
 // FINANZ-APP — FRONTEND LOGIC
-// ============================================================
-// Alle Daten kommen jetzt vom Backend via API-Calls.
-// Kein localStorage mehr — alles serverseitig gespeichert.
 // ============================================================
 
 const API = '/api';
@@ -1012,7 +1008,7 @@ let currentUser = null;
 let categories = [];
 let expenses = [];
 let incomes = [];
-let currentMonth = new Date().toISOString().slice(0, 7); // "2026-02"
+let currentMonth = new Date().toISOString().slice(0, 7);
 let editExpId = null;
 let editIncId = null;
 let editCatId = null;
@@ -1037,14 +1033,12 @@ function monthLabel(ym) {
 // ============ API HELPER ============
 async function api(path, options = {}) {
   const res = await fetch(API + path, {
-    credentials: 'include', // Cookies mitsenden!
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });
   const data = await res.json();
-  if (!res.ok) {
-    throw { status: res.status, ...data };
-  }
+  if (!res.ok) throw { status: res.status, ...data };
   return data;
 }
 
@@ -1063,6 +1057,60 @@ function showLoading() { document.getElementById('loadingOverlay').classList.rem
 function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
 // ============================================================
+// EVENT DELEGATION — zentraler Klick-Handler
+// ============================================================
+document.addEventListener('click', function(e) {
+  const target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  if (!target) return;
+
+  // Navigation (Sidebar + Mobile Tabs)
+  if (target.dataset.page && (target.classList.contains('nav-btn') || target.classList.contains('mobile-tab'))) {
+    go(target.dataset.page);
+    return;
+  }
+
+  // Modal schließen
+  if (target.dataset.closeModal) {
+    closeM(target.dataset.closeModal);
+    return;
+  }
+
+  // Auth-Switch
+  if (target.id === 'authSwitchLink') { toggleAuthMode(); return; }
+
+  // Logout
+  if (target.id === 'logoutBtn') { logout(); return; }
+
+  // Monat wechseln
+  if (target.id === 'monthPrev') { changeMonth(-1); return; }
+  if (target.id === 'monthNext') { changeMonth(1); return; }
+
+  // Hinzufügen-Buttons
+  if (target.id === 'addExpenseBtn') { openExpenseModal(); return; }
+  if (target.id === 'addIncomeBtn') { openIncomeModal(); return; }
+  if (target.id === 'addCatBtn') { openCatModal(); return; }
+
+  // Speichern-Buttons
+  if (target.id === 'saveExpenseBtn') { saveExpense(); return; }
+  if (target.id === 'saveIncomeBtn') { saveIncome(); return; }
+  if (target.id === 'saveCatBtn') { saveCat(); return; }
+
+  // Farb-Picker
+  if (target.classList.contains('color-swatch')) {
+    pickColor(target.dataset.color);
+    return;
+  }
+
+  // Tabellen-Aktionen (dynamisch generiert)
+  if (target.dataset.editExpense) { openExpenseModal(target.dataset.editExpense); return; }
+  if (target.dataset.delExpense)  { openDelModal('expense', target.dataset.delExpense); return; }
+  if (target.dataset.editIncome)  { openIncomeModal(target.dataset.editIncome); return; }
+  if (target.dataset.delIncome)   { openDelModal('income', target.dataset.delIncome); return; }
+  if (target.dataset.editCat)     { openCatModal(target.dataset.editCat); return; }
+  if (target.dataset.delCat)      { openDelModal('category', target.dataset.delCat); return; }
+});
+
+// ============================================================
 // AUTH
 // ============================================================
 function toggleAuthMode() {
@@ -1078,7 +1126,7 @@ function toggleAuthMode() {
   document.getElementById('authError').classList.remove('show');
 }
 
-async function handleAuth(e) {
+document.getElementById('authForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const errEl = document.getElementById('authError');
   errEl.classList.remove('show');
@@ -1093,16 +1141,10 @@ async function handleAuth(e) {
 
   try {
     if (isLoginMode) {
-      await api('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
+      await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
     } else {
       if (!name) throw { errors: ['Bitte gib deinen Namen ein.'] };
-      await api('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ email, password, name }),
-      });
+      await api('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
     }
     await initApp();
   } catch (err) {
@@ -1113,12 +1155,10 @@ async function handleAuth(e) {
     btn.disabled = false;
     btn.textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
   }
-}
+});
 
 async function logout() {
-  try {
-    await api('/auth/logout', { method: 'POST' });
-  } catch (e) {}
+  try { await api('/auth/logout', { method: 'POST' }); } catch (e) {}
   currentUser = null;
   document.getElementById('app').classList.remove('active');
   document.getElementById('authScreen').classList.remove('hidden');
@@ -1135,20 +1175,15 @@ async function initApp() {
     showLoading();
     const { user } = await api('/auth/me');
     currentUser = user;
-
-    // UI aktualisieren
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('app').classList.add('active');
     document.getElementById('userName').textContent = user.name;
     document.getElementById('userEmail').textContent = user.email;
     document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
-
-    // Daten laden
     await loadAllData();
     updateMonthDisplay();
     go('dashboard');
   } catch (err) {
-    // Nicht eingeloggt — Auth-Screen zeigen
     document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('app').classList.remove('active');
   } finally {
@@ -1211,6 +1246,11 @@ function renderCurrentPage() {
 function openM(id) { document.getElementById(id).classList.add('open'); }
 function closeM(id) { document.getElementById(id).classList.remove('open'); }
 
+// Klick außerhalb Modal schließt es
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
 // ============================================================
 // EXPENSE MODAL & CRUD
 // ============================================================
@@ -1239,22 +1279,14 @@ async function saveExpense() {
   const amount = parseFloat(document.getElementById('fExpAmt').value);
   const categoryId = document.getElementById('fExpCat').value;
   const isRecurring = document.getElementById('fExpRecurring').checked;
-
   if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
   if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
-
   try {
     if (editExpId) {
-      await api(`/expenses/${editExpId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }),
-      });
+      await api(`/expenses/${editExpId}`, { method: 'PUT', body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }) });
       toast('Ausgabe aktualisiert');
     } else {
-      await api('/expenses', {
-        method: 'POST',
-        body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }),
-      });
+      await api('/expenses', { method: 'POST', body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }) });
       toast('Ausgabe hinzugefügt');
     }
     closeM('mExpense');
@@ -1301,22 +1333,14 @@ async function saveIncome() {
   const name = document.getElementById('fIncName').value.trim();
   const amount = parseFloat(document.getElementById('fIncAmt').value);
   const isRecurring = document.getElementById('fIncRecurring').checked;
-
   if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
   if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
-
   try {
     if (editIncId) {
-      await api(`/income/${editIncId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, amount, month: currentMonth, isRecurring }),
-      });
+      await api(`/income/${editIncId}`, { method: 'PUT', body: JSON.stringify({ name, amount, month: currentMonth, isRecurring }) });
       toast('Einnahme aktualisiert');
     } else {
-      await api('/income', {
-        method: 'POST',
-        body: JSON.stringify({ name, amount, month: currentMonth, isRecurring }),
-      });
+      await api('/income', { method: 'POST', body: JSON.stringify({ name, amount, month: currentMonth, isRecurring }) });
       toast('Einnahme hinzugefügt');
     }
     closeM('mIncome');
@@ -1361,19 +1385,12 @@ function openCatModal(id) {
 async function saveCat() {
   const name = document.getElementById('fCatName').value.trim();
   if (!name) { toast('Bitte Name eingeben', 'error'); return; }
-
   try {
     if (editCatId) {
-      await api(`/categories/${editCatId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, color: selectedColor }),
-      });
+      await api(`/categories/${editCatId}`, { method: 'PUT', body: JSON.stringify({ name, color: selectedColor }) });
       toast('Kategorie aktualisiert');
     } else {
-      await api('/categories', {
-        method: 'POST',
-        body: JSON.stringify({ name, color: selectedColor }),
-      });
+      await api('/categories', { method: 'POST', body: JSON.stringify({ name, color: selectedColor }) });
       toast('Kategorie hinzugefügt');
     }
     closeM('mCat');
@@ -1430,7 +1447,7 @@ function openDelModal(type, id) {
 // ============ COLOR PICKER ============
 function renderColorPicker() {
   document.getElementById('colorPicker').innerHTML = PALETTE.map(c =>
-    `<div class="color-swatch ${c === selectedColor ? 'selected' : ''}" style="background:${c}" onclick="pickColor('${c}')"></div>`
+    `<div class="color-swatch ${c === selectedColor ? 'selected' : ''}" style="background:${c}" data-color="${c}"></div>`
   ).join('');
 }
 function pickColor(c) { selectedColor = c; renderColorPicker(); }
@@ -1474,7 +1491,6 @@ function renderKPIs() {
   const savCat = categories.find(c => c.name.toLowerCase().includes('spar'));
   const savAmt = savCat ? expenses.filter(e => (e.categoryId || e.category?.id) === savCat.id).reduce((s, e) => s + parseFloat(e.amount), 0) : 0;
   const savRate = inc > 0 ? (savAmt / inc * 100).toFixed(1) : 0;
-
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi glass">
       <div class="kpi-icon" style="background:rgba(48,209,88,0.15);color:var(--green)">↑</div>
@@ -1581,8 +1597,8 @@ function renderTable() {
       <td style="text-align:right;color:var(--text-tertiary);font-size:13px">${p}%</td>
       <td style="text-align:center"><span class="recurring-badge ${e.isRecurring ? 'yes' : 'no'}">${e.isRecurring ? '↻ Fest' : '◇ Einmalig'}</span></td>
       <td><div class="row-actions">
-        <button class="icon-btn" onclick="openExpenseModal('${e.id}')" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="icon-btn danger" onclick="openDelModal('expense','${e.id}')" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        <button class="icon-btn" data-edit-expense="${e.id}" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="icon-btn danger" data-del-expense="${e.id}" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </div></td></tr>`;
   }).join('');
 }
@@ -1606,8 +1622,8 @@ function renderIncome() {
         <div style="display:flex;align-items:center;gap:8px">
           <div class="income-item-amount">${fmt(parseFloat(i.amount))}</div>
           <div class="row-actions">
-            <button class="icon-btn" onclick="openIncomeModal('${i.id}')" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-            <button class="icon-btn danger" onclick="openDelModal('income','${i.id}')" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            <button class="icon-btn" data-edit-income="${i.id}" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn danger" data-del-income="${i.id}" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
         </div>
       </div>`).join('');
@@ -1631,8 +1647,8 @@ function renderCats() {
         <div class="cat-card-amount">${count} Posten · ${fmtS(amt)}</div>
       </div>
       <div class="cat-card-actions">
-        <button class="icon-btn" onclick="openCatModal('${c.id}')" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        <button class="icon-btn danger" onclick="openDelModal('category','${c.id}')" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        <button class="icon-btn" data-edit-cat="${c.id}" title="Bearbeiten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="icon-btn danger" data-del-cat="${c.id}" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
       </div>
     </div>`;
   }).join('');
@@ -1646,10 +1662,6 @@ document.addEventListener('keydown', e => {
     else if (document.getElementById('mIncome').classList.contains('open')) saveIncome();
     else if (document.getElementById('mCat').classList.contains('open')) saveCat();
   }
-});
-
-document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 
 // ============ INIT ============
