@@ -18,8 +18,8 @@ function setupSecurity(app) {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "'unsafe-hashes'"],
-          scriptSrcAttr: [`'nonce-${res.locals.cspNonce}'`, "'unsafe-hashes'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrcAttr: ["'unsafe-hashes'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           imgSrc: ["'self'", "data:"],
           connectSrc: ["'self'"],
