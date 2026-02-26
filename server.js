@@ -16,6 +16,8 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { setupSecurity } = require('./src/middleware/security');
 
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -28,15 +30,37 @@ const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
+// ============================================================
+// NONCE-INJECTION — Für CSP-sichere Inline-Scripts
+// ============================================================
+function serveHtmlWithNonce(filePath) {
+  return (req, res) => {
+    const nonce = crypto.randomBytes(16).toString('base64');
+    res.locals.cspNonce = nonce;
+    fs.readFile(filePath, 'utf8', (err, html) => {
+      if (err) return res.status(500).send('Fehler beim Laden der Seite.');
+      const nonced = html.replace(/__CSP_NONCE__/g, nonce);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(nonced);
+    });
+  };
+}
+
 // Middleware
 app.use(cookieParser());
 setupSecurity(app);
 
-// Statische Dateien: Portal
-app.use('/portal', express.static(path.join(__dirname, 'public', 'portal'), { etag: true }));
+// Statische Dateien: Portal (nur CSS/JS/Bilder, kein HTML)
+app.use('/portal', express.static(path.join(__dirname, 'public', 'portal'), {
+  etag: true,
+  index: false,
+}));
 
-// Statische Dateien: Finanz-App
-app.use('/app/finanzen', express.static(path.join(__dirname, 'public', 'apps', 'finanzen'), { etag: true }));
+// Statische Dateien: Finanz-App (nur CSS/JS/Bilder, kein HTML)
+app.use('/app/finanzen', express.static(path.join(__dirname, 'public', 'apps', 'finanzen'), {
+  etag: true,
+  index: false,
+}));
 
 // Gemeinsame Assets (CSS, Fonts, etc.)
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), { etag: true }));
@@ -61,15 +85,15 @@ app.use('/api/income', incomeRoutes);
 // Root → Portal
 app.get('/', (req, res) => res.redirect('/portal'));
 
-// Portal SPA-Fallback
-app.get('/portal', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'portal', 'index.html'));
-});
+// Portal
+app.get('/portal', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'portal', 'index.html')
+));
 
-// Finanz-App SPA-Fallback
-app.get('/app/finanzen', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'apps', 'finanzen', 'index.html'));
-});
+// Finanz-App
+app.get('/app/finanzen', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'apps', 'finanzen', 'index.html')
+));
 
 // 404 für API
 app.use('/api/*', (req, res) => {

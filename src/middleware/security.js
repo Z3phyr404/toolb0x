@@ -9,32 +9,30 @@ const hpp = require('hpp');
 
 function setupSecurity(app) {
 
-  // 1. HELMET — Sichere HTTP-Header
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        // Fix #6: unsafe-inline ist nötig für Inline-Styles im Liquid Glass CSS.
-        // Ein späteres Refactoring könnte CSS in externe Dateien auslagern
-        // und dann Nonce-basierte CSP verwenden.
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:"],
-        connectSrc: ["'self'"],
+  // 1. HELMET — Sichere HTTP-Header mit Nonce-Unterstützung
+  app.use((req, res, next) => {
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "'unsafe-hashes'"],
+          scriptSrcAttr: [`'nonce-${res.locals.cspNonce}'`, "'unsafe-hashes'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          imgSrc: ["'self'", "data:"],
+          connectSrc: ["'self'"],
+        },
       },
-    },
-  }));
+    })(req, res, next);
+  });
 
-  // 2. CORS — Cross-Origin Resource Sharing
-  // Fix #5: Unterstützt mehrere Origins (z.B. mit und ohne www)
+  // 2. CORS
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
     .split(',')
     .map(o => o.trim());
 
   const corsOptions = {
     origin: function (origin, callback) {
-      // Anfragen ohne Origin erlauben (z.B. Server-zu-Server, curl)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -74,7 +72,7 @@ function setupSecurity(app) {
   });
   app.use('/api/auth/register', registerLimiter);
 
-  // 4. HPP — HTTP Parameter Pollution Schutz
+  // 4. HPP
   app.use(hpp());
 
   // 5. Body-Parser Limits
