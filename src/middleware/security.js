@@ -6,11 +6,13 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
+const crypto = require('crypto');
 
 function setupSecurity(app) {
 
   // 1. HELMET — Sichere HTTP-Header mit Nonce-Unterstützung
   app.use((req, res, next) => {
+    res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
     helmet({
       contentSecurityPolicy: {
         directives: {
