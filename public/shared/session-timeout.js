@@ -75,6 +75,14 @@
     },
 
     /**
+     * Session-Flag setzen (nach Login/Register aufrufen, BEVOR checkAuth/initApp läuft).
+     * Verhindert, dass ein frischer Login als Browser-Neustart erkannt wird.
+     */
+    markActive: function () {
+      sessionStorage.setItem(SESSION_KEY, '1');
+    },
+
+    /**
      * Prüft, ob der Browser geschlossen und neu geöffnet wurde.
      * Gibt true zurück, wenn die Session ungültig ist (kein sessionStorage-Flag).
      * In dem Fall wird die serverseitige Session automatisch beendet.

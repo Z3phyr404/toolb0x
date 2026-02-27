@@ -233,6 +233,7 @@ async function handleAuth(e) {
     const data = await res.json();
     if (!res.ok) throw data;
 
+    SessionTimeout.markActive();
     await checkAuth();
   } catch (err) {
     errEl.innerHTML = err.errors?.join('<br>') || err.error || 'Ein Fehler ist aufgetreten.';

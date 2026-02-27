@@ -1147,6 +1147,7 @@ document.getElementById('authForm').addEventListener('submit', async function(e)
       if (!name) throw { errors: ['Bitte gib deinen Namen ein.'] };
       await api('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
     }
+    SessionTimeout.markActive();
     await initApp();
   } catch (err) {
     const msg = err.errors?.join('<br>') || err.error || 'Ein Fehler ist aufgetreten.';
