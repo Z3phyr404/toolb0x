@@ -42,7 +42,6 @@ function getCookieOptions() {
     httpOnly: true,
     secure: isProduction,
     sameSite: 'strict',
-    maxAge: 24 * 60 * 60 * 1000,
     path: '/',
   };
 }
@@ -52,7 +51,7 @@ function createToken(userId, sessionId) {
   return jwt.sign(
     { userId, sid: sessionId },
     process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: '20m' }
   );
 }
 

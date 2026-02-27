@@ -39,6 +39,20 @@ function requireAuth(req, res, next) {
     req.sessionId = decoded.sid;
     req.encryptionKey = session.encryptionKey; // Buffer aus dem RAM
 
+    // Sliding Session: Token bei jeder Anfrage erneuern
+    // → Die 20-Minuten-Uhr startet bei jeder Aktion neu
+    const newToken = jwt.sign(
+      { userId: decoded.userId, sid: decoded.sid },
+      process.env.JWT_SECRET,
+      { expiresIn: '20m' }
+    );
+    res.cookie('auth_token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
     next();
 
   } catch (error) {
