@@ -992,6 +992,7 @@ main {
 <!-- TOASTS -->
 <div class="toast-box" id="toasts"></div>
 
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
 <script nonce="__CSP_NONCE__">
 // ============================================================
 // FINANZ-APP — FRONTEND LOGIC
@@ -1158,6 +1159,7 @@ document.getElementById('authForm').addEventListener('submit', async function(e)
 });
 
 async function logout() {
+  SessionTimeout.stop();
   try { await api('/auth/logout', { method: 'POST' }); } catch (e) {}
   currentUser = null;
   document.getElementById('app').classList.remove('active');
@@ -1173,6 +1175,13 @@ async function logout() {
 async function initApp() {
   try {
     showLoading();
+
+    // Browser wurde geschlossen? → Session beenden
+    if (SessionTimeout.wasRestarted()) {
+      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {});
+      throw new Error('browser-restart');
+    }
+
     const { user } = await api('/auth/me');
     currentUser = user;
     document.getElementById('authScreen').classList.add('hidden');
@@ -1183,6 +1192,14 @@ async function initApp() {
     await loadAllData();
     updateMonthDisplay();
     go('dashboard');
+
+    // Session-Timeout starten
+    SessionTimeout.start(function () {
+      currentUser = null;
+      document.getElementById('app').classList.remove('active');
+      document.getElementById('authScreen').classList.remove('hidden');
+      toast('Sitzung abgelaufen — bitte erneut anmelden.', 'error');
+    });
   } catch (err) {
     document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('app').classList.remove('active');

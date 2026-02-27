@@ -179,6 +179,7 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
 
 <div class="toast-box" id="toasts"></div>
 
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
 <script nonce="__CSP_NONCE__">
 const API = '/api';
 document.addEventListener('DOMContentLoaded', () => {
@@ -243,6 +244,7 @@ async function handleAuth(e) {
 }
 
 async function logout() {
+  SessionTimeout.stop();
   await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
   document.getElementById('portal').classList.remove('active');
   document.getElementById('authScreen').classList.remove('hidden');
@@ -251,6 +253,12 @@ async function logout() {
 async function checkAuth() {
   showLoading();
   try {
+    // Browser wurde geschlossen? → Session beenden
+    if (SessionTimeout.wasRestarted()) {
+      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {});
+      throw new Error('browser-restart');
+    }
+
     const res = await fetch(API + '/auth/me', { credentials: 'include' });
     if (!res.ok) throw new Error();
     const { user } = await res.json();
@@ -259,6 +267,13 @@ async function checkAuth() {
     document.getElementById('portal').classList.add('active');
     document.getElementById('portalUserName').textContent = user.name;
     document.getElementById('portalGreeting').textContent = user.name.split(' ')[0];
+
+    // Session-Timeout starten
+    SessionTimeout.start(function () {
+      document.getElementById('portal').classList.remove('active');
+      document.getElementById('authScreen').classList.remove('hidden');
+      toast('Sitzung abgelaufen — bitte erneut anmelden.', 'error');
+    });
   } catch {
     document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('portal').classList.remove('active');
