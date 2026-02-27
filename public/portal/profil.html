@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Profil — ToolBox</title>
+<style>
+@font-face { font-family:'SF'; src: local('SF Pro Display'),local('-apple-system'),local('BlinkMacSystemFont'),local('Helvetica Neue'); }
+:root {
+  --glass-bg: rgba(255,255,255,0.12);
+  --glass-bg-heavy: rgba(255,255,255,0.18);
+  --glass-border: rgba(255,255,255,0.22);
+  --glass-shadow: 0 8px 40px rgba(0,0,0,0.15), 0 2px 12px rgba(0,0,0,0.1);
+  --glass-inset: inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -1px 0 rgba(255,255,255,0.05);
+  --text: rgba(0,0,0,0.85); --text-secondary: rgba(0,0,0,0.55); --text-tertiary: rgba(0,0,0,0.35);
+  --blue: #007AFF; --green: #30D158; --red: #FF3B30; --purple: #AF52DE; --indigo: #5856D6;
+  --radius: 20px; --radius-lg: 26px; --radius-xl: 32px; --radius-sm: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; -webkit-font-smoothing:antialiased; color:var(--text); overflow-x:hidden; }
+
+.bg { position:fixed; inset:0; z-index:0; background:linear-gradient(135deg,#a8c8f0 0%,#d4b8e8 25%,#f0c8c8 50%,#b8d8f0 75%,#c8e8d0 100%); background-size:400% 400%; animation:bgShift 20s ease infinite; }
+.bg::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 600px 600px at 20% 20%,rgba(168,200,240,0.6),transparent),radial-gradient(ellipse 500px 500px at 80% 30%,rgba(212,184,232,0.5),transparent),radial-gradient(ellipse 400px 400px at 50% 80%,rgba(184,216,240,0.5),transparent); }
+@keyframes bgShift { 0%,100%{background-position:0% 50%} 25%{background-position:100% 0%} 50%{background-position:100% 100%} 75%{background-position:0% 100%} }
+
+.glass { background:var(--glass-bg); backdrop-filter:blur(40px) saturate(1.8); -webkit-backdrop-filter:blur(40px) saturate(1.8); border:1px solid var(--glass-border); box-shadow:var(--glass-shadow),var(--glass-inset); }
+.glass-heavy { background:var(--glass-bg-heavy); backdrop-filter:blur(50px) saturate(2); -webkit-backdrop-filter:blur(50px) saturate(2); border:1px solid var(--glass-border); box-shadow:0 12px 60px rgba(0,0,0,0.2),0 4px 20px rgba(0,0,0,0.15),var(--glass-inset); }
+
+/* Loading */
+.loading-overlay { position:fixed; inset:0; z-index:150; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.1); backdrop-filter:blur(10px); transition:opacity 0.3s; }
+.loading-overlay.hidden { opacity:0; pointer-events:none; }
+.spinner { width:40px; height:40px; border:3px solid rgba(0,0,0,0.1); border-top-color:var(--blue); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Toast */
+.toast-box { position:fixed; bottom:24px; right:24px; z-index:300; display:flex; flex-direction:column; gap:8px; }
+.toast { display:flex; align-items:center; gap:8px; padding:12px 20px; border-radius:var(--radius-sm); font-size:13px; font-weight:600; animation:toastIn 0.3s,toastOut 0.3s 2.8s forwards; backdrop-filter:blur(30px) saturate(1.5); }
+.toast.success { background:rgba(48,209,88,0.2); border:1px solid rgba(48,209,88,0.3); color:#1a7a2e; }
+.toast.error { background:rgba(255,59,48,0.2); border:1px solid rgba(255,59,48,0.3); color:#c0392b; }
+@keyframes toastIn { from{transform:translateX(40px);opacity:0} }
+@keyframes toastOut { to{transform:translateX(40px);opacity:0} }
+
+/* ===== PROFIL-SEITE ===== */
+.profile-page { position:relative; z-index:1; min-height:100vh; padding:40px; }
+
+.profile-header { display:flex; justify-content:space-between; align-items:center; max-width:600px; margin:0 auto 48px; }
+.back-link { font-size:14px; font-weight:600; color:var(--blue); text-decoration:none; display:flex; align-items:center; gap:4px; transition:opacity 0.2s; }
+.back-link:hover { opacity:0.7; }
+.profile-header-right { display:flex; align-items:center; gap:12px; }
+.profile-header-name { font-size:14px; font-weight:600; }
+.profile-logout { padding:8px 16px; border:none; border-radius:var(--radius-sm); background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; border:1px solid rgba(255,255,255,0.15); }
+.profile-logout:hover { background:rgba(255,59,48,0.1); color:var(--red); border-color:rgba(255,59,48,0.2); }
+
+.profile-container { max-width:600px; margin:0 auto; }
+.profile-title { font-size:36px; font-weight:700; letter-spacing:-0.03em; margin-bottom:32px; }
+
+.profile-card { border-radius:var(--radius-lg); padding:28px 24px; margin-bottom:20px; }
+
+.profile-avatar { width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--purple)); display:flex; align-items:center; justify-content:center; color:#fff; font-size:24px; font-weight:700; margin-bottom:16px; }
+
+.profile-meta { margin-top:8px; }
+.profile-meta-label { font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-tertiary); font-weight:600; }
+.profile-meta-value { font-size:14px; color:var(--text-secondary); margin-top:2px; }
+
+.profile-section-title { font-size:18px; font-weight:700; margin-bottom:20px; }
+.profile-section-title.danger { color:var(--red); }
+
+.form-group { margin-bottom:14px; }
+.form-label { display:block; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:6px; }
+.form-input { width:100%; padding:11px 14px; border:1px solid rgba(0,0,0,0.08); border-radius:10px; background:rgba(255,255,255,0.3); font-family:inherit; font-size:15px; color:var(--text); outline:none; transition:border-color 0.2s,background 0.2s; }
+.form-input:focus { border-color:var(--blue); background:rgba(255,255,255,0.5); }
+
+.profile-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--red); font-size:13px; padding:10px 14px; border-radius:var(--radius-sm); display:none; margin-bottom:14px; }
+.profile-error.show { display:block; }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:11px 22px; border:none; border-radius:var(--radius-sm); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-primary { background:linear-gradient(135deg,var(--blue),var(--indigo)); color:#fff; }
+.btn-primary:hover:not(:disabled) { opacity:0.9; }
+.btn-primary:active:not(:disabled) { transform:scale(0.98); }
+.btn-danger { background:linear-gradient(135deg,#FF3B30,#d63025); color:#fff; }
+.btn-danger:hover:not(:disabled) { opacity:0.9; }
+.btn-danger:active:not(:disabled) { transform:scale(0.98); }
+.btn-glass { background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); color:var(--text-secondary); border:1px solid rgba(255,255,255,0.15); }
+.btn-glass:hover:not(:disabled) { background:rgba(255,255,255,0.25); }
+
+.danger-zone { border:1px solid rgba(255,59,48,0.2); }
+.danger-desc { font-size:14px; color:var(--text-secondary); line-height:1.5; margin-bottom:16px; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal { width:100%; max-width:440px; border-radius:var(--radius-xl); padding:0; margin:16px; }
+.modal-header { display:flex; justify-content:space-between; align-items:center; padding:24px 24px 0; }
+.modal-header h3 { font-size:18px; font-weight:700; }
+.modal-close { background:none; border:none; font-size:24px; color:var(--text-tertiary); cursor:pointer; padding:0 4px; line-height:1; }
+.modal-close:hover { color:var(--text); }
+.modal-body { padding:20px 24px; }
+.modal-footer { display:flex; justify-content:flex-end; gap:10px; padding:0 24px 24px; }
+
+@media (max-width:600px) {
+  .profile-page { padding:20px; }
+  .profile-title { font-size:26px; }
+  .profile-header { flex-direction:column; gap:16px; text-align:center; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<!-- PROFIL -->
+<div class="profile-page">
+  <header class="profile-header">
+    <a href="/portal" class="back-link">← Zurück</a>
+    <div class="profile-header-right">
+      <span class="profile-header-name" id="headerUserName">—</span>
+      <button class="profile-logout" id="logoutBtn">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="profile-container">
+    <h1 class="profile-title">Profil</h1>
+
+    <!-- Avatar & Meta -->
+    <div class="profile-card glass">
+      <div class="profile-avatar" id="profileAvatar">?</div>
+      <div class="profile-meta">
+        <div class="profile-meta-label">Mitglied seit</div>
+        <div class="profile-meta-value" id="profileCreated">—</div>
+      </div>
+    </div>
+
+    <!-- Persönliche Daten -->
+    <div class="profile-card glass">
+      <h2 class="profile-section-title">Persönliche Daten</h2>
+      <form id="profileForm">
+        <div class="form-group">
+          <label class="form-label" for="profileName">Name</label>
+          <input class="form-input" id="profileName" type="text" required minlength="2" maxlength="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="profileEmail">E-Mail</label>
+          <input class="form-input" id="profileEmail" type="email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="profilePassword">Aktuelles Passwort (zur Bestätigung)</label>
+          <input class="form-input" id="profilePassword" type="password" placeholder="Passwort eingeben" required>
+        </div>
+        <div class="profile-error" id="profileError"></div>
+        <button class="btn btn-primary" type="submit" id="saveProfileBtn">Änderungen speichern</button>
+      </form>
+    </div>
+
+    <!-- Gefahrenzone -->
+    <div class="profile-card glass danger-zone">
+      <h2 class="profile-section-title danger">Gefahrenzone</h2>
+      <p class="danger-desc">
+        Das Löschen deines Kontos ist unwiderruflich. Alle deine Daten
+        (Kategorien, Ausgaben, Einnahmen) werden dauerhaft entfernt.
+      </p>
+      <button class="btn btn-danger" id="deleteAccountBtn">Konto unwiderruflich löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- LÖSCH-BESTÄTIGUNG -->
+<div class="modal-overlay" id="mDeleteAccount">
+  <div class="modal glass-heavy">
+    <div class="modal-header">
+      <h3>Konto löschen</h3>
+      <button class="modal-close" id="closeDeleteModal">×</button>
+    </div>
+    <div class="modal-body">
+      <p>Bist du sicher? Diese Aktion kann <strong>nicht rückgängig</strong> gemacht werden.</p>
+      <p style="margin-top:12px;font-size:13px;color:var(--text-secondary)">
+        Alle deine Daten werden dauerhaft gelöscht: Kategorien, Ausgaben,
+        Einnahmen und dein Konto.
+      </p>
+      <div class="form-group" style="margin-top:16px">
+        <label class="form-label" for="deletePassword">Passwort zur Bestätigung</label>
+        <input class="form-input" id="deletePassword" type="password" placeholder="Passwort eingeben">
+      </div>
+      <div class="profile-error" id="deleteError"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-glass" id="cancelDeleteBtn">Abbrechen</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn">Endgültig löschen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-box" id="toasts"></div>
+
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+<script nonce="__CSP_NONCE__">
+const API = '/api';
+let currentUser = null;
+
+// ---- Toast ----
+function toast(msg, type) {
+  type = type || 'success';
+  var el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(function() { el.remove(); }, 3100);
+}
+
+// ---- Loading ----
+function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+
+// ---- Auth Check ----
+async function checkAuth() {
+  showLoading();
+  try {
+    if (SessionTimeout.wasRestarted()) {
+      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function() {});
+      throw new Error('browser-restart');
+    }
+    var res = await fetch(API + '/auth/me', { credentials: 'include' });
+    if (!res.ok) throw new Error();
+    var data = await res.json();
+    currentUser = data.user;
+    populateProfile(data.user);
+    SessionTimeout.start(function() {
+      window.location.href = '/portal';
+    });
+  } catch(e) {
+    window.location.href = '/portal';
+  } finally {
+    hideLoading();
+  }
+}
+
+function populateProfile(user) {
+  document.getElementById('headerUserName').textContent = user.name;
+  document.getElementById('profileName').value = user.name;
+  document.getElementById('profileEmail').value = user.email;
+  document.getElementById('profileAvatar').textContent = user.name.charAt(0).toUpperCase();
+  if (user.createdAt) {
+    var d = new Date(user.createdAt);
+    document.getElementById('profileCreated').textContent =
+      d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+}
+
+// ---- Logout ----
+async function logout() {
+  SessionTimeout.stop();
+  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function() {});
+  window.location.href = '/portal';
+}
+
+// ---- Profil speichern ----
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var errEl = document.getElementById('profileError');
+  errEl.classList.remove('show');
+
+  var name = document.getElementById('profileName').value.trim();
+  var email = document.getElementById('profileEmail').value.trim();
+  var currentPassword = document.getElementById('profilePassword').value;
+
+  if (!currentPassword) {
+    errEl.textContent = 'Bitte gib dein aktuelles Passwort ein.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  var btn = document.getElementById('saveProfileBtn');
+  btn.disabled = true; btn.textContent = 'Speichern…';
+
+  try {
+    var res = await fetch(API + '/auth/profile', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, email: email, currentPassword: currentPassword }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw data;
+
+    currentUser = data.user;
+    populateProfile(data.user);
+    document.getElementById('profilePassword').value = '';
+    toast('Profil aktualisiert!');
+  } catch(err) {
+    errEl.textContent = (err.errors && err.errors.join(', ')) || err.error || 'Fehler beim Speichern.';
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Änderungen speichern';
+  }
+});
+
+// ---- Konto löschen: Modal ----
+document.getElementById('deleteAccountBtn').addEventListener('click', function() {
+  document.getElementById('deletePassword').value = '';
+  document.getElementById('deleteError').classList.remove('show');
+  document.getElementById('mDeleteAccount').classList.add('open');
+});
+
+document.getElementById('closeDeleteModal').addEventListener('click', function() {
+  document.getElementById('mDeleteAccount').classList.remove('open');
+});
+
+document.getElementById('cancelDeleteBtn').addEventListener('click', function() {
+  document.getElementById('mDeleteAccount').classList.remove('open');
+});
+
+document.getElementById('mDeleteAccount').addEventListener('click', function(e) {
+  if (e.target.id === 'mDeleteAccount') {
+    e.target.classList.remove('open');
+  }
+});
+
+// ---- Konto löschen: Bestätigung ----
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+  var errEl = document.getElementById('deleteError');
+  errEl.classList.remove('show');
+  var password = document.getElementById('deletePassword').value;
+
+  if (!password) {
+    errEl.textContent = 'Bitte gib dein Passwort ein.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  var btn = document.getElementById('confirmDeleteBtn');
+  btn.disabled = true; btn.textContent = 'Wird gelöscht…';
+
+  try {
+    var res = await fetch(API + '/auth/account', {
+      method: 'DELETE', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: password }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw data;
+
+    window.location.href = '/portal';
+  } catch(err) {
+    errEl.textContent = (err.errors && err.errors.join(', ')) || err.error || 'Fehler beim Löschen.';
+    errEl.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Endgültig löschen';
+  }
+});
+
+// ---- Logout-Button ----
+document.getElementById('logoutBtn').addEventListener('click', logout);
+
+// ---- Escape schließt Modal ----
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('mDeleteAccount').classList.remove('open');
+  }
+});
+
+// ---- Init ----
+checkAuth();
+</script>
+</body>
+</html>

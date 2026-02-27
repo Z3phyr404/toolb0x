@@ -87,6 +87,11 @@ app.get('/portal', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'portal', 'index.html')
 ));
 
+// Profil-Seite
+app.get('/portal/profil', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'portal', 'profil.html')
+));
+
 // Finanz-App
 app.get('/app/finanzen', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'apps', 'finanzen', 'index.html')

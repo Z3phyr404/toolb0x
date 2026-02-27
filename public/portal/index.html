@@ -52,7 +52,8 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
 .portal-brand { font-size:28px; font-weight:700; letter-spacing:-0.03em; }
 .portal-brand span { background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .portal-user { display:flex; align-items:center; gap:12px; }
-.portal-user-name { font-size:14px; font-weight:600; }
+.portal-user-name { font-size:14px; font-weight:600; text-decoration:none; color:inherit; transition:color 0.2s; }
+a.portal-user-name:hover { color:var(--blue); }
 .portal-logout { padding:8px 16px; border:none; border-radius:var(--radius-sm); background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; border:1px solid rgba(255,255,255,0.15); }
 .portal-logout:hover { background:rgba(255,59,48,0.1); color:var(--red); border-color:rgba(255,59,48,0.2); }
 
@@ -132,7 +133,7 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
   <header class="portal-header">
     <div class="portal-brand"><span>ToolBox</span></div>
     <div class="portal-user">
-      <span class="portal-user-name" id="portalUserName">—</span>
+      <a href="/portal/profil" class="portal-user-name" id="portalUserName">—</a>
       <button class="portal-logout" id="logoutBtn">Abmelden</button>
     </div>
   </header>

@@ -1058,6 +1058,14 @@ function showLoading() { document.getElementById('loadingOverlay').classList.rem
 function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
 // ============================================================
+// SIDEBAR-USER → Profil-Seite
+// ============================================================
+document.getElementById('sidebarUser').addEventListener('click', function(e) {
+  if (e.target.closest('#logoutBtn') || e.target.closest('.sidebar-logout')) return;
+  window.location.href = '/portal/profil';
+});
+
+// ============================================================
 // EVENT DELEGATION — zentraler Klick-Handler
 // ============================================================
 document.addEventListener('click', function(e) {

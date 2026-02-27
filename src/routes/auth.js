@@ -318,4 +318,139 @@ router.put('/password', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================
+// PUT /api/auth/profile — Profil aktualisieren (Name/E-Mail)
+// ============================================================
+router.put('/profile', requireAuth, async (req, res) => {
+  try {
+    const { name, email, currentPassword } = req.body;
+
+    // Passwort zur Re-Authentifizierung erforderlich
+    if (!currentPassword) {
+      return res.status(400).json({
+        errors: ['Bitte gib dein aktuelles Passwort zur Bestätigung ein.'],
+      });
+    }
+
+    // Name validieren
+    const trimmedName = name?.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      return res.status(400).json({
+        errors: ['Der Name muss mindestens 2 Zeichen lang sein.'],
+      });
+    }
+    if (trimmedName.length > 50) {
+      return res.status(400).json({
+        errors: ['Der Name darf maximal 50 Zeichen lang sein.'],
+      });
+    }
+
+    // E-Mail validieren
+    const validator = require('validator');
+    const newEmail = email?.toLowerCase().trim();
+    if (!newEmail || !validator.isEmail(newEmail)) {
+      return res.status(400).json({
+        errors: ['Bitte gib eine gültige E-Mail-Adresse ein.'],
+      });
+    }
+
+    // Aktuellen User laden
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+    });
+
+    // Passwort prüfen
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(401).json({
+        errors: ['Das aktuelle Passwort ist falsch.'],
+      });
+    }
+
+    // E-Mail-Eindeutigkeit prüfen (nur wenn geändert)
+    if (newEmail !== user.email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: newEmail },
+      });
+      if (existingUser) {
+        return res.status(400).json({
+          errors: ['Diese E-Mail-Adresse wird bereits verwendet.'],
+        });
+      }
+    }
+
+    // Profil aktualisieren
+    const updatedUser = await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        name: trimmedName,
+        email: newEmail,
+      },
+      select: { id: true, email: true, name: true, createdAt: true },
+    });
+
+    res.json({
+      message: 'Profil erfolgreich aktualisiert.',
+      user: updatedUser,
+    });
+
+  } catch (error) {
+    console.error('Profil-Aktualisierung fehlgeschlagen:', error.message);
+    res.status(500).json({
+      errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
+    });
+  }
+});
+
+// ============================================================
+// DELETE /api/auth/account — Konto und alle Daten löschen
+// ============================================================
+router.delete('/account', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+
+    if (!currentPassword) {
+      return res.status(400).json({
+        errors: ['Bitte gib dein Passwort zur Bestätigung ein.'],
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+    });
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(401).json({
+        errors: ['Das Passwort ist falsch.'],
+      });
+    }
+
+    // User löschen — Kaskade löscht Categories, Expenses, Incomes
+    await prisma.user.delete({
+      where: { id: req.userId },
+    });
+
+    // ALLE Sessions des Users ungültig machen
+    sessionStore.deleteAllForUser(req.userId);
+
+    // Cookie löschen
+    res.cookie('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0,
+      path: '/',
+    });
+
+    res.json({ message: 'Konto und alle Daten wurden gelöscht.' });
+
+  } catch (error) {
+    console.error('Konto-Löschung fehlgeschlagen:', error.message);
+    res.status(500).json({
+      errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
+    });
+  }
+});
+
 module.exports = router;
