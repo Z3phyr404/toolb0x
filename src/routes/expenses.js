@@ -133,20 +133,12 @@ router.get('/', async (req, res) => {
         return res.json({ expenses: [], total: 0, month });
       }
 
-      // Letzten Monat mit Ausgaben finden (max. 24 Monate zurück)
-      let sourceMonth = prevMonth(month);
-      let sourceExpenses = [];
-
-      for (let i = 0; i < 24; i++) {
-        const found = await prisma.expense.findMany({
-          where: { userId: req.userId, month: sourceMonth, isRecurring: true },
-        });
-        if (found.length > 0) {
-          sourceExpenses = found;
-          break;
-        }
-        sourceMonth = prevMonth(sourceMonth);
-      }
+      // Nur direkt aus dem Vormonat kopieren — kein weiteres Zurückgehen.
+      // Verhindert, dass gelöschte Einträge aus älteren Monaten wiederkehren.
+      const sourceMonth = prevMonth(month);
+      const sourceExpenses = await prisma.expense.findMany({
+        where: { userId: req.userId, month: sourceMonth, isRecurring: true },
+      });
 
       // Wiederkehrende in den neuen Monat kopieren
       if (sourceExpenses.length > 0) {
@@ -231,6 +223,26 @@ router.post('/', async (req, res) => {
       },
       include: { category: { select: { id: true, name: true, color: true } } },
     });
+
+    // Neue wiederkehrende Ausgabe in bereits initialisierte Zukunftsmonate kopieren,
+    // damit sie dort nicht fehlt, wenn der Monat schon mal besucht wurde.
+    if (expense.isRecurring) {
+      const futureInits = await prisma.monthInit.findMany({
+        where: { userId: req.userId, type: 'expense', month: { gt: month } },
+      });
+      if (futureInits.length > 0) {
+        await prisma.expense.createMany({
+          data: futureInits.map(fi => ({
+            name: expense.name,
+            amount: expense.amount,
+            categoryId: expense.categoryId,
+            userId: expense.userId,
+            month: fi.month,
+            isRecurring: true,
+          })),
+        });
+      }
+    }
 
     res.status(201).json({ expense: decryptExpense(expense, key) });
 
