@@ -133,12 +133,27 @@ router.get('/', async (req, res) => {
         return res.json({ expenses: [], total: 0, month });
       }
 
-      // Nur direkt aus dem Vormonat kopieren — kein weiteres Zurückgehen.
-      // Verhindert, dass gelöschte Einträge aus älteren Monaten wiederkehren.
-      const sourceMonth = prevMonth(month);
-      const sourceExpenses = await prisma.expense.findMany({
-        where: { userId: req.userId, month: sourceMonth, isRecurring: true },
-      });
+      // Letzten Monat mit Ausgaben finden (max. 24 Monate zurück).
+      // Stoppt wenn ein Monat gefunden wird, der vom User explizit bearbeitet
+      // wurde (monthInit vorhanden) — auch wenn er leer ist. Das verhindert,
+      // dass absichtlich gelöschte Einträge aus noch älteren Monaten zurückkommen.
+      let sourceMonth = prevMonth(month);
+      let sourceExpenses = [];
+
+      for (let i = 0; i < 24; i++) {
+        const found = await prisma.expense.findMany({
+          where: { userId: req.userId, month: sourceMonth, isRecurring: true },
+        });
+        if (found.length > 0) {
+          sourceExpenses = found;
+          break;
+        }
+        const wasModified = await prisma.monthInit.findUnique({
+          where: { userId_month_type: { userId: req.userId, month: sourceMonth, type: 'expense' } },
+        });
+        if (wasModified) break;
+        sourceMonth = prevMonth(sourceMonth);
+      }
 
       // Wiederkehrende in den neuen Monat kopieren
       if (sourceExpenses.length > 0) {
