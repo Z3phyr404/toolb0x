@@ -121,8 +121,18 @@ router.get('/', async (req, res) => {
       include: { category: { select: { id: true, name: true, color: true } } },
     });
 
-    // Wenn keine Ausgaben für diesen Monat: wiederkehrende kopieren
+    // Wenn keine Ausgaben: nur kopieren wenn der Monat noch NICHT initialisiert wurde
+    // (d.h. der User hat noch NICHTS für diesen Monat gemacht — kein Löschen, kein Hinzufügen)
     if (rawExpenses.length === 0) {
+      const alreadyInit = await prisma.monthInit.findUnique({
+        where: { userId_month_type: { userId: req.userId, month, type: 'expense' } },
+      });
+
+      if (alreadyInit) {
+        // Monat wurde bereits initialisiert → nicht neu kopieren, leer lassen
+        return res.json({ expenses: [], total: 0, month });
+      }
+
       // Letzten Monat mit Ausgaben finden (max. 24 Monate zurück)
       let sourceMonth = prevMonth(month);
       let sourceExpenses = [];
@@ -157,6 +167,13 @@ router.get('/', async (req, res) => {
           include: { category: { select: { id: true, name: true, color: true } } },
         });
       }
+
+      // Monat als initialisiert markieren (egal ob Daten kopiert wurden oder nicht)
+      await prisma.monthInit.upsert({
+        where: { userId_month_type: { userId: req.userId, month, type: 'expense' } },
+        create: { userId: req.userId, month, type: 'expense' },
+        update: {},
+      });
     }
 
     const expenses = rawExpenses.map(e => decryptExpense(e, req.encryptionKey));
@@ -272,6 +289,14 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Ausgabe nicht gefunden.' });
 
     await prisma.expense.delete({ where: { id: req.params.id } });
+
+    // Monat als initialisiert markieren → verhindert Auto-Copy beim nächsten Laden
+    await prisma.monthInit.upsert({
+      where: { userId_month_type: { userId: req.userId, month: existing.month, type: 'expense' } },
+      create: { userId: req.userId, month: existing.month, type: 'expense' },
+      update: {},
+    });
+
     res.json({ message: 'Ausgabe gelöscht.' });
 
   } catch (error) {

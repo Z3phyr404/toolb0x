@@ -45,8 +45,16 @@ router.get('/', async (req, res) => {
       where: { userId: req.userId, month },
     });
 
-    // Wenn keine Einnahmen für diesen Monat: wiederkehrende kopieren
+    // Wenn keine Einnahmen: nur kopieren wenn der Monat noch NICHT initialisiert wurde
     if (raw.length === 0) {
+      const alreadyInit = await prisma.monthInit.findUnique({
+        where: { userId_month_type: { userId: req.userId, month, type: 'income' } },
+      });
+
+      if (alreadyInit) {
+        return res.json({ incomes: [], total: 0, month });
+      }
+
       // Letzten Monat mit Einnahmen finden (max. 24 Monate zurück)
       let sourceMonth = prevMonth(month);
       let sourceIncomes = [];
@@ -79,6 +87,13 @@ router.get('/', async (req, res) => {
           where: { userId: req.userId, month },
         });
       }
+
+      // Monat als initialisiert markieren
+      await prisma.monthInit.upsert({
+        where: { userId_month_type: { userId: req.userId, month, type: 'income' } },
+        create: { userId: req.userId, month, type: 'income' },
+        update: {},
+      });
     }
 
     const incomes = raw.map(i => decryptIncome(i, req.encryptionKey));
@@ -160,6 +175,14 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Einnahme nicht gefunden.' });
 
     await prisma.income.delete({ where: { id: req.params.id } });
+
+    // Monat als initialisiert markieren → verhindert Auto-Copy beim nächsten Laden
+    await prisma.monthInit.upsert({
+      where: { userId_month_type: { userId: req.userId, month: existing.month, type: 'income' } },
+      create: { userId: req.userId, month: existing.month, type: 'income' },
+      update: {},
+    });
+
     res.json({ message: 'Einnahme gelöscht.' });
 
   } catch (error) {

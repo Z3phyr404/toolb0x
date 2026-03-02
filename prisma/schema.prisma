@@ -25,9 +25,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  categories Category[]
-  expenses   Expense[]
-  incomes    Income[]
+  categories  Category[]
+  expenses    Expense[]
+  incomes     Income[]
+  monthInits  MonthInit[]
 
   @@map("users")
 }
@@ -86,4 +87,20 @@ model Income {
 
   @@index([userId, month])
   @@map("incomes")
+}
+
+// Trackt ob ein Monat bereits für einen User initialisiert wurde.
+// Verhindert dass gelöschte Einträge nach einem Refresh wieder auftauchen.
+model MonthInit {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month  String  // Format: "YYYY-MM"
+  type   String  // "expense" | "income"
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, month, type])
+  @@index([userId, month])
+  @@map("month_inits")
 }
