@@ -1015,6 +1015,8 @@ let editIncId = null;
 let editCatId = null;
 let selectedColor = PALETTE[0];
 let isLoginMode = true;
+let pendingDelType = null;
+let pendingDelId = null;
 
 // ============ HELPERS ============
 const fmt = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -1069,7 +1071,7 @@ document.getElementById('sidebarUser').addEventListener('click', function(e) {
 // EVENT DELEGATION — zentraler Klick-Handler
 // ============================================================
 document.addEventListener('click', function(e) {
-  const target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  const target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
   if (!target) return;
 
   // Navigation (Sidebar + Mobile Tabs)
@@ -1103,6 +1105,15 @@ document.addEventListener('click', function(e) {
   if (target.id === 'saveExpenseBtn') { saveExpense(); return; }
   if (target.id === 'saveIncomeBtn') { saveIncome(); return; }
   if (target.id === 'saveCatBtn') { saveCat(); return; }
+
+  // Löschen-Bestätigung
+  if (target.id === 'mDelBtn') {
+    if (pendingDelType === 'expense') delExpense(pendingDelId);
+    else if (pendingDelType === 'income') delIncome(pendingDelId);
+    else if (pendingDelType === 'category') delCat(pendingDelId);
+    closeM('mDel');
+    return;
+  }
 
   // Farb-Picker
   if (target.classList.contains('color-swatch')) {
@@ -1447,7 +1458,7 @@ function openDelModal(type, id) {
     document.getElementById('mDelName').textContent = e.name;
     document.getElementById('mDelAmt').textContent = fmt(parseFloat(e.amount));
     document.getElementById('mDelAmt').style.display = '';
-    document.getElementById('mDelBtn').onclick = () => { delExpense(id); closeM('mDel'); };
+    pendingDelType = 'expense'; pendingDelId = id;
   } else if (type === 'income') {
     const i = incomes.find(x => x.id === id);
     document.getElementById('mDelTitle').textContent = 'Einnahme löschen';
@@ -1455,7 +1466,7 @@ function openDelModal(type, id) {
     document.getElementById('mDelName').textContent = i.name;
     document.getElementById('mDelAmt').textContent = fmt(parseFloat(i.amount));
     document.getElementById('mDelAmt').style.display = '';
-    document.getElementById('mDelBtn').onclick = () => { delIncome(id); closeM('mDel'); };
+    pendingDelType = 'income'; pendingDelId = id;
   } else {
     const c = categories.find(x => x.id === id);
     const count = expenses.filter(e => (e.categoryId || e.category?.id) === id).length;
@@ -1465,7 +1476,7 @@ function openDelModal(type, id) {
       : 'Möchtest du diese Kategorie wirklich löschen?';
     document.getElementById('mDelName').textContent = c.name;
     document.getElementById('mDelAmt').style.display = 'none';
-    document.getElementById('mDelBtn').onclick = () => { delCat(id); closeM('mDel'); };
+    pendingDelType = 'category'; pendingDelId = id;
   }
   openM('mDel');
 }
