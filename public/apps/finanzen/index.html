@@ -1108,10 +1108,12 @@ document.addEventListener('click', function(e) {
 
   // Löschen-Bestätigung
   if (target.id === 'mDelBtn') {
-    if (pendingDelType === 'expense') delExpense(pendingDelId);
-    else if (pendingDelType === 'income') delIncome(pendingDelId);
-    else if (pendingDelType === 'category') delCat(pendingDelId);
     closeM('mDel');
+    (async () => {
+      if (pendingDelType === 'expense') await delExpense(pendingDelId);
+      else if (pendingDelType === 'income') await delIncome(pendingDelId);
+      else if (pendingDelType === 'category') await delCat(pendingDelId);
+    })();
     return;
   }
 
