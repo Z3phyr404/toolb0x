@@ -182,6 +182,22 @@ router.put('/:id', async (req, res) => {
       },
     });
 
+    // Änderungen an wiederkehrenden Einnahmen in Zukunftsmonate propagieren.
+    if (income.isRecurring && existing.isRecurring) {
+      await prisma.income.updateMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+        data: {
+          name: income.name,
+          amount: income.amount,
+        },
+      });
+    }
+
     res.json({ income: decryptIncome(income, key) });
 
   } catch (error) {

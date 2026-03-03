@@ -299,6 +299,25 @@ router.put('/:id', async (req, res) => {
       include: { category: { select: { id: true, name: true, color: true } } },
     });
 
+    // Änderungen an wiederkehrenden Ausgaben in Zukunftsmonate propagieren.
+    // Kopien werden anhand des alten verschlüsselten Namens gefunden
+    // (beim Kopieren werden die verschlüsselten Werte 1:1 übernommen).
+    if (expense.isRecurring && existing.isRecurring) {
+      await prisma.expense.updateMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+        data: {
+          name: expense.name,
+          amount: expense.amount,
+          categoryId: expense.categoryId,
+        },
+      });
+    }
+
     res.json({ expense: decryptExpense(expense, key) });
 
   } catch (error) {
