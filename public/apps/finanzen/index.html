@@ -1142,6 +1142,151 @@
       cursor: pointer;
     }
 
+    /* ============ TAG INPUT ============ */
+    .tag-input-wrapper {
+      position: relative;
+    }
+
+    .tag-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .tag-badges:empty {
+      display: none;
+    }
+
+    .tag-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 99px;
+      background: rgba(0, 122, 255, 0.1);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .tag-badge-x {
+      cursor: pointer;
+      opacity: 0.6;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .tag-badge-x:hover {
+      opacity: 1;
+    }
+
+    .tag-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      display: none;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .tag-suggestions.open {
+      display: block;
+    }
+
+    .tag-suggestion {
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .tag-suggestion:hover,
+    .tag-suggestion.active {
+      background: rgba(0, 122, 255, 0.08);
+    }
+
+    /* ============ TAG MINI BADGES (Tabelle) ============ */
+    .tag-mini {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 99px;
+      background: rgba(0, 122, 255, 0.08);
+      color: var(--blue);
+      font-size: 10px;
+      font-weight: 500;
+      margin-left: 4px;
+    }
+
+    /* ============ TAG AUSWERTUNG ============ */
+    .tag-analysis-section {
+      margin-top: 24px;
+    }
+
+    .tag-analysis-section h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-secondary);
+    }
+
+    .tag-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .tag-bar-label {
+      width: 120px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tag-bar-track {
+      flex: 1;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(0, 0, 0, 0.04);
+      overflow: hidden;
+    }
+
+    .tag-bar-fill {
+      height: 100%;
+      border-radius: 9px;
+      background: var(--blue);
+      transition: width 0.4s ease;
+    }
+
+    .tag-bar-val {
+      width: 70px;
+      text-align: right;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--blue);
+      flex-shrink: 0;
+    }
+
+    .tag-bar-count {
+      width: 30px;
+      text-align: right;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
     .color-picker-row {
       display: flex;
       flex-wrap: wrap;
@@ -1513,6 +1658,10 @@
           <div class="budget-strip-wrap" id="budgetStrip"></div>
           <div class="budget-legend" id="budgetLeg"></div>
         </div>
+        <div class="tag-analysis-section glass" id="tagAnalysis" style="display:none;padding:20px;border-radius:var(--radius)">
+          <h3>Nach Tags</h3>
+          <div id="tagBarChart"></div>
+        </div>
       </div>
 
       <!-- EXPENSES -->
@@ -1634,6 +1783,14 @@
               type="number" step="0.01" min="0" placeholder="0.00"></div>
           <div class="form-group"><label class="form-label">Kategorie</label><select class="form-select"
               id="fExpCat"></select></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tags</label>
+          <div class="tag-input-wrapper" id="tagInputWrapper">
+            <div class="tag-badges" id="tagBadges"></div>
+            <input class="form-input" id="fExpTags" placeholder="Tag eingeben..." autocomplete="off">
+            <div class="tag-suggestions" id="tagSuggestions"></div>
+          </div>
         </div>
         <div class="form-check-row">
           <input type="checkbox" class="form-check" id="fExpRecurring" checked>
@@ -2005,6 +2162,110 @@
     });
 
     // ============================================================
+    // TAG INPUT LOGIC
+    // ============================================================
+    let currentTags = [];     // Tags der aktuell bearbeiteten Ausgabe
+    let tagSuggestionIdx = -1;
+
+    function getAllTags() {
+      const s = new Set();
+      expenses.forEach(e => (e.tags || []).forEach(t => s.add(t)));
+      return [...s].sort();
+    }
+
+    function renderTagBadges() {
+      document.getElementById('tagBadges').innerHTML = currentTags.map((t, i) =>
+        `<span class="tag-badge">${t}<span class="tag-badge-x" data-rm-tag="${i}">&times;</span></span>`
+      ).join('');
+    }
+
+    function addTag(tag) {
+      const t = tag.trim();
+      if (!t || currentTags.includes(t) || currentTags.length >= 10) return;
+      currentTags.push(t);
+      renderTagBadges();
+      document.getElementById('fExpTags').value = '';
+      closeTagSuggestions();
+    }
+
+    function removeTag(idx) {
+      currentTags.splice(idx, 1);
+      renderTagBadges();
+    }
+
+    function showTagSuggestions(query) {
+      const el = document.getElementById('tagSuggestions');
+      const all = getAllTags().filter(t => !currentTags.includes(t));
+      const filtered = query ? all.filter(t => t.toLowerCase().includes(query.toLowerCase())) : all;
+      if (filtered.length === 0) { el.classList.remove('open'); return; }
+      tagSuggestionIdx = -1;
+      el.innerHTML = filtered.map(t =>
+        `<div class="tag-suggestion" data-tag-val="${t}">${t}</div>`
+      ).join('');
+      el.classList.add('open');
+    }
+
+    function closeTagSuggestions() {
+      document.getElementById('tagSuggestions').classList.remove('open');
+      tagSuggestionIdx = -1;
+    }
+
+    // Event Listener: Tag-Input
+    document.getElementById('fExpTags').addEventListener('input', e => {
+      showTagSuggestions(e.target.value.trim());
+    });
+
+    document.getElementById('fExpTags').addEventListener('keydown', e => {
+      const sugEl = document.getElementById('tagSuggestions');
+      const items = sugEl.querySelectorAll('.tag-suggestion');
+
+      if (e.key === 'ArrowDown' && items.length > 0) {
+        e.preventDefault();
+        tagSuggestionIdx = Math.min(tagSuggestionIdx + 1, items.length - 1);
+        items.forEach((it, i) => it.classList.toggle('active', i === tagSuggestionIdx));
+      } else if (e.key === 'ArrowUp' && items.length > 0) {
+        e.preventDefault();
+        tagSuggestionIdx = Math.max(tagSuggestionIdx - 1, 0);
+        items.forEach((it, i) => it.classList.toggle('active', i === tagSuggestionIdx));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (tagSuggestionIdx >= 0 && items[tagSuggestionIdx]) {
+          addTag(items[tagSuggestionIdx].dataset.tagVal);
+        } else if (e.target.value.trim()) {
+          addTag(e.target.value);
+        }
+      } else if (e.key === ',' || e.key === 'Tab') {
+        if (e.target.value.trim()) {
+          e.preventDefault();
+          addTag(e.target.value);
+        }
+      } else if (e.key === 'Backspace' && !e.target.value && currentTags.length > 0) {
+        removeTag(currentTags.length - 1);
+      }
+    });
+
+    document.getElementById('fExpTags').addEventListener('focus', () => {
+      showTagSuggestions(document.getElementById('fExpTags').value.trim());
+    });
+
+    // Click auf Vorschlag
+    document.getElementById('tagSuggestions').addEventListener('click', e => {
+      const val = e.target.closest('.tag-suggestion')?.dataset.tagVal;
+      if (val) addTag(val);
+    });
+
+    // Click auf X-Badge
+    document.getElementById('tagBadges').addEventListener('click', e => {
+      const idx = e.target.dataset.rmTag;
+      if (idx !== undefined) removeTag(parseInt(idx));
+    });
+
+    // Schließen bei Klick außerhalb
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#tagInputWrapper')) closeTagSuggestions();
+    });
+
+    // ============================================================
     // EXPENSE MODAL & CRUD
     // ============================================================
     function openExpenseModal(id) {
@@ -2016,12 +2277,17 @@
         document.getElementById('fExpAmt').value = parseFloat(e.amount);
         document.getElementById('fExpCat').value = e.categoryId || e.category?.id;
         document.getElementById('fExpRecurring').checked = e.isRecurring;
+        currentTags = [...(e.tags || [])];
       } else {
         document.getElementById('mExpTitle').textContent = 'Ausgabe hinzufügen';
         document.getElementById('fExpName').value = '';
         document.getElementById('fExpAmt').value = '';
         document.getElementById('fExpRecurring').checked = true;
+        currentTags = [];
       }
+      renderTagBadges();
+      document.getElementById('fExpTags').value = '';
+      closeTagSuggestions();
       populateCatSelect();
       openM('mExpense');
       setTimeout(() => document.getElementById('fExpName').focus(), 120);
@@ -2032,14 +2298,15 @@
       const amount = parseFloat(document.getElementById('fExpAmt').value);
       const categoryId = document.getElementById('fExpCat').value;
       const isRecurring = document.getElementById('fExpRecurring').checked;
+      const tags = [...currentTags];
       if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
       if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
       try {
         if (editExpId) {
-          await api(`/expenses/${editExpId}`, { method: 'PUT', body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }) });
+          await api(`/expenses/${editExpId}`, { method: 'PUT', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
           toast('Ausgabe aktualisiert');
         } else {
-          await api('/expenses', { method: 'POST', body: JSON.stringify({ name, amount, categoryId, month: currentMonth, isRecurring }) });
+          await api('/expenses', { method: 'POST', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
           toast('Ausgabe hinzugefügt');
         }
         closeM('mExpense');
@@ -2226,7 +2493,7 @@
     // ============================================================
     // RENDER: DASHBOARD
     // ============================================================
-    function renderDash() { renderKPIs(); renderDonut(); renderBars(); renderBudget(); }
+    function renderDash() { renderKPIs(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
 
     function grouped() {
       const m = {};
@@ -2328,6 +2595,34 @@
     }
 
     // ============================================================
+    // RENDER: TAG ANALYSIS
+    // ============================================================
+    function renderTagAnalysis() {
+      const section = document.getElementById('tagAnalysis');
+      const chart = document.getElementById('tagBarChart');
+      const byTag = {};
+      expenses.forEach(e => {
+        (e.tags || []).forEach(tag => {
+          if (!byTag[tag]) byTag[tag] = { tag, total: 0, count: 0 };
+          byTag[tag].total += parseFloat(e.amount);
+          byTag[tag].count += 1;
+        });
+      });
+      const sorted = Object.values(byTag).sort((a, b) => b.total - a.total);
+      if (sorted.length === 0) { section.style.display = 'none'; return; }
+      section.style.display = '';
+      const mx = sorted[0].total || 1;
+      chart.innerHTML = sorted.map(t =>
+        `<div class="tag-bar-row">
+          <div class="tag-bar-label">${t.tag}</div>
+          <div class="tag-bar-track"><div class="tag-bar-fill" style="width:${(t.total / mx * 100).toFixed(1)}%"></div></div>
+          <div class="tag-bar-val">${fmtS(t.total)}</div>
+          <div class="tag-bar-count">${t.count}x</div>
+        </div>`
+      ).join('');
+    }
+
+    // ============================================================
     // RENDER: EXPENSES TABLE
     // ============================================================
     function renderTable() {
@@ -2345,7 +2640,7 @@
         const p = t > 0 ? (a / t * 100).toFixed(1) : 0;
         return `<tr>
       <td style="font-weight:600">${e.name}</td>
-      <td><span class="cat-badge"><span class="cd" style="background:${c.color}"></span>${c.name}</span></td>
+      <td><span class="cat-badge"><span class="cd" style="background:${c.color}"></span>${c.name}</span>${(e.tags||[]).map(t=>`<span class="tag-mini">${t}</span>`).join('')}</td>
       <td class="amount-cell" style="text-align:right;color:${c.color}">${fmt(a)}</td>
       <td style="text-align:right;color:var(--text-tertiary);font-size:13px">${p}%</td>
       <td style="text-align:center"><span class="recurring-badge ${e.isRecurring ? 'yes' : 'no'}">${e.isRecurring ? '↻ Fest' : '◇ Einmalig'}</span></td>

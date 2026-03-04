@@ -95,6 +95,27 @@ function validateExpense(data) {
     errors.push('Ungültiges Monatsformat. Erwartet: YYYY-MM (z.B. 2026-02).');
   }
 
+  // Tags (optional)
+  if (data.tags !== undefined && data.tags !== null) {
+    if (!Array.isArray(data.tags)) {
+      errors.push('Tags müssen als Array übergeben werden.');
+    } else {
+      if (data.tags.length > 10) {
+        errors.push('Maximal 10 Tags pro Ausgabe erlaubt.');
+      }
+      for (const tag of data.tags) {
+        if (typeof tag !== 'string' || tag.trim().length === 0) {
+          errors.push('Tags dürfen nicht leer sein.');
+          break;
+        }
+        if (tag.length > 30) {
+          errors.push('Ein Tag darf maximal 30 Zeichen lang sein.');
+          break;
+        }
+      }
+    }
+  }
+
   return errors;
 }
 

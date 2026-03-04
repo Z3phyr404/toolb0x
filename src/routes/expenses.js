@@ -13,10 +13,15 @@ const router = express.Router();
 router.use(requireAuth);
 
 function decryptExpense(exp, key) {
+  let tags = [];
+  if (exp.tags) {
+    try { tags = JSON.parse(decrypt(exp.tags, key)); } catch { tags = []; }
+  }
   return {
     ...exp,
     name: decrypt(exp.name, key),
     amount: decrypt(exp.amount, key),
+    tags,
     category: exp.category ? {
       ...exp.category,
       name: decrypt(exp.category.name, key),
@@ -72,6 +77,16 @@ router.get('/summary', async (req, res) => {
       byCategory[catId].count += 1;
     }
 
+    const byTag = {};
+    for (const expense of expenses) {
+      const tags = expense.tags || [];
+      for (const tag of tags) {
+        if (!byTag[tag]) byTag[tag] = { tag, total: 0, count: 0 };
+        byTag[tag].total += parseFloat(expense.amount);
+        byTag[tag].count += 1;
+      }
+    }
+
     const pm = prevMonth(month);
     const prevRaw = await prisma.expense.findMany({
       where: { userId: req.userId, month: pm },
@@ -88,6 +103,7 @@ router.get('/summary', async (req, res) => {
       totalIncome: Math.round(totalIncome * 100) / 100,
       remaining: Math.round((totalIncome - totalExpenses) * 100) / 100,
       byCategory: Object.values(byCategory).sort((a, b) => b.total - a.total),
+      byTag: Object.values(byTag).sort((a, b) => b.total - a.total),
       comparison: {
         previousMonth: pm,
         previousTotal: Math.round(prevTotal * 100) / 100,
@@ -162,6 +178,7 @@ router.get('/', async (req, res) => {
             name: e.name,           // bleibt verschlüsselt
             amount: e.amount,       // bleibt verschlüsselt
             categoryId: e.categoryId,
+            tags: e.tags,           // bleibt verschlüsselt
             userId: e.userId,
             month,
             isRecurring: true,
@@ -227,11 +244,17 @@ router.post('/', async (req, res) => {
     const month = req.body.month || new Date().toISOString().slice(0, 7);
     const key = req.encryptionKey;
 
+    const tags = Array.isArray(req.body.tags)
+      ? req.body.tags.map(t => sanitize(t.trim())).filter(Boolean)
+      : [];
+    const encryptedTags = tags.length > 0 ? encrypt(JSON.stringify(tags), key) : '';
+
     const expense = await prisma.expense.create({
       data: {
         name: encrypt(sanitize(req.body.name), key),
         amount: encrypt(String(parseFloat(req.body.amount)), key),
         categoryId: req.body.categoryId,
+        tags: encryptedTags,
         userId: req.userId,
         month,
         isRecurring: req.body.isRecurring !== false,
@@ -251,6 +274,7 @@ router.post('/', async (req, res) => {
             name: expense.name,
             amount: expense.amount,
             categoryId: expense.categoryId,
+            tags: expense.tags,
             userId: expense.userId,
             month: fi.month,
             isRecurring: true,
@@ -287,12 +311,18 @@ router.put('/:id', async (req, res) => {
 
     const key = req.encryptionKey;
 
+    const tags = Array.isArray(req.body.tags)
+      ? req.body.tags.map(t => sanitize(t.trim())).filter(Boolean)
+      : [];
+    const encryptedTags = tags.length > 0 ? encrypt(JSON.stringify(tags), key) : '';
+
     const expense = await prisma.expense.update({
       where: { id: req.params.id },
       data: {
         name: encrypt(sanitize(req.body.name), key),
         amount: encrypt(String(parseFloat(req.body.amount)), key),
         categoryId: req.body.categoryId,
+        tags: encryptedTags,
         month: req.body.month || existing.month,
         isRecurring: req.body.isRecurring ?? existing.isRecurring,
       },
@@ -314,6 +344,7 @@ router.put('/:id', async (req, res) => {
           name: expense.name,
           amount: expense.amount,
           categoryId: expense.categoryId,
+          tags: expense.tags,
         },
       });
     }
