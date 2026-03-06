@@ -442,6 +442,18 @@
       height: 18px;
     }
 
+    .back-portal-btn {
+      text-decoration: none;
+      color: var(--text-tertiary);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .back-portal-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.12);
+    }
+
     /* ===== MAIN CONTENT ===== */
     main {
       flex: 1;
@@ -1557,6 +1569,13 @@
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="sidebar-inner glass-heavy">
+        <a href="/portal" class="nav-btn back-portal-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Zur Übersicht
+        </a>
+
         <div class="sidebar-logo"><span>Finanz</span></div>
 
         <div class="nav-group-label">Übersicht</div>
@@ -2054,12 +2073,7 @@
     async function logout() {
       SessionTimeout.stop();
       try { await api('/auth/logout', { method: 'POST' }); } catch (e) { }
-      currentUser = null;
-      document.getElementById('app').classList.remove('active');
-      document.getElementById('authScreen').classList.remove('hidden');
-      document.getElementById('authEmail').value = '';
-      document.getElementById('authPassword').value = '';
-      document.getElementById('authName').value = '';
+      window.location.href = '/portal';
     }
 
     // ============================================================
@@ -2088,14 +2102,11 @@
 
         // Session-Timeout starten
         SessionTimeout.start(function () {
-          currentUser = null;
-          document.getElementById('app').classList.remove('active');
-          document.getElementById('authScreen').classList.remove('hidden');
-          toast('Sitzung abgelaufen — bitte erneut anmelden.', 'error');
+          window.location.href = '/portal';
         });
       } catch (err) {
-        document.getElementById('authScreen').classList.remove('hidden');
-        document.getElementById('app').classList.remove('active');
+        window.location.href = '/portal';
+        return;
       } finally {
         hideLoading();
       }
