@@ -37,7 +37,8 @@ toolb0x/
 │       ├── auth.js                      # /api/auth/* (login, register, logout, me, password, profile)
 │       ├── categories.js                # /api/categories CRUD
 │       ├── expenses.js                  # /api/expenses CRUD + summary
-│       └── income.js                    # /api/income CRUD
+│       ├── income.js                    # /api/income CRUD
+│       └── export.js                    # /api/export/pdf — PDF-Export der Monatsübersicht
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -64,6 +65,7 @@ toolb0x/
 | `/api/categories/*` | Kategorien-API |
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
+| `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 
 **CSP-Nonce:** Alle HTML-Dateien werden mit `serveHtmlWithNonce()` ausgeliefert. Inline-Scripts müssen `nonce="__CSP_NONCE__"` haben — der Platzhalter wird serverseitig ersetzt.
 
@@ -200,6 +202,9 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 - PUT `/:id` — Einnahme bearbeiten
 - DELETE `/:id` — Einnahme löschen
 
+### Export (`/api/export/`)
+- GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
+
 ---
 
 ## Sicherheitsmaßnahmen (`src/middleware/security.js`)
@@ -324,3 +329,4 @@ RATE_LIMIT_LOGIN=10
 - `MonthInit` verhindert, dass gelöschte `isRecurring`-Einträge bei Monatswechsel wieder entstehen
 - Bei Passwort-Änderung: ALLE Sessions des Users werden invalidiert (neu einloggen erforderlich)
 - Session-Store ist ein Singleton — `require('../utils/sessionStore')` gibt immer dieselbe Instanz zurück
+- PDF-Export nutzt `pdfkit` (server-seitig) — Decrypt-Helfer sind in `export.js` repliziert (gleiche Logik wie `expenses.js`/`income.js`)
