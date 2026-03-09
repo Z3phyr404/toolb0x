@@ -69,11 +69,13 @@ const authRoutes = require('./src/routes/auth');
 const categoryRoutes = require('./src/routes/categories');
 const expenseRoutes = require('./src/routes/expenses');
 const incomeRoutes = require('./src/routes/income');
+const exportRoutes = require('./src/routes/export');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/income', incomeRoutes);
+app.use('/api/export', exportRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING

@@ -567,6 +567,19 @@
       box-shadow: 0 6px 24px rgba(0, 122, 255, 0.4);
     }
 
+    .btn-export {
+      background: var(--glass-bg-heavy);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      color: var(--text);
+      border: 1px solid var(--glass-border);
+    }
+    .btn-export:hover {
+      background: rgba(255, 255, 255, 0.28);
+      transform: translateY(-1px);
+    }
+    .btn-export svg { width: 16px; height: 16px; }
+
     .btn-glass {
       background: rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(20px);
@@ -1652,6 +1665,14 @@
             <div class="page-title">Dashboard</div>
             <div class="page-subtitle">Deine finanzielle Übersicht</div>
           </div>
+          <button class="btn btn-export glass" id="exportPdfBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            PDF Export
+          </button>
         </div>
         <div class="kpi-row" id="kpiRow"></div>
         <div class="chart-row">
@@ -1961,7 +1982,7 @@
     // EVENT DELEGATION — zentraler Klick-Handler
     // ============================================================
     document.addEventListener('click', function (e) {
-      const target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+      const target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
       if (!target) return;
 
       // Navigation (Sidebar + Mobile Tabs)
@@ -1985,6 +2006,32 @@
       // Monat wechseln
       if (target.id === 'monthPrev') { changeMonth(-1); return; }
       if (target.id === 'monthNext') { changeMonth(1); return; }
+
+      // PDF Export
+      if (target.id === 'exportPdfBtn') {
+        (async () => {
+          try {
+            const r = await fetch(`${API}/export/pdf?month=${currentMonth}`);
+            if (!r.ok) {
+              if (r.status === 401) return window.location.href = '/portal';
+              throw new Error();
+            }
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Finanzuebersicht_${monthLabel(currentMonth).replace(' ', '_')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            toast('PDF wurde erstellt', 'success');
+          } catch {
+            toast('PDF-Export fehlgeschlagen', 'error');
+          }
+        })();
+        return;
+      }
 
       // Hinzufügen-Buttons
       if (target.id === 'addExpenseBtn') { openExpenseModal(); return; }
