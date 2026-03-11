@@ -84,6 +84,13 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
 .btn-glass { background:rgba(255,255,255,0.15); backdrop-filter:blur(20px); color:var(--text-secondary); border:1px solid rgba(255,255,255,0.15); }
 .btn-glass:hover:not(:disabled) { background:rgba(255,255,255,0.25); }
 
+.export-section { border:1px solid rgba(0,122,255,0.15); }
+.export-desc { font-size:14px; color:var(--text-secondary); line-height:1.5; margin-bottom:16px; }
+.btn-export { background:linear-gradient(135deg,var(--blue),var(--indigo)); color:#fff; }
+.btn-export:hover:not(:disabled) { opacity:0.9; }
+.btn-export:active:not(:disabled) { transform:scale(0.98); }
+.btn-export svg { width:16px; height:16px; vertical-align:middle; }
+
 .danger-zone { border:1px solid rgba(255,59,48,0.2); }
 .danger-desc { font-size:14px; color:var(--text-secondary); line-height:1.5; margin-bottom:16px; }
 
@@ -152,6 +159,19 @@ html,body { height:100%; font-family:'SF',-apple-system,BlinkMacSystemFont,'Helv
         <div class="profile-error" id="profileError"></div>
         <button class="btn btn-primary" type="submit" id="saveProfileBtn">Änderungen speichern</button>
       </form>
+    </div>
+
+    <!-- Datenexport -->
+    <div class="profile-card glass export-section">
+      <h2 class="profile-section-title">Datenexport</h2>
+      <p class="export-desc">
+        Exportiere alle deine Finanzdaten (Einnahmen und Ausgaben aller Monate)
+        als PDF-Datei.
+      </p>
+      <button class="btn btn-export" id="exportAllBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Alle Finanzdaten exportieren (PDF)
+      </button>
     </div>
 
     <!-- Gefahrenzone -->
@@ -345,6 +365,36 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
     errEl.textContent = (err.errors && err.errors.join(', ')) || err.error || 'Fehler beim Löschen.';
     errEl.classList.add('show');
     btn.disabled = false; btn.textContent = 'Endgültig löschen';
+  }
+});
+
+// ---- Gesamt-Export ----
+document.getElementById('exportAllBtn').addEventListener('click', async function() {
+  var btn = document.getElementById('exportAllBtn');
+  btn.disabled = true;
+  btn.textContent = 'Export wird erstellt…';
+
+  try {
+    var res = await fetch(API + '/export/pdf-all', { credentials: 'include' });
+    if (!res.ok) {
+      if (res.status === 401) return window.location.href = '/portal';
+      throw new Error();
+    }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Gesamtexport_Finanzen_' + new Date().toISOString().slice(0, 10) + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Gesamtexport wurde erstellt!');
+  } catch(err) {
+    toast('Export fehlgeschlagen.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Alle Finanzdaten exportieren (PDF)';
   }
 });
 

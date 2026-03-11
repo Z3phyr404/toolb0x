@@ -38,7 +38,7 @@ toolb0x/
 │       ├── categories.js                # /api/categories CRUD
 │       ├── expenses.js                  # /api/expenses CRUD + summary
 │       ├── income.js                    # /api/income CRUD
-│       └── export.js                    # /api/export/pdf — PDF-Export der Monatsübersicht
+│       └── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -66,6 +66,7 @@ toolb0x/
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
+| `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
 **CSP-Nonce:** Alle HTML-Dateien werden mit `serveHtmlWithNonce()` ausgeliefert. Inline-Scripts müssen `nonce="__CSP_NONCE__"` haben — der Platzhalter wird serverseitig ersetzt.
 
@@ -204,6 +205,7 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
+- GET `/pdf-all` — Gesamt-PDF-Export aller Einnahmen & Ausgaben (Monatsübersicht + Details pro Monat)
 
 ---
 
@@ -330,3 +332,4 @@ RATE_LIMIT_LOGIN=10
 - Bei Passwort-Änderung: ALLE Sessions des Users werden invalidiert (neu einloggen erforderlich)
 - Session-Store ist ein Singleton — `require('../utils/sessionStore')` gibt immer dieselbe Instanz zurück
 - PDF-Export nutzt `pdfkit` (server-seitig) — Decrypt-Helfer sind in `export.js` repliziert (gleiche Logik wie `expenses.js`/`income.js`)
+- Gesamt-PDF-Export (`/api/export/pdf-all`) — exportiert alle Monate auf einmal, Button auf der Profilseite (`/portal/profil`)
