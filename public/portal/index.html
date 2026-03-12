@@ -95,6 +95,26 @@ a.portal-user-name:hover { color:var(--blue); }
 @keyframes toastIn { from{transform:translateX(40px);opacity:0} }
 @keyframes toastOut { to{transform:translateX(40px);opacity:0} }
 
+/* ===== ERINNERUNGEN ===== */
+.reminder-card { cursor:default; }
+.reminder-card:hover { transform:none; }
+.reminder-card-body { margin-top:12px; }
+.reminder-item { display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05); font-size:13px; gap:10px; }
+.reminder-item:last-child { border-bottom:none; }
+.reminder-item-name { font-weight:600; font-size:14px; }
+.reminder-item-date { color:var(--text-secondary); font-size:12px; margin-top:2px; }
+.reminder-item-days { font-size:11px; font-weight:600; padding:3px 10px; border-radius:99px; white-space:nowrap; flex-shrink:0; align-self:center; }
+.reminder-days-overdue { background:rgba(255,59,48,0.12); color:var(--red); }
+.reminder-days-soon { background:rgba(255,149,0,0.12); color:#b87800; }
+.reminder-days-ok { background:rgba(48,209,88,0.12); color:var(--green); }
+.reminder-actions { display:flex; gap:6px; margin-top:6px; }
+.reminder-action-btn { font-size:11px; padding:4px 10px; border:none; border-radius:8px; cursor:pointer; font-family:inherit; font-weight:600; transition:opacity 0.2s; }
+.reminder-action-btn:hover { opacity:0.75; }
+.reminder-action-btn.done { background:rgba(48,209,88,0.15); color:var(--green); }
+.reminder-action-btn.dismiss { background:rgba(0,0,0,0.05); color:var(--text-tertiary); }
+.reminder-more { text-align:center; padding:10px; font-size:12px; color:var(--text-tertiary); }
+.reminder-more a { color:var(--blue); text-decoration:none; font-weight:500; }
+
 @media (max-width:600px) {
   .portal { padding:20px; }
   .portal-welcome h1 { font-size:26px; }
@@ -144,6 +164,13 @@ a.portal-user-name:hover { color:var(--blue); }
   </div>
 
   <div class="tools-grid">
+
+    <!-- ERINNERUNGEN — Dynamische Karte (wird per JS befüllt) -->
+    <div class="tool-card glass reminder-card" id="reminderCard" style="display:none">
+      <div class="tool-icon" style="background:rgba(255,149,0,0.12);color:#FF9500">&#128276;</div>
+      <div class="tool-name">Erinnerungen</div>
+      <div id="reminderCardBody" class="reminder-card-body"></div>
+    </div>
 
     <!-- FINANZ-APP -->
     <a href="/app/finanzen" class="tool-card glass">
@@ -276,6 +303,9 @@ async function checkAuth() {
       document.getElementById('authScreen').classList.remove('hidden');
       toast('Sitzung abgelaufen — bitte erneut anmelden.', 'error');
     });
+
+    // Erinnerungen laden
+    loadReminders();
   } catch {
     document.getElementById('authScreen').classList.remove('hidden');
     document.getElementById('portal').classList.remove('active');
@@ -283,6 +313,84 @@ async function checkAuth() {
     hideLoading();
   }
 }
+
+// ============================================================
+// ERINNERUNGEN
+// ============================================================
+async function loadReminders() {
+  try {
+    const res = await fetch(API + '/reminders/upcoming', { credentials: 'include' });
+    if (!res.ok) return;
+    const { reminders } = await res.json();
+
+    const card = document.getElementById('reminderCard');
+    const body = document.getElementById('reminderCardBody');
+
+    if (!reminders || reminders.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+
+    card.style.display = '';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    body.innerHTML = reminders.slice(0, 5).map(function(r) {
+      const rDate = new Date(r.reminderDate);
+      rDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((rDate - today) / (1000 * 60 * 60 * 24));
+      const daysLabel = diffDays < 0 ? Math.abs(diffDays) + 'd \u00fcberf\u00e4llig'
+                      : diffDays === 0 ? 'Heute'
+                      : diffDays + 'd verbleibend';
+      const daysClass = diffDays < 0 ? 'overdue' : diffDays <= 3 ? 'soon' : 'ok';
+      const expName = (r.expense && r.expense.name) ? r.expense.name : (r.note || 'Erinnerung');
+      const dateStr = rDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      return '<div class="reminder-item">'
+        + '<div>'
+        + '<div class="reminder-item-name">' + expName + '</div>'
+        + '<div class="reminder-item-date">' + dateStr + (r.note ? ' \u2014 ' + r.note : '') + '</div>'
+        + '<div class="reminder-actions">'
+        + '<button class="reminder-action-btn done" data-reminder-done="' + r.id + '">Erledigt</button>'
+        + '<button class="reminder-action-btn dismiss" data-reminder-dismiss="' + r.id + '">Ausblenden</button>'
+        + '</div>'
+        + '</div>'
+        + '<span class="reminder-item-days reminder-days-' + daysClass + '">' + daysLabel + '</span>'
+        + '</div>';
+    }).join('');
+
+    if (reminders.length > 5) {
+      body.innerHTML += '<div class="reminder-more">+' + (reminders.length - 5) + ' weitere &middot; <a href="/app/finanzen">Alle anzeigen</a></div>';
+    }
+  } catch (e) { /* Fehler still ignorieren */ }
+}
+
+// Event-Delegation: Erledigt/Ausblenden
+document.getElementById('reminderCard').addEventListener('click', async function(e) {
+  var doneBtn = e.target.closest('[data-reminder-done]');
+  var dismissBtn = e.target.closest('[data-reminder-dismiss]');
+  if (doneBtn) {
+    try {
+      await fetch(API + '/reminders/' + doneBtn.dataset.reminderDone + '/status', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'done' }),
+      });
+      toast('Erinnerung als erledigt markiert');
+      loadReminders();
+    } catch (err) { toast('Fehler', 'error'); }
+  }
+  if (dismissBtn) {
+    try {
+      await fetch(API + '/reminders/' + dismissBtn.dataset.reminderDismiss + '/status', {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dismissed' }),
+      });
+      loadReminders();
+    } catch (err) { toast('Fehler', 'error'); }
+  }
+});
 
 checkAuth();
 </script>

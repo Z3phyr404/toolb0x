@@ -70,12 +70,14 @@ const categoryRoutes = require('./src/routes/categories');
 const expenseRoutes = require('./src/routes/expenses');
 const incomeRoutes = require('./src/routes/income');
 const exportRoutes = require('./src/routes/export');
+const reminderRoutes = require('./src/routes/reminders');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/income', incomeRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/reminders', reminderRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -118,5 +120,6 @@ app.listen(PORT, () => {
   console.log(`📊 Portal:      http://localhost:${PORT}/portal`);
   console.log(`💰 Finanz-App:  http://localhost:${PORT}/app/finanzen`);
   console.log(`📡 API:         http://localhost:${PORT}/api`);
+  console.log(`🔔 Erinnerungen: http://localhost:${PORT}/api/reminders`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });

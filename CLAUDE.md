@@ -22,7 +22,7 @@ toolb0x/
 ├── server.js                            # Hauptserver, Routing, CSP-Nonce-Injection
 ├── package.json
 ├── prisma/
-│   ├── schema.prisma                    # DB-Schema (User, Category, Expense, Income, MonthInit)
+│   ├── schema.prisma                    # DB-Schema (User, Category, Expense, Income, MonthInit, Reminder)
 │   └── seed.js                          # Testdaten mit verschlüsselten Einträgen
 ├── src/
 │   ├── utils/
@@ -38,6 +38,7 @@ toolb0x/
 │       ├── categories.js                # /api/categories CRUD
 │       ├── expenses.js                  # /api/expenses CRUD + summary
 │       ├── income.js                    # /api/income CRUD
+│       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
 │       └── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
 └── public/
     ├── portal/
@@ -65,6 +66,7 @@ toolb0x/
 | `/api/categories/*` | Kategorien-API |
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
+| `/api/reminders/*` | Erinnerungs-API |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -118,8 +120,9 @@ toolb0x/
 | Category | `name`, `color` |
 | Expense | `name`, `amount`, `tags` |
 | Income | `name`, `amount` |
+| Reminder | `note` |
 
-**Nicht verschlüsselt:** `month` (Format YYYY-MM, für DB-Queries), `isRecurring`, alle IDs, Timestamps
+**Nicht verschlüsselt:** `month` (Format YYYY-MM, für DB-Queries), `isRecurring`, `reminderDate`, `daysBefore`, `status`, alle IDs, Timestamps
 
 ### Hilfsfunktionen
 ```js
@@ -137,7 +140,7 @@ decryptFields(obj, key, fields)  // Objekt mit ausgewählten Feldern entschlüss
 ```
 id (UUID), email (unique), password (bcrypt), name, encryptedKey
 createdAt, updatedAt
-→ hat: categories[], expenses[], incomes[], monthInits[]
+→ hat: categories[], expenses[], incomes[], monthInits[], reminders[]
 ```
 
 ### Category
@@ -153,6 +156,7 @@ id (UUID), name (enc), amount (enc, String), categoryId → Category
 tags (enc, JSON-Array als String, default ""), month (YYYY-MM, nicht enc)
 isRecurring (Boolean), userId → User (Cascade Delete)
 Index: [userId, month]
+→ hat: reminders[]
 ```
 
 ### Income
@@ -160,6 +164,16 @@ Index: [userId, month]
 id (UUID), name (enc), amount (enc, String)
 month (YYYY-MM), isRecurring (Boolean), userId → User (Cascade Delete)
 Index: [userId, month]
+```
+
+### Reminder
+```
+id (UUID), note (enc, optional), reminderDate (DateTime, nicht enc)
+daysBefore (Int, 0–90), status ("pending"|"done"|"dismissed")
+expenseId → Expense (optional, SetNull bei Delete)
+userId → User (Cascade Delete)
+Index: [userId, status], [userId, reminderDate]
+Zweck: Kündigungserinnerungen für Ausgaben (Abos, Verträge)
 ```
 
 ### MonthInit
@@ -202,6 +216,16 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 - POST `/` — Neue Einnahme
 - PUT `/:id` — Einnahme bearbeiten
 - DELETE `/:id` — Einnahme löschen
+
+### Reminders (`/api/reminders/`)
+| Methode | Route | Beschreibung |
+|---------|-------|-------------|
+| GET | `/` | Alle Erinnerungen (optional `?status=`, `?expenseId=`) |
+| GET | `/upcoming` | Fällige Erinnerungen (alertDate <= heute) |
+| POST | `/` | Neue Erinnerung (optional mit Expense verlinkt) |
+| PUT | `/:id` | Erinnerung bearbeiten |
+| DELETE | `/:id` | Erinnerung löschen |
+| PATCH | `/:id/status` | Status ändern (done/dismissed) |
 
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
@@ -333,3 +357,7 @@ RATE_LIMIT_LOGIN=10
 - Session-Store ist ein Singleton — `require('../utils/sessionStore')` gibt immer dieselbe Instanz zurück
 - PDF-Export nutzt `pdfkit` (server-seitig) — Decrypt-Helfer sind in `export.js` repliziert (gleiche Logik wie `expenses.js`/`income.js`)
 - Gesamt-PDF-Export (`/api/export/pdf-all`) — exportiert alle Monate auf einmal, Button auf der Profilseite (`/portal/profil`)
+- **Erinnerungen** sind an Ausgaben gekoppelt (optional), überleben aber gelöschte Ausgaben (`onDelete: SetNull`)
+- `reminderDate` ist NICHT verschlüsselt (für DB-Queries nötig), `note` ist verschlüsselt
+- Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)
+- Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)

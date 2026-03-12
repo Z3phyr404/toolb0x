@@ -1979,6 +1979,33 @@
           <input type="checkbox" class="form-check" id="fExpRecurring" checked>
           <label class="form-check-label" for="fExpRecurring">Wiederkehrend (monatlich)</label>
         </div>
+        <div class="form-check-row">
+          <input type="checkbox" class="form-check" id="fExpReminder">
+          <label class="form-check-label" for="fExpReminder">Erinnerung setzen</label>
+        </div>
+        <div id="reminderFields" style="display:none">
+          <div class="form-row" style="display:flex;gap:10px">
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Erinnerungsdatum</label>
+              <input class="form-input" id="fExpReminderDate" type="date">
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="form-label">Tage vorher</label>
+              <select class="form-input" id="fExpReminderDays">
+                <option value="0">Am selben Tag</option>
+                <option value="1">1 Tag vorher</option>
+                <option value="3" selected>3 Tage vorher</option>
+                <option value="7">1 Woche vorher</option>
+                <option value="14">2 Wochen vorher</option>
+                <option value="30">1 Monat vorher</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notiz (optional)</label>
+            <input class="form-input" id="fExpReminderNote" placeholder="z.B. Kündigen bis...">
+          </div>
+        </div>
         <div class="duplicate-warning" id="dupWarnExpense" style="display:none">
           <div class="duplicate-warning-icon">!</div>
           <div>
@@ -2088,6 +2115,8 @@
     let editExpId = null;
     let editIncId = null;
     let editCatId = null;
+    let editReminderId = null;
+    let reminders = [];
     let selectedColor = PALETTE[0];
     let isLoginMode = true;
     let pendingDelType = null;
@@ -2326,14 +2355,16 @@
     }
 
     async function loadAllData() {
-      const [catData, expData, incData] = await Promise.all([
+      const [catData, expData, incData, remData] = await Promise.all([
         api('/categories'),
         api(`/expenses?month=${currentMonth}`),
         api(`/income?month=${currentMonth}`),
+        api('/reminders?status=pending'),
       ]);
       categories = catData.categories;
       expenses = expData.expenses;
       incomes = incData.incomes;
+      reminders = remData.reminders;
     }
 
     // ============================================================
@@ -2384,6 +2415,11 @@
     // Klick außerhalb Modal schließt es
     document.querySelectorAll('.modal-overlay').forEach(o => {
       o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+    });
+
+    // Erinnerungs-Felder ein-/ausblenden
+    document.getElementById('fExpReminder').addEventListener('change', function() {
+      document.getElementById('reminderFields').style.display = this.checked ? '' : 'none';
     });
 
     // ============================================================
@@ -2597,9 +2633,18 @@
     // ============================================================
     function openExpenseModal(id) {
       editExpId = id || null;
+      editReminderId = null;
       dupOverride.expense = false;
       document.getElementById('dupWarnExpense').style.display = 'none';
       document.getElementById('saveExpenseBtn').textContent = 'Speichern';
+
+      // Erinnerungs-Felder zurücksetzen
+      document.getElementById('fExpReminder').checked = false;
+      document.getElementById('reminderFields').style.display = 'none';
+      document.getElementById('fExpReminderDate').value = '';
+      document.getElementById('fExpReminderDays').value = '3';
+      document.getElementById('fExpReminderNote').value = '';
+
       if (id) {
         const e = expenses.find(x => x.id === id);
         document.getElementById('mExpTitle').textContent = 'Ausgabe bearbeiten';
@@ -2608,6 +2653,17 @@
         document.getElementById('fExpCat').value = e.categoryId || e.category?.id;
         document.getElementById('fExpRecurring').checked = e.isRecurring;
         currentTags = [...(e.tags || [])];
+
+        // Bestehende Erinnerung laden
+        const rem = reminders.find(r => r.expenseId === id && r.status === 'pending');
+        if (rem) {
+          editReminderId = rem.id;
+          document.getElementById('fExpReminder').checked = true;
+          document.getElementById('reminderFields').style.display = '';
+          document.getElementById('fExpReminderDate').value = rem.reminderDate.split('T')[0];
+          document.getElementById('fExpReminderDays').value = String(rem.daysBefore);
+          document.getElementById('fExpReminderNote').value = rem.note || '';
+        }
       } else {
         document.getElementById('mExpTitle').textContent = 'Ausgabe hinzufügen';
         document.getElementById('fExpName').value = '';
@@ -2642,13 +2698,36 @@
         }
       }
       try {
+        let savedExpenseId = editExpId;
         if (editExpId) {
           await api(`/expenses/${editExpId}`, { method: 'PUT', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
           toast('Ausgabe aktualisiert');
         } else {
-          await api('/expenses', { method: 'POST', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
+          const res = await api('/expenses', { method: 'POST', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
+          savedExpenseId = res.expense.id;
           toast('Ausgabe hinzugefügt');
         }
+
+        // Erinnerung erstellen/aktualisieren/löschen
+        const hasReminder = document.getElementById('fExpReminder').checked;
+        if (hasReminder) {
+          const reminderPayload = {
+            reminderDate: document.getElementById('fExpReminderDate').value,
+            daysBefore: parseInt(document.getElementById('fExpReminderDays').value),
+            note: document.getElementById('fExpReminderNote').value.trim(),
+            expenseId: savedExpenseId,
+          };
+          if (!reminderPayload.reminderDate) {
+            toast('Bitte Erinnerungsdatum eingeben', 'error');
+          } else if (editReminderId) {
+            await api(`/reminders/${editReminderId}`, { method: 'PUT', body: JSON.stringify(reminderPayload) });
+          } else {
+            await api('/reminders', { method: 'POST', body: JSON.stringify(reminderPayload) });
+          }
+        } else if (editReminderId) {
+          await api(`/reminders/${editReminderId}`, { method: 'DELETE' });
+        }
+
         closeM('mExpense');
         document.getElementById('saveExpenseBtn').textContent = 'Speichern';
         await loadAllData();
@@ -3010,7 +3089,7 @@
         const a = parseFloat(e.amount);
         const p = t > 0 ? (a / t * 100).toFixed(1) : 0;
         return `<tr>
-      <td style="font-weight:600">${e.name}</td>
+      <td style="font-weight:600">${e.name}${reminders.some(r => r.expenseId === e.id) ? ' <span title="Erinnerung gesetzt" style="color:var(--orange);font-size:14px;vertical-align:middle">&#128276;</span>' : ''}</td>
       <td><span class="cat-badge"><span class="cd" style="background:${c.color}"></span>${c.name}</span>${(e.tags||[]).map(t=>`<span class="tag-mini">${t}</span>`).join('')}</td>
       <td class="amount-cell" style="text-align:right;color:${c.color}">${fmt(a)}</td>
       <td style="text-align:right;color:var(--text-tertiary);font-size:13px">${p}%</td>

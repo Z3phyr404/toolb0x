@@ -183,11 +183,52 @@ function sanitize(text) {
   // Das Script wird dann nur als Text angezeigt, nicht ausgeführt.
 }
 
+// --------------------------------------------------------
+// Erinnerung validieren
+// --------------------------------------------------------
+function validateReminder(data) {
+  const errors = [];
+
+  // Erinnerungsdatum (Pflicht)
+  if (!data.reminderDate) {
+    errors.push('Bitte gib ein Datum für die Erinnerung ein.');
+  } else {
+    const d = new Date(data.reminderDate);
+    if (isNaN(d.getTime())) {
+      errors.push('Ungültiges Datumsformat.');
+    }
+  }
+
+  // Tage vorher (Pflicht, 0–90)
+  const days = parseInt(data.daysBefore);
+  if (isNaN(days) || days < 0 || days > 90) {
+    errors.push('Tage vorher muss zwischen 0 und 90 liegen.');
+  }
+
+  // Notiz (optional, max 200 Zeichen)
+  if (data.note && data.note.length > 200) {
+    errors.push('Die Notiz darf maximal 200 Zeichen lang sein.');
+  }
+
+  // Expense-ID (optional, aber wenn gesetzt → gültige UUID)
+  if (data.expenseId && !validator.isUUID(data.expenseId)) {
+    errors.push('Ungültige Ausgaben-ID.');
+  }
+
+  // Status (optional, nur bei Updates)
+  if (data.status && !['pending', 'done', 'dismissed'].includes(data.status)) {
+    errors.push('Ungültiger Status.');
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
   validateExpense,
   validateIncome,
   validateCategory,
+  validateReminder,
   sanitize,
 };
