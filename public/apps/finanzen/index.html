@@ -3095,21 +3095,25 @@
           </div>
           <span class="dash-reminder-badge ${cls}">${badge}</span>
           <div class="dash-reminder-actions">
-            <button onclick="markDashReminder('${r.id}','done')">Erledigt</button>
-            <button onclick="markDashReminder('${r.id}','dismissed')">Ausblenden</button>
+            <button data-rem-id="${r.id}" data-rem-action="done">Erledigt</button>
+            <button data-rem-id="${r.id}" data-rem-action="dismissed">Ausblenden</button>
           </div>
         </div>`;
       }).join('');
     }
 
-    async function markDashReminder(id, status) {
+    document.getElementById('dashReminders').addEventListener('click', async function(e) {
+      const btn = e.target.closest('[data-rem-action]');
+      if (!btn) return;
+      const id = btn.dataset.remId;
+      const status = btn.dataset.remAction;
       try {
         await api(`/reminders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
         reminders = reminders.filter(r => r.id !== id);
         renderDashReminders();
         toast(status === 'done' ? 'Erledigt!' : 'Ausgeblendet');
       } catch(e) { toast('Fehler', 'error'); }
-    }
+    });
 
     function renderDonut() {
       const grps = grouped(), t = totalExp();
