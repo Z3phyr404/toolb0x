@@ -504,6 +504,118 @@
       margin-top: 2px;
     }
 
+    /* ===== SEARCH BAR ===== */
+    .page-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      min-width: 220px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .search-bar:focus-within {
+      border-color: var(--blue);
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    .search-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
+    .search-input {
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .search-clear {
+      border: none;
+      background: rgba(0, 0, 0, 0.06);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      transition: all 0.2s;
+      flex-shrink: 0;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .search-clear:hover {
+      background: rgba(0, 0, 0, 0.1);
+      color: var(--text);
+    }
+
+    /* ===== DUPLICATE WARNING ===== */
+    .duplicate-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 149, 0, 0.1);
+      border: 1px solid rgba(255, 149, 0, 0.25);
+      margin-top: 14px;
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .duplicate-warning-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--orange);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .duplicate-warning-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--orange);
+    }
+
+    .duplicate-warning-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
     /* ===== MONTH SELECTOR ===== */
     .month-selector {
       display: flex;
@@ -1540,6 +1652,16 @@
         flex-direction: column;
         align-items: flex-start;
       }
+
+      .page-header-actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .search-bar {
+        min-width: unset;
+        flex: 1;
+      }
     }
   </style>
 </head>
@@ -1711,13 +1833,20 @@
             <div class="page-title">Ausgaben</div>
             <div class="page-subtitle" id="expCount">—</div>
           </div>
-          <button class="btn btn-primary" id="addExpenseBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Hinzufügen
-          </button>
+          <div class="page-header-actions">
+            <div class="search-bar glass">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="search-input" id="searchExpenses" placeholder="Suche nach Name, Kategorie oder Tag..." autocomplete="off">
+              <button class="search-clear" id="clearSearchExpenses" style="display:none">&times;</button>
+            </div>
+            <button class="btn btn-primary" id="addExpenseBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Hinzufügen
+            </button>
+          </div>
         </div>
         <div class="table-card glass">
           <table class="table">
@@ -1743,13 +1872,20 @@
             <div class="page-title">Einnahmen</div>
             <div class="page-subtitle" id="incCount">—</div>
           </div>
-          <button class="btn btn-primary" id="addIncomeBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Hinzufügen
-          </button>
+          <div class="page-header-actions">
+            <div class="search-bar glass">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="search-input" id="searchIncome" placeholder="Suche nach Name..." autocomplete="off">
+              <button class="search-clear" id="clearSearchIncome" style="display:none">&times;</button>
+            </div>
+            <button class="btn btn-primary" id="addIncomeBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Hinzufügen
+            </button>
+          </div>
         </div>
         <div class="income-card glass">
           <div id="incomeList"></div>
@@ -1767,13 +1903,20 @@
             <div class="page-title">Kategorien</div>
             <div class="page-subtitle" id="catCount">—</div>
           </div>
-          <button class="btn btn-primary" id="addCatBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Hinzufügen
-          </button>
+          <div class="page-header-actions">
+            <div class="search-bar glass">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" class="search-input" id="searchCategories" placeholder="Suche nach Name..." autocomplete="off">
+              <button class="search-clear" id="clearSearchCategories" style="display:none">&times;</button>
+            </div>
+            <button class="btn btn-primary" id="addCatBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Hinzufügen
+            </button>
+          </div>
         </div>
         <div class="cat-grid" id="catGrid"></div>
       </div>
@@ -1836,6 +1979,13 @@
           <input type="checkbox" class="form-check" id="fExpRecurring" checked>
           <label class="form-check-label" for="fExpRecurring">Wiederkehrend (monatlich)</label>
         </div>
+        <div class="duplicate-warning" id="dupWarnExpense" style="display:none">
+          <div class="duplicate-warning-icon">!</div>
+          <div>
+            <div class="duplicate-warning-title">Mögliches Duplikat gefunden</div>
+            <div class="duplicate-warning-desc" id="dupWarnExpenseDesc"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mExpense">Abbrechen</button><button
           class="btn btn-primary" id="saveExpenseBtn">Speichern</button></div>
@@ -1857,6 +2007,13 @@
           <input type="checkbox" class="form-check" id="fIncRecurring" checked>
           <label class="form-check-label" for="fIncRecurring">Wiederkehrend (monatlich)</label>
         </div>
+        <div class="duplicate-warning" id="dupWarnIncome" style="display:none">
+          <div class="duplicate-warning-icon">!</div>
+          <div>
+            <div class="duplicate-warning-title">Mögliches Duplikat gefunden</div>
+            <div class="duplicate-warning-desc" id="dupWarnIncomeDesc"></div>
+          </div>
+        </div>
       </div>
       <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mIncome">Abbrechen</button><button
           class="btn btn-primary" id="saveIncomeBtn">Speichern</button></div>
@@ -1875,6 +2032,13 @@
         <div class="form-group">
           <label class="form-label">Farbe</label>
           <div class="color-picker-row" id="colorPicker"></div>
+        </div>
+        <div class="duplicate-warning" id="dupWarnCat" style="display:none">
+          <div class="duplicate-warning-icon">!</div>
+          <div>
+            <div class="duplicate-warning-title">Mögliches Duplikat gefunden</div>
+            <div class="duplicate-warning-desc" id="dupWarnCatDesc"></div>
+          </div>
         </div>
       </div>
       <div class="modal-footer"><button class="btn btn-glass" data-close-modal="mCat">Abbrechen</button><button
@@ -1928,6 +2092,8 @@
     let isLoginMode = true;
     let pendingDelType = null;
     let pendingDelId = null;
+    let searchQuery = { expenses: '', income: '', categories: '' };
+    let dupOverride = { expense: false, income: false, category: false };
 
     // ============ HELPERS ============
     const fmt = n => Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -2180,6 +2346,7 @@
       if (newM > 12) { newM = 1; newY++; }
       if (newM < 1) { newM = 12; newY--; }
       currentMonth = `${newY}-${String(newM).padStart(2, '0')}`;
+      resetSearch();
       updateMonthDisplay();
       loadAllData().then(() => renderCurrentPage());
     }
@@ -2324,10 +2491,115 @@
     });
 
     // ============================================================
+    // SEARCH / FILTER
+    // ============================================================
+    function setupSearch(inputId, clearId, key, renderFn) {
+      const input = document.getElementById(inputId);
+      const clear = document.getElementById(clearId);
+      input.addEventListener('input', function () {
+        searchQuery[key] = this.value.trim().toLowerCase();
+        clear.style.display = searchQuery[key] ? '' : 'none';
+        renderFn();
+      });
+      clear.addEventListener('click', function () {
+        input.value = '';
+        searchQuery[key] = '';
+        clear.style.display = 'none';
+        renderFn();
+      });
+    }
+
+    function getFilteredExpenses() {
+      const q = searchQuery.expenses;
+      if (!q) return expenses;
+      return expenses.filter(e => {
+        if (e.name.toLowerCase().includes(q)) return true;
+        if ((e.tags || []).some(t => t.toLowerCase().includes(q))) return true;
+        const catName = getCat(e.categoryId || e.category?.id).name.toLowerCase();
+        if (catName.includes(q)) return true;
+        return false;
+      });
+    }
+
+    function getFilteredIncomes() {
+      const q = searchQuery.income;
+      if (!q) return incomes;
+      return incomes.filter(i => i.name.toLowerCase().includes(q));
+    }
+
+    function getFilteredCategories() {
+      const q = searchQuery.categories;
+      if (!q) return categories;
+      return categories.filter(c => c.name.toLowerCase().includes(q));
+    }
+
+    function resetSearch() {
+      searchQuery = { expenses: '', income: '', categories: '' };
+      ['searchExpenses', 'searchIncome', 'searchCategories'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      ['clearSearchExpenses', 'clearSearchIncome', 'clearSearchCategories'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    }
+
+    // ============================================================
+    // DUPLICATE DETECTION
+    // ============================================================
+    function findDuplicateExpense(name, amount, excludeId) {
+      const nameLower = name.trim().toLowerCase();
+      const amt = parseFloat(amount);
+      return expenses.find(e => {
+        if (excludeId && e.id === excludeId) return false;
+        return e.name.toLowerCase() === nameLower && parseFloat(e.amount) === amt;
+      });
+    }
+
+    function findDuplicateIncome(name, amount, excludeId) {
+      const nameLower = name.trim().toLowerCase();
+      const amt = parseFloat(amount);
+      return incomes.find(i => {
+        if (excludeId && i.id === excludeId) return false;
+        return i.name.toLowerCase() === nameLower && parseFloat(i.amount) === amt;
+      });
+    }
+
+    function findDuplicateCategory(name, excludeId) {
+      const nameLower = name.trim().toLowerCase();
+      return categories.find(c => {
+        if (excludeId && c.id === excludeId) return false;
+        return c.name.toLowerCase() === nameLower;
+      });
+    }
+
+    function resetDupWarning(type, warnId, btnId) {
+      dupOverride[type] = false;
+      document.getElementById(warnId).style.display = 'none';
+      document.getElementById(btnId).textContent = 'Speichern';
+    }
+
+    // Reset duplicate warnings when inputs change
+    document.getElementById('fExpName').addEventListener('input', () => { if (dupOverride.expense) resetDupWarning('expense', 'dupWarnExpense', 'saveExpenseBtn'); });
+    document.getElementById('fExpAmt').addEventListener('input', () => { if (dupOverride.expense) resetDupWarning('expense', 'dupWarnExpense', 'saveExpenseBtn'); });
+    document.getElementById('fIncName').addEventListener('input', () => { if (dupOverride.income) resetDupWarning('income', 'dupWarnIncome', 'saveIncomeBtn'); });
+    document.getElementById('fIncAmt').addEventListener('input', () => { if (dupOverride.income) resetDupWarning('income', 'dupWarnIncome', 'saveIncomeBtn'); });
+    document.getElementById('fCatName').addEventListener('input', () => { if (dupOverride.category) resetDupWarning('category', 'dupWarnCat', 'saveCatBtn'); });
+
+    // Setup search inputs
+    setupSearch('searchExpenses', 'clearSearchExpenses', 'expenses', renderTable);
+    setupSearch('searchIncome', 'clearSearchIncome', 'income', renderIncome);
+    setupSearch('searchCategories', 'clearSearchCategories', 'categories', renderCats);
+
+    // ============================================================
     // EXPENSE MODAL & CRUD
     // ============================================================
     function openExpenseModal(id) {
       editExpId = id || null;
+      dupOverride.expense = false;
+      document.getElementById('dupWarnExpense').style.display = 'none';
+      document.getElementById('saveExpenseBtn').textContent = 'Speichern';
       if (id) {
         const e = expenses.find(x => x.id === id);
         document.getElementById('mExpTitle').textContent = 'Ausgabe bearbeiten';
@@ -2359,6 +2631,16 @@
       const tags = [...currentTags];
       if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
       if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
+      if (!editExpId && !dupOverride.expense) {
+        const dup = findDuplicateExpense(name, amount, null);
+        if (dup) {
+          document.getElementById('dupWarnExpenseDesc').textContent = `"${dup.name}" mit ${fmt(parseFloat(dup.amount))} existiert bereits in ${monthLabel(currentMonth)}. Trotzdem anlegen?`;
+          document.getElementById('dupWarnExpense').style.display = '';
+          document.getElementById('saveExpenseBtn').textContent = 'Trotzdem speichern';
+          dupOverride.expense = true;
+          return;
+        }
+      }
       try {
         if (editExpId) {
           await api(`/expenses/${editExpId}`, { method: 'PUT', body: JSON.stringify({ name, amount, categoryId, tags, month: currentMonth, isRecurring }) });
@@ -2368,6 +2650,7 @@
           toast('Ausgabe hinzugefügt');
         }
         closeM('mExpense');
+        document.getElementById('saveExpenseBtn').textContent = 'Speichern';
         await loadAllData();
         renderCurrentPage();
       } catch (err) {
@@ -2391,6 +2674,9 @@
     // ============================================================
     function openIncomeModal(id) {
       editIncId = id || null;
+      dupOverride.income = false;
+      document.getElementById('dupWarnIncome').style.display = 'none';
+      document.getElementById('saveIncomeBtn').textContent = 'Speichern';
       if (id) {
         const i = incomes.find(x => x.id === id);
         document.getElementById('mIncTitle').textContent = 'Einnahme bearbeiten';
@@ -2413,6 +2699,16 @@
       const isRecurring = document.getElementById('fIncRecurring').checked;
       if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
       if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
+      if (!editIncId && !dupOverride.income) {
+        const dup = findDuplicateIncome(name, amount, null);
+        if (dup) {
+          document.getElementById('dupWarnIncomeDesc').textContent = `"${dup.name}" mit ${fmt(parseFloat(dup.amount))} existiert bereits in ${monthLabel(currentMonth)}. Trotzdem anlegen?`;
+          document.getElementById('dupWarnIncome').style.display = '';
+          document.getElementById('saveIncomeBtn').textContent = 'Trotzdem speichern';
+          dupOverride.income = true;
+          return;
+        }
+      }
       try {
         if (editIncId) {
           await api(`/income/${editIncId}`, { method: 'PUT', body: JSON.stringify({ name, amount, month: currentMonth, isRecurring }) });
@@ -2422,6 +2718,7 @@
           toast('Einnahme hinzugefügt');
         }
         closeM('mIncome');
+        document.getElementById('saveIncomeBtn').textContent = 'Speichern';
         await loadAllData();
         renderCurrentPage();
       } catch (err) {
@@ -2445,6 +2742,9 @@
     // ============================================================
     function openCatModal(id) {
       editCatId = id || null;
+      dupOverride.category = false;
+      document.getElementById('dupWarnCat').style.display = 'none';
+      document.getElementById('saveCatBtn').textContent = 'Speichern';
       if (id) {
         const c = categories.find(x => x.id === id);
         document.getElementById('mCatTitle').textContent = 'Kategorie bearbeiten';
@@ -2463,6 +2763,16 @@
     async function saveCat() {
       const name = document.getElementById('fCatName').value.trim();
       if (!name) { toast('Bitte Name eingeben', 'error'); return; }
+      if (!editCatId && !dupOverride.category) {
+        const dup = findDuplicateCategory(name, null);
+        if (dup) {
+          document.getElementById('dupWarnCatDesc').textContent = `Eine Kategorie "${dup.name}" existiert bereits. Trotzdem anlegen?`;
+          document.getElementById('dupWarnCat').style.display = '';
+          document.getElementById('saveCatBtn').textContent = 'Trotzdem speichern';
+          dupOverride.category = true;
+          return;
+        }
+      }
       try {
         if (editCatId) {
           await api(`/categories/${editCatId}`, { method: 'PUT', body: JSON.stringify({ name, color: selectedColor }) });
@@ -2472,6 +2782,7 @@
           toast('Kategorie hinzugefügt');
         }
         closeM('mCat');
+        document.getElementById('saveCatBtn').textContent = 'Speichern';
         await loadAllData();
         renderCurrentPage();
       } catch (err) {
@@ -2684,12 +2995,14 @@
     // RENDER: EXPENSES TABLE
     // ============================================================
     function renderTable() {
-      const t = totalExp();
-      const sorted = [...expenses].sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
-      document.getElementById('expCount').textContent = `${sorted.length} Posten · ${fmtS(t)}`;
+      const filtered = getFilteredExpenses();
+      const t = filtered.reduce((s, e) => s + parseFloat(e.amount), 0);
+      const sorted = [...filtered].sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
+      const filterNote = searchQuery.expenses ? ` (gefiltert aus ${expenses.length})` : '';
+      document.getElementById('expCount').textContent = `${sorted.length} Posten${filterNote} · ${fmtS(t)}`;
       const tb = document.getElementById('expTbody');
       if (!sorted.length) {
-        tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-tertiary)">Keine Ausgaben für ${monthLabel(currentMonth)}</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-tertiary)">${searchQuery.expenses ? 'Keine Treffer' : 'Keine Ausgaben für ' + monthLabel(currentMonth)}</td></tr>`;
         return;
       }
       tb.innerHTML = sorted.map(e => {
@@ -2713,13 +3026,15 @@
     // RENDER: INCOME
     // ============================================================
     function renderIncome() {
-      const t = totalInc();
-      document.getElementById('incCount').textContent = `${incomes.length} Einnahmen · ${fmtS(t)}`;
+      const filtered = getFilteredIncomes();
+      const t = filtered.reduce((s, i) => s + parseFloat(i.amount), 0);
+      const filterNote = searchQuery.income ? ` (gefiltert aus ${incomes.length})` : '';
+      document.getElementById('incCount').textContent = `${filtered.length} Einnahmen${filterNote} · ${fmtS(t)}`;
       const list = document.getElementById('incomeList');
-      if (!incomes.length) {
-        list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Keine Einnahmen für ${monthLabel(currentMonth)}</div>`;
+      if (!filtered.length) {
+        list.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-tertiary)">${searchQuery.income ? 'Keine Treffer' : 'Keine Einnahmen für ' + monthLabel(currentMonth)}</div>`;
       } else {
-        list.innerHTML = incomes.map(i => `
+        list.innerHTML = filtered.map(i => `
       <div class="income-item">
         <div>
           <div class="income-item-name">${i.name}</div>
@@ -2734,15 +3049,17 @@
         </div>
       </div>`).join('');
       }
-      document.getElementById('incomeTotalVal').textContent = fmtS(t);
+      document.getElementById('incomeTotalVal').textContent = fmtS(totalInc());
     }
 
     // ============================================================
     // RENDER: CATEGORIES
     // ============================================================
     function renderCats() {
-      document.getElementById('catCount').textContent = `${categories.length} Kategorien`;
-      document.getElementById('catGrid').innerHTML = categories.map(c => {
+      const filtered = getFilteredCategories();
+      const filterNote = searchQuery.categories ? ` (gefiltert aus ${categories.length})` : '';
+      document.getElementById('catCount').textContent = `${filtered.length} Kategorien${filterNote}`;
+      document.getElementById('catGrid').innerHTML = filtered.map(c => {
         const catExpenses = expenses.filter(e => (e.categoryId || e.category?.id) === c.id);
         const amt = catExpenses.reduce((s, e) => s + parseFloat(e.amount), 0);
         const count = catExpenses.length;
