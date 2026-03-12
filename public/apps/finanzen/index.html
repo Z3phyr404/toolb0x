@@ -763,6 +763,80 @@
       letter-spacing: -0.02em;
     }
 
+    /* ===== DASHBOARD REMINDERS ===== */
+    .dash-reminders {
+      margin-bottom: 24px;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+    .dash-reminders-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dash-reminder-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dash-reminder-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.08);
+      gap: 12px;
+    }
+    .dash-reminder-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .dash-reminder-name {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dash-reminder-note {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .dash-reminder-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .dash-reminder-badge.overdue { background: rgba(255,59,48,0.15); color: var(--red); }
+    .dash-reminder-badge.soon { background: rgba(255,149,0,0.15); color: var(--orange); }
+    .dash-reminder-badge.ok { background: rgba(48,209,88,0.15); color: var(--green); }
+    .dash-reminder-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .dash-reminder-actions button {
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .dash-reminder-actions button:hover {
+      background: rgba(255,255,255,0.2);
+      color: var(--text);
+    }
+
     /* ===== DONUT + BARS ===== */
     .chart-row {
       display: grid;
@@ -1797,6 +1871,10 @@
           </button>
         </div>
         <div class="kpi-row" id="kpiRow"></div>
+        <div class="dash-reminders glass" id="dashReminders" style="display:none">
+          <div class="dash-reminders-title">&#128276; Erinnerungen</div>
+          <div class="dash-reminder-list" id="dashReminderList"></div>
+        </div>
         <div class="chart-row">
           <div class="card glass">
             <div class="card-title">Ausgaben nach Kategorie</div>
@@ -2941,7 +3019,7 @@
     // ============================================================
     // RENDER: DASHBOARD
     // ============================================================
-    function renderDash() { renderKPIs(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
+    function renderDash() { renderKPIs(); renderDashReminders(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
 
     function grouped() {
       const m = {};
@@ -2980,6 +3058,57 @@
       <div class="kpi-label">Sparquote</div>
       <div class="kpi-value" style="color:var(--yellow)">${savRate}%</div>
     </div>`;
+    }
+
+    function renderDashReminders() {
+      const container = document.getElementById('dashReminders');
+      const list = document.getElementById('dashReminderList');
+      const today = new Date(); today.setHours(0,0,0,0);
+
+      // Alle Erinnerungen anzeigen (pending)
+      const pending = reminders.filter(r => r.status === 'pending');
+      if (pending.length === 0) { container.style.display = 'none'; return; }
+
+      // Sortieren: überfällige zuerst, dann nach Datum
+      const sorted = pending.map(r => {
+        const rd = new Date(r.reminderDate); rd.setHours(0,0,0,0);
+        const alertDate = new Date(rd); alertDate.setDate(alertDate.getDate() - r.daysBefore);
+        const daysLeft = Math.ceil((rd - today) / 86400000);
+        return { ...r, daysLeft, alertDate };
+      }).sort((a, b) => a.daysLeft - b.daysLeft);
+
+      container.style.display = '';
+      list.innerHTML = sorted.map(r => {
+        let badge, cls;
+        if (r.daysLeft < 0) { badge = `${Math.abs(r.daysLeft)}d überfällig`; cls = 'overdue'; }
+        else if (r.daysLeft <= 3) { badge = r.daysLeft === 0 ? 'Heute' : `${r.daysLeft}d`; cls = 'soon'; }
+        else { badge = `${r.daysLeft}d`; cls = 'ok'; }
+
+        const expName = r.expense ? r.expense.name : '';
+        const label = expName || r.note || 'Erinnerung';
+        const note = expName && r.note ? r.note : (!expName && !r.note ? '' : '');
+
+        return `<div class="dash-reminder-item">
+          <div class="dash-reminder-info">
+            <div class="dash-reminder-name">${label}</div>
+            ${note ? `<div class="dash-reminder-note">${note}</div>` : ''}
+          </div>
+          <span class="dash-reminder-badge ${cls}">${badge}</span>
+          <div class="dash-reminder-actions">
+            <button onclick="markDashReminder('${r.id}','done')">Erledigt</button>
+            <button onclick="markDashReminder('${r.id}','dismissed')">Ausblenden</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function markDashReminder(id, status) {
+      try {
+        await api(`/reminders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+        reminders = reminders.filter(r => r.id !== id);
+        renderDashReminders();
+        toast(status === 'done' ? 'Erledigt!' : 'Ausgeblendet');
+      } catch(e) { toast('Fehler', 'error'); }
     }
 
     function renderDonut() {
