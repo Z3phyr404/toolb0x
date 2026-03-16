@@ -21,6 +21,7 @@ model User {
   password     String
   name         String
   role         String   @default("user")  // "user" | "admin"
+  suspended    Boolean  @default(false)   // Gesperrte Nutzer können sich nicht einloggen
   encryptedKey String   // Encryption Key, verschlüsselt mit dem User-Passwort
 
   createdAt DateTime @default(now())

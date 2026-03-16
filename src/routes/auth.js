@@ -148,6 +148,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Gesperrte Nutzer können sich nicht einloggen
+    if (user.suspended) {
+      return res.status(403).json({
+        errors: ['Dein Konto wurde gesperrt. Bitte kontaktiere den Administrator.'],
+      });
+    }
+
     const encKey = unwrapEncryptionKey(user.encryptedKey, password);
     if (!encKey) {
       return res.status(500).json({

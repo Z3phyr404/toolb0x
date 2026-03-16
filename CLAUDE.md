@@ -39,7 +39,7 @@ toolb0x/
 │       ├── expenses.js                  # /api/expenses CRUD + summary
 │       ├── income.js                    # /api/income CRUD
 │       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
-│       ├── admin.js                     # /api/admin/stats — Admin-Statistiken (requireAdmin)
+│       ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
 │       └── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
 └── public/
     ├── portal/
@@ -143,7 +143,7 @@ decryptFields(obj, key, fields)  // Objekt mit ausgewählten Feldern entschlüss
 
 ### User
 ```
-id (UUID), email (unique), password (bcrypt), name, role (default "user"), encryptedKey
+id (UUID), email (unique), password (bcrypt), name, role (default "user"), suspended (default false), encryptedKey
 createdAt, updatedAt
 → hat: categories[], expenses[], incomes[], monthInits[], reminders[]
 ```
@@ -240,6 +240,8 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 | Methode | Route | Beschreibung |
 |---------|-------|-------------|
 | GET | `/stats` | Nutzeranzahl + neuester Nutzer (`requireAuth` + `requireAdmin`) |
+| GET | `/users` | Nutzerliste mit E-Mail, Rolle, Datenstatistiken |
+| PATCH | `/users/:id/suspend` | Nutzer sperren/entsperren (body: `{ suspended: bool }`) |
 
 ---
 
@@ -372,3 +374,4 @@ RATE_LIMIT_LOGIN=10
 - Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)
 - Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)
 - **Admin-Bereich** (`/app/admin`): Nur für User mit `role: 'admin'` sichtbar. Admin-Karte im Portal wird per JS bedingt angezeigt. Backend geschützt durch `requireAdmin` Middleware. Admin sieht nur unverschlüsselte Felder (Zero-Knowledge gewahrt). Admin-Rolle nur per DB-Zugriff setzbar.
+- **Nutzersperre** (`suspended`-Feld): Gesperrte Nutzer können sich nicht einloggen (403 beim Login). Beim Sperren werden alle aktiven Sessions sofort beendet (`sessionStore.deleteAllForUser`). Admins können nicht gesperrt werden. Admin kann sich nicht selbst sperren.
