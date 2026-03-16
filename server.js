@@ -59,6 +59,12 @@ app.use('/app/finanzen', express.static(path.join(__dirname, 'public', 'apps', '
   index: false,
 }));
 
+// Statische Dateien: Admin-Bereich (nur CSS/JS/Bilder, kein HTML)
+app.use('/app/admin', express.static(path.join(__dirname, 'public', 'apps', 'admin'), {
+  etag: true,
+  index: false,
+}));
+
 // Gemeinsame Assets (CSS, Fonts, etc.)
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), { etag: true }));
 
@@ -71,6 +77,7 @@ const expenseRoutes = require('./src/routes/expenses');
 const incomeRoutes = require('./src/routes/income');
 const exportRoutes = require('./src/routes/export');
 const reminderRoutes = require('./src/routes/reminders');
+const adminRoutes = require('./src/routes/admin');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -78,6 +85,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/income', incomeRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -101,6 +109,11 @@ app.get('/app/finanzen', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'apps', 'finanzen', 'index.html')
 ));
 
+// Admin-Bereich
+app.get('/app/admin', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'apps', 'admin', 'index.html')
+));
+
 // 404 für API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API-Route nicht gefunden.' });
@@ -121,5 +134,6 @@ app.listen(PORT, () => {
   console.log(`💰 Finanz-App:  http://localhost:${PORT}/app/finanzen`);
   console.log(`📡 API:         http://localhost:${PORT}/api`);
   console.log(`🔔 Erinnerungen: http://localhost:${PORT}/api/reminders`);
+  console.log(`🔧 Admin:        http://localhost:${PORT}/app/admin`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });

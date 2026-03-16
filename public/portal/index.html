@@ -180,6 +180,14 @@ a.portal-user-name:hover { color:var(--blue); }
       <span class="tool-badge active">✓ Verfügbar</span>
     </a>
 
+    <!-- ADMIN-BEREICH (nur für Admins sichtbar) -->
+    <a href="/app/admin" class="tool-card glass" id="adminCard" style="display:none">
+      <div class="tool-icon" style="background:rgba(88,86,214,0.12);color:var(--indigo)">&#9881;</div>
+      <div class="tool-name">Administration</div>
+      <div class="tool-desc">Nutzerübersicht und System-Statistiken. Nur für Administratoren sichtbar.</div>
+      <span class="tool-badge active">&#10003; Verfügbar</span>
+    </a>
+
     <!-- PLATZHALTER: Zukünftige Tools -->
     <div class="tool-card glass" style="opacity:0.6;cursor:default">
       <div class="tool-icon" style="background:rgba(175,82,222,0.12);color:var(--purple)">📝</div>
@@ -296,6 +304,12 @@ async function checkAuth() {
     document.getElementById('portal').classList.add('active');
     document.getElementById('portalUserName').textContent = user.name;
     document.getElementById('portalGreeting').textContent = user.name.split(' ')[0];
+
+    // Admin-Karte anzeigen
+    var adminCard = document.getElementById('adminCard');
+    if (adminCard) {
+      adminCard.style.display = (user.role === 'admin') ? '' : 'none';
+    }
 
     // Session-Timeout starten
     SessionTimeout.start(function () {

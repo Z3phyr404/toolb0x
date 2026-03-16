@@ -67,4 +67,25 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+// ============================================================
+// ADMIN-MIDDLEWARE — prüft ob User Admin-Rolle hat
+// ============================================================
+// Muss NACH requireAuth verwendet werden (braucht req.userId).
+// ============================================================
+
+function requireAdmin(req, res, next) {
+  const prisma = require('../utils/prisma');
+  prisma.user.findUnique({
+    where: { id: req.userId },
+    select: { role: true },
+  }).then(user => {
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Keine Berechtigung.' });
+    }
+    next();
+  }).catch(() => {
+    res.status(500).json({ error: 'Berechtigungsprüfung fehlgeschlagen.' });
+  });
+}
+
+module.exports = { requireAuth, requireAdmin };

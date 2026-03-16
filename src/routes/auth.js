@@ -213,6 +213,7 @@ router.get('/me', requireAuth, async (req, res) => {
         id: true,
         email: true,
         name: true,
+        role: true,
         createdAt: true,
       },
     });

@@ -31,7 +31,7 @@ toolb0x/
 │   │   ├── prisma.js                    # Zentrale Prisma-Instanz (ein Pool)
 │   │   └── validation.js               # Eingabe-Validierung & Sanitization
 │   ├── middleware/
-│   │   ├── auth.js                      # requireAuth: JWT prüfen + Enc-Key aus RAM holen
+│   │   ├── auth.js                      # requireAuth + requireAdmin: JWT prüfen + Enc-Key aus RAM holen
 │   │   └── security.js                  # Helmet, CORS, Rate-Limiting, HPP, Body-Parser
 │   └── routes/
 │       ├── auth.js                      # /api/auth/* (login, register, logout, me, password, profile)
@@ -39,14 +39,17 @@ toolb0x/
 │       ├── expenses.js                  # /api/expenses CRUD + summary
 │       ├── income.js                    # /api/income CRUD
 │       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
+│       ├── admin.js                     # /api/admin/stats — Admin-Statistiken (requireAdmin)
 │       └── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
     │   └── profil.html                  # Profil-/Einstellungsseite
     ├── apps/
-    │   └── finanzen/
-    │       └── index.html               # Finanz-App (komplette SPA in einer HTML-Datei)
+    │   ├── finanzen/
+    │   │   └── index.html               # Finanz-App (komplette SPA in einer HTML-Datei)
+    │   └── admin/
+    │       └── index.html               # Admin-Bereich (Nutzerübersicht, nur für Admins)
     └── shared/
         └── session-timeout.js           # Inaktivitäts-Timeout (20min), Browser-Restart-Erkennung
 ```
@@ -61,12 +64,14 @@ toolb0x/
 | `/portal` | Tool-Übersicht (HTML mit Nonce) |
 | `/portal/profil` | Profilseite (HTML mit Nonce) |
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |
+| `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
 | `/api/auth/*` | Auth-API |
 | `/api/categories/*` | Kategorien-API |
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
 | `/api/reminders/*` | Erinnerungs-API |
+| `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -138,7 +143,7 @@ decryptFields(obj, key, fields)  // Objekt mit ausgewählten Feldern entschlüss
 
 ### User
 ```
-id (UUID), email (unique), password (bcrypt), name, encryptedKey
+id (UUID), email (unique), password (bcrypt), name, role (default "user"), encryptedKey
 createdAt, updatedAt
 → hat: categories[], expenses[], incomes[], monthInits[], reminders[]
 ```
@@ -230,6 +235,11 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
 - GET `/pdf-all` — Gesamt-PDF-Export aller Einnahmen & Ausgaben (Monatsübersicht + Details pro Monat)
+
+### Admin (`/api/admin/`)
+| Methode | Route | Beschreibung |
+|---------|-------|-------------|
+| GET | `/stats` | Nutzeranzahl + neuester Nutzer (`requireAuth` + `requireAdmin`) |
 
 ---
 
@@ -361,3 +371,4 @@ RATE_LIMIT_LOGIN=10
 - `reminderDate` ist NICHT verschlüsselt (für DB-Queries nötig), `note` ist verschlüsselt
 - Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)
 - Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)
+- **Admin-Bereich** (`/app/admin`): Nur für User mit `role: 'admin'` sichtbar. Admin-Karte im Portal wird per JS bedingt angezeigt. Backend geschützt durch `requireAdmin` Middleware. Admin sieht nur unverschlüsselte Felder (Zero-Knowledge gewahrt). Admin-Rolle nur per DB-Zugriff setzbar.
