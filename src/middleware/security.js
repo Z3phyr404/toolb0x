@@ -17,10 +17,9 @@ function setupSecurity(app) {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "'unsafe-hashes'"],
-          scriptSrcAttr: ["'unsafe-hashes'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
+          styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
+          fontSrc: ["'self'"],
           imgSrc: ["'self'", "data:"],
           connectSrc: ["'self'"],
         },
@@ -44,7 +43,7 @@ function setupSecurity(app) {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     maxAge: 86400,
   };
   app.use(cors(corsOptions));
@@ -74,6 +73,16 @@ function setupSecurity(app) {
   });
   app.use('/api/auth/register', registerLimiter);
 
+  // Sensitive Endpunkte: strengeres Rate-Limit
+  const sensitiveLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { error: 'Zu viele Anfragen. Bitte warte einen Moment.' },
+  });
+  app.use('/api/auth/password', sensitiveLimiter);
+  app.use('/api/auth/profile', sensitiveLimiter);
+  app.use('/api/auth/account', sensitiveLimiter);
+
   // 4. HPP
   app.use(hpp());
 
@@ -81,6 +90,46 @@ function setupSecurity(app) {
   const express = require('express');
   app.use(express.json({ limit: '10kb' }));
   app.use(express.urlencoded({ extended: false, limit: '10kb' }));
+
+  // 6. CSRF-Schutz (Double-Submit-Cookie-Pattern)
+  // Bei jeder Antwort wird ein CSRF-Token als Cookie gesetzt.
+  // State-changing Requests müssen dieses Token im Header mitschicken.
+  app.use((req, res, next) => {
+    // Token generieren falls noch nicht vorhanden
+    if (!req.cookies?.csrf_token) {
+      const csrfToken = crypto.randomBytes(32).toString('hex');
+      res.cookie('csrf_token', csrfToken, {
+        httpOnly: false,    // JS muss darauf zugreifen können
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+      });
+    }
+
+    // GET/HEAD/OPTIONS sind safe — kein CSRF-Check nötig
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+      return next();
+    }
+
+    // Login und Register sind ausgenommen (noch kein Token vorhanden)
+    if (req.path === '/api/auth/login' || req.path === '/api/auth/register') {
+      return next();
+    }
+
+    // Nur API-Routen prüfen
+    if (!req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    const cookieToken = req.cookies?.csrf_token;
+    const headerToken = req.headers['x-csrf-token'];
+
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+      return res.status(403).json({ error: 'CSRF-Token ungültig.' });
+    }
+
+    next();
+  });
 }
 
 module.exports = { setupSecurity };

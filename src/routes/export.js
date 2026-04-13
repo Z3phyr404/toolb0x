@@ -434,10 +434,12 @@ router.get('/pdf-all', async (req, res) => {
         where: { userId: req.userId },
         include: { category: { select: { id: true, name: true, color: true } } },
         orderBy: { month: 'desc' },
+        take: 10000,
       }),
       prisma.income.findMany({
         where: { userId: req.userId },
         orderBy: { month: 'desc' },
+        take: 10000,
       }),
     ]);
 

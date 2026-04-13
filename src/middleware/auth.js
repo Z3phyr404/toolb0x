@@ -7,8 +7,9 @@
 
 const jwt = require('jsonwebtoken');
 const sessionStore = require('../utils/sessionStore');
+const prisma = require('../utils/prisma');
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   try {
     const token = req.cookies?.auth_token;
 
@@ -18,7 +19,7 @@ function requireAuth(req, res, next) {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
 
     // Session aus dem Store holen
     const session = sessionStore.get(decoded.sid);
@@ -32,6 +33,18 @@ function requireAuth(req, res, next) {
     if (session.userId !== decoded.userId) {
       return res.status(401).json({
         error: 'Ungültige Sitzung.',
+      });
+    }
+
+    // Suspended-Check: gesperrte Nutzer sofort abweisen
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { suspended: true },
+    });
+    if (!user || user.suspended) {
+      sessionStore.delete(decoded.sid);
+      return res.status(403).json({
+        error: 'Konto gesperrt. Bitte kontaktiere den Administrator.',
       });
     }
 

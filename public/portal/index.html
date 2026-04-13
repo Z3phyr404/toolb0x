@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Tool-Portal</title>
-<style>
+<style nonce="__CSP_NONCE__">
 @font-face { font-family:'SF'; src: local('SF Pro Display'),local('-apple-system'),local('BlinkMacSystemFont'),local('Helvetica Neue'); }
 :root {
   --glass-bg: rgba(255,255,255,0.12);
@@ -227,10 +227,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 let isLoginMode = true;
 
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function getCsrfToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return m ? m[1] : '';
+}
+
 function toast(msg, type='success') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `${type==='success'?'✓':'✕'} ${msg}`;
+  el.innerHTML = `${type==='success'?'✓':'✕'} ${escapeHtml(msg)}`;
   document.getElementById('toasts').appendChild(el);
   setTimeout(()=>el.remove(), 3100);
 }
@@ -274,7 +285,7 @@ async function handleAuth(e) {
     SessionTimeout.markActive();
     await checkAuth();
   } catch (err) {
-    errEl.innerHTML = err.errors?.join('<br>') || err.error || 'Ein Fehler ist aufgetreten.';
+    errEl.textContent = err.errors?.join(', ') || err.error || 'Ein Fehler ist aufgetreten.';
     errEl.classList.add('show');
   } finally {
     btn.disabled = false;
@@ -284,7 +295,7 @@ async function handleAuth(e) {
 
 async function logout() {
   SessionTimeout.stop();
-  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(() => {});
   document.getElementById('portal').classList.remove('active');
   document.getElementById('authScreen').classList.remove('hidden');
 }
@@ -294,7 +305,7 @@ async function checkAuth() {
   try {
     // Browser wurde geschlossen? → Session beenden
     if (SessionTimeout.wasRestarted()) {
-      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {});
+      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(function () {});
       throw new Error('browser-restart');
     }
 
@@ -364,8 +375,8 @@ async function loadReminders() {
 
       return '<div class="reminder-item">'
         + '<div>'
-        + '<div class="reminder-item-name">' + expName + '</div>'
-        + '<div class="reminder-item-date">' + dateStr + (r.note ? ' \u2014 ' + r.note : '') + '</div>'
+        + '<div class="reminder-item-name">' + escapeHtml(expName) + '</div>'
+        + '<div class="reminder-item-date">' + escapeHtml(dateStr) + (r.note ? ' \u2014 ' + escapeHtml(r.note) : '') + '</div>'
         + '<div class="reminder-actions">'
         + '<button class="reminder-action-btn done" data-reminder-done="' + r.id + '">Erledigt</button>'
         + '<button class="reminder-action-btn dismiss" data-reminder-dismiss="' + r.id + '">Ausblenden</button>'
@@ -389,7 +400,7 @@ document.getElementById('reminderCard').addEventListener('click', async function
     try {
       await fetch(API + '/reminders/' + doneBtn.dataset.reminderDone + '/status', {
         method: 'PATCH', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ status: 'done' }),
       });
       toast('Erinnerung als erledigt markiert');
@@ -400,7 +411,7 @@ document.getElementById('reminderCard').addEventListener('click', async function
     try {
       await fetch(API + '/reminders/' + dismissBtn.dataset.reminderDismiss + '/status', {
         method: 'PATCH', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ status: 'dismissed' }),
       });
       loadReminders();

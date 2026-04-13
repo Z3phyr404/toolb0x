@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Toolb0x — Administration</title>
-  <style>
+  <style nonce="__CSP_NONCE__">
     /* ============================================================
    iOS 26 LIQUID GLASS — ADMIN
    ============================================================ */
@@ -649,7 +649,8 @@
           try {
             var res = await fetch('/api/admin/users/' + userId + '/suspend', {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
               body: JSON.stringify({ suspended: suspend }),
             });
             var data = await res.json();
@@ -679,6 +680,11 @@
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(str));
         return div.innerHTML;
+      }
+
+      function getCsrfToken() {
+        var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+        return m ? m[1] : '';
       }
 
       function showToast(msg, isError) {

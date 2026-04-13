@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Profil — ToolBox</title>
-<style>
+<style nonce="__CSP_NONCE__">
 @font-face { font-family:'SF'; src: local('SF Pro Display'),local('-apple-system'),local('BlinkMacSystemFont'),local('Helvetica Neue'); }
 :root {
   --glass-bg: rgba(255,255,255,0.12);
@@ -229,6 +229,11 @@ function toast(msg, type) {
   setTimeout(function() { el.remove(); }, 3100);
 }
 
+function getCsrfToken() {
+  var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return m ? m[1] : '';
+}
+
 // ---- Loading ----
 function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
 function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
@@ -238,7 +243,7 @@ async function checkAuth() {
   showLoading();
   try {
     if (SessionTimeout.wasRestarted()) {
-      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function() {});
+      await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(function() {});
       throw new Error('browser-restart');
     }
     var res = await fetch(API + '/auth/me', { credentials: 'include' });
@@ -271,7 +276,7 @@ function populateProfile(user) {
 // ---- Logout ----
 async function logout() {
   SessionTimeout.stop();
-  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function() {});
+  await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(function() {});
   window.location.href = '/portal';
 }
 
@@ -297,7 +302,7 @@ document.getElementById('profileForm').addEventListener('submit', async function
   try {
     var res = await fetch(API + '/auth/profile', {
       method: 'PUT', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ name: name, email: email, currentPassword: currentPassword }),
     });
     var data = await res.json();
@@ -354,7 +359,7 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
   try {
     var res = await fetch(API + '/auth/account', {
       method: 'DELETE', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ currentPassword: password }),
     });
     var data = await res.json();

@@ -33,11 +33,11 @@ class SessionStore {
     // Map: sessionId → { userId, encryptionKey, createdAt }
     this.sessions = new Map();
 
-    // Abgelaufene Sessions alle 15 Minuten aufräumen
-    this.cleanupInterval = setInterval(() => this.cleanup(), 15 * 60 * 1000);
+    // Abgelaufene Sessions alle 5 Minuten aufräumen
+    this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
 
-    // Session-Lebensdauer: 24 Stunden (muss mit JWT expiresIn übereinstimmen)
-    this.maxAge = 24 * 60 * 60 * 1000;
+    // Session-Lebensdauer: 30 Minuten (passend zum JWT expiresIn von 20min + Puffer)
+    this.maxAge = 30 * 60 * 1000;
   }
 
   /**

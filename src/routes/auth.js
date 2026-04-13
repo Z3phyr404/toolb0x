@@ -162,6 +162,9 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Alte Sessions invalidieren (verhindert Session-Akkumulation)
+    sessionStore.deleteAllForUser(user.id);
+
     // Fix #1: Key im Session-Store statt im JWT
     const sessionId = sessionStore.create(user.id, encKey);
     const token = createToken(user.id, sessionId);

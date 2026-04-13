@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Toolb0x</title>
-  <style>
+  <style nonce="__CSP_NONCE__">
     /* ============================================================
    iOS 26 LIQUID GLASS — FINANZ APP
    ============================================================ */
@@ -2217,11 +2217,17 @@
       return `${MONTHS_DE[parseInt(m) - 1]} ${y}`;
     }
 
+    // ============ CSRF TOKEN ============
+    function getCsrfToken() {
+      const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+      return m ? m[1] : '';
+    }
+
     // ============ API HELPER ============
     async function api(path, options = {}) {
       const res = await fetch(API + path, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...options.headers },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), ...options.headers },
         ...options,
       });
       const data = await res.json();
@@ -2229,12 +2235,19 @@
       return data;
     }
 
+    // ============ HTML ESCAPING ============
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
     // ============ TOAST ============
     function toast(msg, type = 'success') {
       const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
       const el = document.createElement('div');
       el.className = `toast ${type}`;
-      el.innerHTML = `<span class="t-icon">${icon}</span>${msg}`;
+      el.innerHTML = `<span class="t-icon">${icon}</span>${escapeHtml(msg)}`;
       document.getElementById('toasts').appendChild(el);
       setTimeout(() => el.remove(), 3100);
     }
@@ -2382,7 +2395,7 @@
         await initApp();
       } catch (err) {
         const msg = err.errors?.join('<br>') || err.error || 'Ein Fehler ist aufgetreten.';
-        errEl.innerHTML = msg;
+        errEl.textContent = msg;
         errEl.classList.add('show');
       } finally {
         btn.disabled = false;
@@ -3016,7 +3029,7 @@
     // ============ POPULATE SELECT ============
     function populateCatSelect() {
       const sel = document.getElementById('fExpCat');
-      sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      sel.innerHTML = categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
       if (editExpId) {
         const e = expenses.find(x => x.id === editExpId);
         if (e) sel.value = e.categoryId || e.category?.id;
@@ -3105,8 +3118,8 @@
 
         return `<div class="dash-reminder-item">
           <div class="dash-reminder-info">
-            <div class="dash-reminder-name">${label}</div>
-            ${note ? `<div class="dash-reminder-note">${note}</div>` : ''}
+            <div class="dash-reminder-name">${escapeHtml(label)}</div>
+            ${note ? `<div class="dash-reminder-note">${escapeHtml(note)}</div>` : ''}
           </div>
           <span class="dash-reminder-badge ${cls}">${badge}</span>
           <div class="dash-reminder-actions">
@@ -3151,7 +3164,7 @@
       });
       document.getElementById('donutLeg').innerHTML = grps.map(g => {
         const p = t > 0 ? (g.amount / t * 100).toFixed(1) : 0;
-        return `<div class="legend-item"><span class="legend-dot" style="background:${g.color}"></span><span>${g.name}</span><span class="legend-val">${fmtS(g.amount)} <span style="color:var(--text-tertiary);font-weight:400;font-size:11px">${p}%</span></span></div>`;
+        return `<div class="legend-item"><span class="legend-dot" style="background:${escapeHtml(g.color)}"></span><span>${escapeHtml(g.name)}</span><span class="legend-val">${fmtS(g.amount)} <span style="color:var(--text-tertiary);font-weight:400;font-size:11px">${p}%</span></span></div>`;
       }).join('');
     }
 
@@ -3161,7 +3174,7 @@
       document.getElementById('barChart').innerHTML = sorted.map(e => {
         const c = getCat(e.categoryId || e.category?.id);
         const a = parseFloat(e.amount);
-        return `<div class="bar-row"><div class="bar-label">${e.name}</div><div class="bar-track"><div class="bar-fill" style="width:${(a / mx * 100).toFixed(1)}%;background:${c.color}"></div></div><div class="bar-val" style="color:${c.color}">${fmtS(a)}</div></div>`;
+        return `<div class="bar-row"><div class="bar-label">${escapeHtml(e.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${(a / mx * 100).toFixed(1)}%;background:${escapeHtml(c.color)}"></div></div><div class="bar-val" style="color:${escapeHtml(c.color)}">${fmtS(a)}</div></div>`;
       }).join('');
     }
 
@@ -3176,7 +3189,7 @@
         s.className = 'budget-seg'; s.style.width = p.toFixed(1) + '%'; s.style.background = g.color;
         if (p > 6) s.textContent = g.name.split(' ')[0];
         strip.appendChild(s);
-        leg.innerHTML += `<div class="budget-legend-item"><span class="budget-legend-dot" style="background:${g.color}"></span>${g.name} — ${p.toFixed(1)}%</div>`;
+        leg.innerHTML += `<div class="budget-legend-item"><span class="budget-legend-dot" style="background:${escapeHtml(g.color)}"></span>${escapeHtml(g.name)} — ${p.toFixed(1)}%</div>`;
       });
       const rem = Math.max(0, balance() / inc * 100);
       if (rem > 0) {
@@ -3210,7 +3223,7 @@
       const mx = sorted[0].total || 1;
       chart.innerHTML = sorted.map(t =>
         `<div class="tag-bar-row">
-          <div class="tag-bar-label">${t.tag}</div>
+          <div class="tag-bar-label">${escapeHtml(t.tag)}</div>
           <div class="tag-bar-track"><div class="tag-bar-fill" style="width:${(t.total / mx * 100).toFixed(1)}%"></div></div>
           <div class="tag-bar-val">${fmtS(t.total)}</div>
           <div class="tag-bar-count">${t.count}x</div>
@@ -3237,9 +3250,9 @@
         const a = parseFloat(e.amount);
         const p = t > 0 ? (a / t * 100).toFixed(1) : 0;
         return `<tr>
-      <td style="font-weight:600">${e.name}${reminders.some(r => r.expenseId === e.id) ? ' <span title="Erinnerung gesetzt" style="color:var(--orange);font-size:14px;vertical-align:middle">&#128276;</span>' : ''}</td>
-      <td><span class="cat-badge"><span class="cd" style="background:${c.color}"></span>${c.name}</span>${(e.tags||[]).map(t=>`<span class="tag-mini">${t}</span>`).join('')}</td>
-      <td class="amount-cell" style="text-align:right;color:${c.color}">${fmt(a)}</td>
+      <td style="font-weight:600">${escapeHtml(e.name)}${reminders.some(r => r.expenseId === e.id) ? ' <span title="Erinnerung gesetzt" style="color:var(--orange);font-size:14px;vertical-align:middle">&#128276;</span>' : ''}</td>
+      <td><span class="cat-badge"><span class="cd" style="background:${escapeHtml(c.color)}"></span>${escapeHtml(c.name)}</span>${(e.tags||[]).map(t=>`<span class="tag-mini">${escapeHtml(t)}</span>`).join('')}</td>
+      <td class="amount-cell" style="text-align:right;color:${escapeHtml(c.color)}">${fmt(a)}</td>
       <td style="text-align:right;color:var(--text-tertiary);font-size:13px">${p}%</td>
       <td style="text-align:center"><span class="recurring-badge ${e.isRecurring ? 'yes' : 'no'}">${e.isRecurring ? '↻ Fest' : '◇ Einmalig'}</span></td>
       <td><div class="row-actions">
@@ -3264,7 +3277,7 @@
         list.innerHTML = filtered.map(i => `
       <div class="income-item">
         <div>
-          <div class="income-item-name">${i.name}</div>
+          <div class="income-item-name">${escapeHtml(i.name)}</div>
           <span class="recurring-badge ${i.isRecurring ? 'yes' : 'no'}" style="font-size:10px;margin-top:4px">${i.isRecurring ? '↻ Fest' : '◇ Einmalig'}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -3291,9 +3304,9 @@
         const amt = catExpenses.reduce((s, e) => s + parseFloat(e.amount), 0);
         const count = catExpenses.length;
         return `<div class="cat-card glass">
-      <div class="cat-card-dot" style="background:${c.color}">${c.name.charAt(0)}</div>
+      <div class="cat-card-dot" style="background:${escapeHtml(c.color)}">${escapeHtml(c.name.charAt(0))}</div>
       <div class="cat-card-info">
-        <div class="cat-card-name">${c.name}</div>
+        <div class="cat-card-name">${escapeHtml(c.name)}</div>
         <div class="cat-card-amount">${count} Posten · ${fmtS(amt)}</div>
       </div>
       <div class="cat-card-actions">
