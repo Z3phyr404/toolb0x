@@ -2513,9 +2513,19 @@
     }
 
     function renderTagBadges() {
-      document.getElementById('tagBadges').innerHTML = currentTags.map((t, i) =>
-        `<span class="tag-badge">${t}<span class="tag-badge-x" data-rm-tag="${i}">&times;</span></span>`
-      ).join('');
+      const container = document.getElementById('tagBadges');
+      container.innerHTML = '';
+      currentTags.forEach((t, i) => {
+        const span = document.createElement('span');
+        span.className = 'tag-badge';
+        span.textContent = t;
+        const x = document.createElement('span');
+        x.className = 'tag-badge-x';
+        x.dataset.rmTag = i;
+        x.textContent = '\u00d7';
+        span.appendChild(x);
+        container.appendChild(span);
+      });
     }
 
     function addTag(tag) {
@@ -2536,11 +2546,16 @@
       const el = document.getElementById('tagSuggestions');
       const all = getAllTags().filter(t => !currentTags.includes(t));
       const filtered = query ? all.filter(t => t.toLowerCase().includes(query.toLowerCase())) : all;
-      if (filtered.length === 0) { el.classList.remove('open'); return; }
+      if (filtered.length === 0) { closeTagSuggestions(); return; }
       tagSuggestionIdx = -1;
-      el.innerHTML = filtered.map(t =>
-        `<div class="tag-suggestion" data-tag-val="${t}">${t}</div>`
-      ).join('');
+      el.innerHTML = '';
+      filtered.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'tag-suggestion';
+        div.dataset.tagVal = t;
+        div.textContent = t;
+        el.appendChild(div);
+      });
       el.classList.add('open');
     }
 
