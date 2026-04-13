@@ -32,6 +32,7 @@ model User {
   incomes     Income[]
   monthInits  MonthInit[]
   reminders   Reminder[]
+  notes       Note[]
 
   @@map("users")
 }
@@ -137,4 +138,36 @@ model Reminder {
   @@index([userId, status])
   @@index([userId, reminderDate])
   @@map("reminders")
+}
+
+// ============================================================
+// NOTIZEN — Hierarchische Seiten (Notion-ähnlich)
+// ============================================================
+// title und content sind VERSCHLÜSSELT (Zero-Knowledge).
+// icon, sortOrder, isPinned, isArchived sind NICHT verschlüsselt
+// (für Queries/Sortierung nötig).
+// Self-Relation: Seiten können beliebig tief verschachtelt werden.
+// onDelete: Cascade — Löschen einer Seite löscht alle Unterseiten.
+// ============================================================
+model Note {
+  id         String   @id @default(uuid())
+  title      String   // VERSCHLÜSSELT
+  content    String   @db.Text // VERSCHLÜSSELT (HTML aus WYSIWYG-Editor)
+  icon       String   @default("") // Emoji-Icon, NICHT verschlüsselt
+  parentId   String?
+  parent     Note?    @relation("NoteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Note[]   @relation("NoteHierarchy")
+  sortOrder  Int      @default(0)
+  isPinned   Boolean  @default(false)
+  isArchived Boolean  @default(false)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, parentId])
+  @@index([userId, isPinned])
+  @@map("notes")
 }

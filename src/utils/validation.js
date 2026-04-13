@@ -223,6 +223,39 @@ function validateReminder(data) {
   return errors;
 }
 
+// --------------------------------------------------------
+// Notiz validieren
+// --------------------------------------------------------
+function validateNote(data) {
+  const errors = [];
+
+  // Titel (Pflicht)
+  if (!data.title || data.title.trim().length === 0) {
+    errors.push('Bitte gib einen Titel ein.');
+  }
+  if (data.title && data.title.length > 200) {
+    errors.push('Der Titel darf maximal 200 Zeichen lang sein.');
+  }
+
+  // Content (optional, max 100.000 Zeichen)
+  // NICHT mit sanitize() bereinigen — HTML aus WYSIWYG muss erhalten bleiben
+  if (data.content !== undefined && data.content !== null && data.content.length > 100000) {
+    errors.push('Der Inhalt darf maximal 100.000 Zeichen lang sein.');
+  }
+
+  // Icon (optional, Emoji)
+  if (data.icon !== undefined && data.icon !== null && data.icon.length > 10) {
+    errors.push('Ungültiges Icon.');
+  }
+
+  // ParentId (optional, muss UUID sein)
+  if (data.parentId && !validator.isUUID(data.parentId)) {
+    errors.push('Ungültige übergeordnete Seite.');
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -230,5 +263,6 @@ module.exports = {
   validateIncome,
   validateCategory,
   validateReminder,
+  validateNote,
   sanitize,
 };
