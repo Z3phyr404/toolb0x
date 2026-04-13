@@ -3307,7 +3307,7 @@
     // ============ KEYBOARD ============
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-      if (e.key === 'Enter' && !e.target.closest('.auth-form')) {
+      if (e.key === 'Enter' && !e.target.closest('.auth-form') && e.target.id !== 'fExpTags') {
         if (document.getElementById('mExpense').classList.contains('open')) saveExpense();
         else if (document.getElementById('mIncome').classList.contains('open')) saveIncome();
         else if (document.getElementById('mCat').classList.contains('open')) saveCat();
