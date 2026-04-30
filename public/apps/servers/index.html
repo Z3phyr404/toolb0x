@@ -382,6 +382,19 @@
     @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
     @keyframes toastOut { to{opacity:0;transform:translateY(-10px)} }
 
+    /* ===== AUTO-REFRESH HINT ===== */
+    .stats-grid {
+      position: relative;
+    }
+    .stats-grid:not(.hidden-init)::after {
+      content: '↻ Live · alle 30s';
+      position: absolute;
+      top: -10px; right: 0;
+      font-size: 10px; font-weight: 600;
+      color: var(--mint); letter-spacing: 0.3px;
+      opacity: 0.7;
+    }
+
     /* ===== UTILITY ===== */
     .hidden-init { display: none; }
     .notes-textarea {
@@ -606,7 +619,11 @@
   function loadServers() {
     api('/servers').then(function(data) {
       allServers = data.servers || [];
+      // Alte Auto-Refresh-Timer stoppen (z.B. wenn Server gelöscht/neu geladen werden)
+      Object.keys(statsTimers).forEach(stopStatsAutoRefresh);
       renderServerList();
+      // Auto-Status für alle Server (leichtgewichtig, nur Status-Dot)
+      allServers.forEach(function(s) { SRV.fetchStatus(s.id); });
     }).catch(function(err) {
       toast(err.error || 'Server konnten nicht geladen werden.', 'error');
     });
@@ -649,6 +666,7 @@
       'Alle gespeicherten Zugangsdaten werden unwiderruflich entfernt.',
       function() {
         api('/servers/' + id, { method: 'DELETE' }).then(function() {
+          stopStatsAutoRefresh(id);
           toast('Server gelöscht.');
           loadServers();
         }).catch(function(err) {
@@ -810,11 +828,45 @@
     api('/servers/' + id + '/stats', { method: 'POST' }).then(function(data) {
       setDot(id, 'online');
       renderStats(id, data);
+      startStatsAutoRefresh(id);
     }).catch(function(err) {
       setDot(id, 'offline');
       toast(err.error || 'Stats konnten nicht geladen werden.', 'error');
+      stopStatsAutoRefresh(id);
     });
   };
+
+  // Stiller Refresh — keine Toasts bei Fehlern (sonst Toast-Spam beim Polling)
+  function fetchStatsQuiet(id) {
+    api('/servers/' + id + '/stats', { method: 'POST' }).then(function(data) {
+      setDot(id, 'online');
+      renderStats(id, data);
+    }).catch(function() {
+      setDot(id, 'offline');
+    });
+  }
+
+  function startStatsAutoRefresh(id) {
+    stopStatsAutoRefresh(id);
+    statsTimers[id] = setInterval(function() {
+      // Tab nicht sichtbar? Skip — spart SSH-Verbindungen
+      if (document.visibilityState !== 'visible') return;
+      // Stats-Grid nicht mehr im DOM oder versteckt? Stop
+      var grid = $('stats-' + id);
+      if (!grid || grid.classList.contains('hidden-init')) {
+        stopStatsAutoRefresh(id);
+        return;
+      }
+      fetchStatsQuiet(id);
+    }, 30000);
+  }
+
+  function stopStatsAutoRefresh(id) {
+    if (statsTimers[id]) {
+      clearInterval(statsTimers[id]);
+      delete statsTimers[id];
+    }
+  }
 
   SRV.toggleServices = function(id) {
     var panel = $('services-' + id);
@@ -895,6 +947,8 @@
       function() {
         setDot(id, 'loading');
         setInfo(id, 'Neustart wird ausgeführt...');
+        // Auto-Refresh stoppen während Server reboootet (sonst Fehler-Spam)
+        stopStatsAutoRefresh(id);
         api('/servers/' + id + '/restart', { method: 'POST' }).then(function() {
           setDot(id, 'offline');
           setInfo(id, 'Server wird neu gestartet... (ca. 30–60 Sekunden)');
