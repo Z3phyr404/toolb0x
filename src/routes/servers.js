@@ -6,7 +6,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const prisma = require('../utils/prisma');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { validateServer, sanitize } = require('../utils/validation');
+const { validateServer } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { execSSH } = require('../utils/ssh');
 
@@ -101,7 +101,7 @@ router.post('/', async (req, res) => {
     var errors = validateServer(req.body);
     if (errors.length > 0) return res.status(400).json({ errors: errors });
 
-    var label = sanitize(req.body.label);
+    var label = (req.body.label || '').trim();
     var key = req.encryptionKey;
 
     var entry = await prisma.server.create({
@@ -135,7 +135,7 @@ router.put('/:id', async (req, res) => {
     var errors = validateServer(req.body);
     if (errors.length > 0) return res.status(400).json({ errors: errors });
 
-    var label = sanitize(req.body.label);
+    var label = (req.body.label || '').trim();
     var key = req.encryptionKey;
 
     var entry = await prisma.server.update({

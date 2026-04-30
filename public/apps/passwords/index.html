@@ -453,8 +453,8 @@
 
         <div class="password-display">
           <div class="password-output" id="pwOutput">&mdash;</div>
-          <button class="icon-btn" id="copyGenBtn" title="Kopieren">&#128203;</button>
-          <button class="icon-btn" id="refreshBtn" title="Neu generieren">&#128260;</button>
+          <button class="icon-btn" id="copyGenBtn" title="Kopieren">📋</button>
+          <button class="icon-btn" id="refreshBtn" title="Neu generieren">🔄</button>
         </div>
 
         <div class="strength-row">
@@ -485,7 +485,7 @@
           </label>
         </div>
 
-        <button class="save-gen-btn" id="saveGenBtn">&#128190; Speichern</button>
+        <button class="save-gen-btn" id="saveGenBtn">💾 Speichern</button>
       </section>
 
       <!-- ===== SAVED PASSWORDS ===== -->
@@ -497,7 +497,7 @@
         </div>
         <div class="password-list" id="passwordList"></div>
         <div class="empty-state" id="emptyState" style="display:none">
-          <div class="empty-icon">&#128274;</div>
+          <div class="empty-icon">🔒</div>
           <div class="empty-title">Noch keine Passwörter gespeichert</div>
           <div class="empty-text">Generiere ein Passwort oben und speichere es, oder füge eines manuell hinzu.</div>
         </div>
@@ -521,7 +521,7 @@
         <label class="form-label">Passwort *</label>
         <div class="pw-input-wrap">
           <input class="form-input" id="modalPassword" type="password" maxlength="500">
-          <button class="pw-toggle-vis" id="modalToggleVis" type="button">&#128065;</button>
+          <button class="pw-toggle-vis" id="modalToggleVis" type="button">👁️</button>
         </div>
       </div>
       <div class="form-group">
@@ -843,7 +843,7 @@
           if (p.website) meta.push(esc(p.website));
           return '<div class="password-card glass" data-id="' + p.id + '">' +
             '<div class="card-top">' +
-              '<div class="card-icon">&#128274;</div>' +
+              '<div class="card-icon">🔒</div>' +
               '<div class="card-info">' +
                 '<div class="card-name">' + esc(p.name) + '</div>' +
                 (meta.length ? '<div class="card-meta">' + meta.join(' &middot; ') + '</div>' : '') +
@@ -852,10 +852,10 @@
             '<div class="card-pw-row">' +
               '<span class="card-pw-text" data-dots="' + p.id + '">' + '•'.repeat(12) + '</span>' +
               '<span class="card-pw-text" data-plain="' + p.id + '" style="display:none">' + esc(p.password) + '</span>' +
-              '<button class="card-btn" data-reveal="' + p.id + '" title="Anzeigen">&#128065;</button>' +
-              '<button class="card-btn" data-copy="' + p.id + '" title="Kopieren">&#128203;</button>' +
-              '<button class="card-btn" data-edit="' + p.id + '" title="Bearbeiten">&#9998;</button>' +
-              '<button class="card-btn danger" data-del="' + p.id + '" title="Löschen">&#128465;</button>' +
+              '<button class="card-btn" data-reveal="' + p.id + '" title="Anzeigen">👁️</button>' +
+              '<button class="card-btn" data-copy="' + p.id + '" title="Kopieren">📋</button>' +
+              '<button class="card-btn" data-edit="' + p.id + '" title="Bearbeiten">✏️</button>' +
+              '<button class="card-btn danger" data-del="' + p.id + '" title="Löschen">🗑️</button>' +
             '</div>' +
             (p.notes ? '<div class="card-notes-preview">' + esc(p.notes) + '</div>' : '') +
           '</div>';
