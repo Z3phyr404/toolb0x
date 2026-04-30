@@ -382,6 +382,14 @@
     @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
     @keyframes toastOut { to{opacity:0;transform:translateY(-10px)} }
 
+    /* ===== UTILITY ===== */
+    .hidden-init { display: none; }
+    .notes-textarea {
+      font-family: inherit !important;
+      font-size: 14px !important;
+    }
+    .services-error { color: var(--red); }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 600px) {
       .app-header { padding: 12px 16px; gap: 10px; }
@@ -452,7 +460,7 @@
         <input class="form-input" id="fPassword" type="password">
       </div>
     </div>
-    <div id="keyFields" style="display:none">
+    <div id="keyFields" class="hidden-init">
       <div class="form-group">
         <label class="form-label">Private Key</label>
         <textarea class="form-textarea" id="fPrivateKey" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
@@ -465,7 +473,7 @@
 
     <div class="form-group">
       <label class="form-label">Notizen (optional)</label>
-      <textarea class="form-textarea" id="fNotes" rows="2" style="font-family:inherit;font-size:14px" placeholder="z.B. Ubuntu 24.04, 4GB RAM"></textarea>
+      <textarea class="form-textarea notes-textarea" id="fNotes" rows="2" placeholder="z.B. Ubuntu 24.04, 4GB RAM"></textarea>
     </div>
 
     <div class="form-error" id="formError"></div>
@@ -696,15 +704,15 @@
         + '<div class="server-host">' + escapeHtml(s.host) + '</div>'
         + '</div>'
         + '<div class="server-info" id="info-' + s.id + '">' + (s.notes ? escapeHtml(s.notes) : 'Klicke auf &quot;Status&quot; um den Server zu prüfen.') + '</div>'
-        + '<div class="stats-grid" id="stats-' + s.id + '" style="display:none"></div>'
+        + '<div class="stats-grid hidden-init" id="stats-' + s.id + '"></div>'
         + '<div class="action-row">'
-        + '<button class="action-btn btn-status" onclick="SRV.fetchStatus(\'' + s.id + '\')">&#9889; Status</button>'
-        + '<button class="action-btn btn-stats" onclick="SRV.fetchStats(\'' + s.id + '\')">&#128202; Stats</button>'
-        + '<button class="action-btn btn-services" onclick="SRV.toggleServices(\'' + s.id + '\')">&#9881; Services</button>'
-        + '<button class="action-btn btn-update" id="updateBtn-' + s.id + '" onclick="SRV.runUpdate(\'' + s.id + '\')">&#11014; Update</button>'
-        + '<button class="action-btn btn-restart" onclick="SRV.confirmRestart(\'' + s.id + '\')">&#128260; Neustart</button>'
-        + '<button class="action-btn btn-edit" onclick="SRV.openEdit(\'' + s.id + '\')">&#9998;</button>'
-        + '<button class="action-btn btn-delete" onclick="SRV.deleteServer(\'' + s.id + '\')">&#128465;</button>'
+        + '<button class="action-btn btn-status" data-action="status" data-id="' + s.id + '">&#9889; Status</button>'
+        + '<button class="action-btn btn-stats" data-action="stats" data-id="' + s.id + '">&#128202; Stats</button>'
+        + '<button class="action-btn btn-services" data-action="services" data-id="' + s.id + '">&#9881; Services</button>'
+        + '<button class="action-btn btn-update" id="updateBtn-' + s.id + '" data-action="update" data-id="' + s.id + '">&#11014; Update</button>'
+        + '<button class="action-btn btn-restart" data-action="restart" data-id="' + s.id + '">&#128260; Neustart</button>'
+        + '<button class="action-btn btn-edit" data-action="edit" data-id="' + s.id + '">&#9998;</button>'
+        + '<button class="action-btn btn-delete" data-action="delete" data-id="' + s.id + '">&#128465;</button>'
         + '</div>'
         + '<div class="services-panel" id="services-' + s.id + '"></div>'
         + '<div class="update-log" id="updateLog-' + s.id + '">'
@@ -723,22 +731,22 @@
     var ramPct = data.ram.total > 0 ? Math.round((data.ram.used / data.ram.total) * 100) : 0;
     var diskPct = parseInt(data.disk.percent) || 0;
 
-    grid.style.display = 'grid';
+    grid.classList.remove('hidden-init');
     grid.innerHTML = ''
       + '<div class="stat-item">'
       + '<div class="stat-label">CPU</div>'
       + '<div class="stat-value">' + cpuPct + '%</div>'
-      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(cpuPct) + '" style="width:' + cpuPct + '%"></div></div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(cpuPct) + '" data-pct="' + cpuPct + '"></div></div>'
       + '</div>'
       + '<div class="stat-item">'
       + '<div class="stat-label">RAM</div>'
       + '<div class="stat-value">' + (data.ram.used / 1024).toFixed(1) + ' / ' + (data.ram.total / 1024).toFixed(1) + ' GB</div>'
-      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(ramPct) + '" style="width:' + ramPct + '%"></div></div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(ramPct) + '" data-pct="' + ramPct + '"></div></div>'
       + '</div>'
       + '<div class="stat-item">'
       + '<div class="stat-label">Disk</div>'
       + '<div class="stat-value">' + escapeHtml(data.disk.used) + ' / ' + escapeHtml(data.disk.total) + '</div>'
-      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(diskPct) + '" style="width:' + diskPct + '%"></div></div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(diskPct) + '" data-pct="' + diskPct + '"></div></div>'
       + '</div>'
       + '<div class="stat-item">'
       + '<div class="stat-label">Load</div>'
@@ -756,6 +764,12 @@
       + '<div class="stat-label">Uptime</div>'
       + '<div class="stat-value">' + formatUptime(data.uptime) + '</div>'
       + '</div>';
+
+    // Progress-Bar-Breiten programmatisch setzen (CSP-konform)
+    var bars = grid.querySelectorAll('.stat-bar-fill[data-pct]');
+    for (var i = 0; i < bars.length; i++) {
+      bars[i].style.width = bars[i].dataset.pct + '%';
+    }
   }
 
   // ============================================================
@@ -824,11 +838,11 @@
         + services.map(function(s) {
           return '<div class="service-item">'
             + '<span class="service-name">' + escapeHtml(s) + '</span>'
-            + '<button class="service-restart-btn" onclick="SRV.restartService(\'' + id + '\',\'' + escapeHtml(s) + '\', this)">&#8635; Neustarten</button>'
+            + '<button class="service-restart-btn" data-action="service-restart" data-server="' + id + '" data-service="' + escapeHtml(s) + '">&#8635; Neustarten</button>'
             + '</div>';
         }).join('');
     }).catch(function(err) {
-      panel.innerHTML = '<div class="services-panel-title" style="color:var(--red)">' + escapeHtml(err.error || 'Fehler beim Laden.') + '</div>';
+      panel.innerHTML = '<div class="services-panel-title services-error">' + escapeHtml(err.error || 'Fehler beim Laden.') + '</div>';
     });
   };
 
@@ -993,6 +1007,25 @@
     });
     $('confirmModal').addEventListener('click', function(e) {
       if (e.target === $('confirmModal')) closeConfirm();
+    });
+
+    // Event-Delegation für dynamisch erzeugte Buttons (CSP-konform)
+    $('serverList').addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      var id = btn.dataset.id;
+
+      if (action === 'status') SRV.fetchStatus(id);
+      else if (action === 'stats') SRV.fetchStats(id);
+      else if (action === 'services') SRV.toggleServices(id);
+      else if (action === 'update') SRV.runUpdate(id);
+      else if (action === 'restart') SRV.confirmRestart(id);
+      else if (action === 'edit') SRV.openEdit(id);
+      else if (action === 'delete') SRV.deleteServer(id);
+      else if (action === 'service-restart') {
+        SRV.restartService(btn.dataset.server, btn.dataset.service, btn);
+      }
     });
 
     checkAuth();
