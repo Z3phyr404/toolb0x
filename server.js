@@ -71,6 +71,12 @@ app.use('/app/notizen', express.static(path.join(__dirname, 'public', 'apps', 'n
   index: false,
 }));
 
+// Statische Dateien: Passwort-Manager (nur CSS/JS/Bilder, kein HTML)
+app.use('/app/passwords', express.static(path.join(__dirname, 'public', 'apps', 'passwords'), {
+  etag: true,
+  index: false,
+}));
+
 // Gemeinsame Assets (CSS, Fonts, etc.)
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), { etag: true }));
 
@@ -85,6 +91,7 @@ const exportRoutes = require('./src/routes/export');
 const reminderRoutes = require('./src/routes/reminders');
 const adminRoutes = require('./src/routes/admin');
 const noteRoutes = require('./src/routes/notes');
+const passwordRoutes = require('./src/routes/passwords');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -94,6 +101,7 @@ app.use('/api/export', exportRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notes', noteRoutes);
+app.use('/api/passwords', passwordRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -127,6 +135,11 @@ app.get('/app/notizen', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'apps', 'notizen', 'index.html')
 ));
 
+// Passwort-Manager
+app.get('/app/passwords', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'apps', 'passwords', 'index.html')
+));
+
 // 404 für API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API-Route nicht gefunden.' });
@@ -149,5 +162,6 @@ app.listen(PORT, () => {
   console.log(`🔔 Erinnerungen: http://localhost:${PORT}/api/reminders`);
   console.log(`🔧 Admin:        http://localhost:${PORT}/app/admin`);
   console.log(`📝 Notizen:      http://localhost:${PORT}/app/notizen`);
+  console.log(`🔐 Passwörter:   http://localhost:${PORT}/app/passwords`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });

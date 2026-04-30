@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Toolb0x — Passwort-Manager</title>
+  <style nonce="__CSP_NONCE__">
+    /* ============================================================
+       iOS 26 LIQUID GLASS — PASSWORT-MANAGER
+       ============================================================ */
+
+    @font-face {
+      font-family: 'SF';
+      src: local('SF Pro Display'), local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Helvetica Neue');
+    }
+
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.12);
+      --glass-bg-heavy: rgba(255, 255, 255, 0.18);
+      --glass-border: rgba(255, 255, 255, 0.22);
+      --glass-border-light: rgba(255, 255, 255, 0.12);
+      --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 2px 12px rgba(0, 0, 0, 0.1);
+      --glass-shadow-elevated: 0 12px 60px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.15);
+      --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+      --glass-blur: 40px;
+      --glass-saturate: 1.8;
+
+      --text: rgba(0, 0, 0, 0.85);
+      --text-secondary: rgba(0, 0, 0, 0.55);
+      --text-tertiary: rgba(0, 0, 0, 0.35);
+
+      --blue: #007AFF;
+      --green: #30D158;
+      --red: #FF3B30;
+      --orange: #FF9500;
+      --purple: #AF52DE;
+      --pink: #FF2D55;
+      --teal: #5AC8FA;
+      --indigo: #5856D6;
+      --mint: #00C7BE;
+      --yellow: #FFCC00;
+
+      --radius-sm: 12px;
+      --radius: 20px;
+      --radius-lg: 26px;
+      --radius-xl: 32px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      font-family: 'SF', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ===== ANIMATED BACKGROUND ===== */
+    .bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: linear-gradient(135deg, #a8c8f0 0%, #d4b8e8 25%, #f0c8c8 50%, #b8d8f0 75%, #c8e8d0 100%);
+      background-size: 400% 400%;
+      animation: bgShift 20s ease infinite;
+    }
+    .bg::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 600px 600px at 20% 20%, rgba(168, 200, 240, 0.6), transparent),
+        radial-gradient(ellipse 500px 500px at 80% 80%, rgba(212, 184, 232, 0.5), transparent),
+        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(240, 200, 200, 0.4), transparent);
+    }
+    @keyframes bgShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+
+    /* ===== GLASS SYSTEM ===== */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), var(--glass-inset);
+    }
+    .glass-heavy {
+      background: var(--glass-bg-heavy);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
+    }
+
+    /* ===== LOADING ===== */
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px);
+      transition: opacity 0.4s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== APP SHELL ===== */
+    .app {
+      position: relative; z-index: 1;
+      height: 100%; display: flex; flex-direction: column;
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .app.active { opacity: 1; }
+
+    /* ===== HEADER ===== */
+    .app-header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      z-index: 10; flex-shrink: 0;
+    }
+    .back-btn {
+      color: var(--purple); text-decoration: none; font-size: 14px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .back-btn:hover { opacity: 0.7; }
+    .app-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-name { font-size: 13px; color: var(--text-secondary); }
+    .logout-btn {
+      background: rgba(255,59,48,0.12); color: var(--red);
+      border: none; padding: 6px 14px; border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .logout-btn:hover { background: rgba(255,59,48,0.2); }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1; overflow-y: auto; padding: 20px 24px 40px;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+
+    /* ===== GENERATOR SECTION ===== */
+    .generator-section {
+      border-radius: var(--radius-lg); padding: 24px;
+    }
+    .section-title {
+      font-size: 18px; font-weight: 700; margin-bottom: 16px;
+    }
+
+    /* Password Output */
+    .password-display {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.06); border-radius: var(--radius);
+      padding: 14px 16px; margin-bottom: 12px;
+    }
+    .password-output {
+      flex: 1; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 16px; font-weight: 600;
+      word-break: break-all; user-select: all;
+      min-height: 24px; line-height: 1.5;
+    }
+    .icon-btn {
+      width: 36px; height: 36px; border: none; border-radius: var(--radius-sm);
+      background: rgba(0,0,0,0.06); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover { background: rgba(0,0,0,0.12); }
+    .icon-btn:active { transform: scale(0.92); }
+
+    /* Strength Bar */
+    .strength-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+    }
+    .strength-bar {
+      flex: 1; height: 6px; background: rgba(0,0,0,0.08);
+      border-radius: 3px; overflow: hidden;
+    }
+    .strength-fill {
+      height: 100%; width: 0%; border-radius: 3px;
+      transition: width 0.3s, background 0.3s;
+    }
+    .strength-label {
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+    }
+
+    /* Controls */
+    .control-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .control-row label {
+      font-size: 14px; font-weight: 600; white-space: nowrap; min-width: 100px;
+    }
+    .slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px;
+      background: rgba(0,0,0,0.1); outline: none;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--purple); cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .slider::-moz-range-thumb {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--purple); cursor: pointer; border: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .toggle-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin-bottom: 16px;
+    }
+    .toggle-label {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      background: rgba(0,0,0,0.04); transition: background 0.15s;
+    }
+    .toggle-label:hover { background: rgba(0,0,0,0.08); }
+    .toggle-label.disabled {
+      opacity: 0.4; pointer-events: none;
+    }
+    .toggle-label input[type="checkbox"] {
+      width: 18px; height: 18px; accent-color: var(--purple);
+      flex-shrink: 0;
+    }
+    .memorable-toggle {
+      grid-column: 1 / -1;
+      background: rgba(175,82,222,0.08);
+      border: 1px solid rgba(175,82,222,0.15);
+    }
+
+    .save-gen-btn {
+      width: 100%; padding: 12px; border: none; border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--purple), var(--indigo));
+      color: #fff; font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    .save-gen-btn:hover { opacity: 0.85; }
+    .save-gen-btn:active { transform: scale(0.98); }
+
+    /* ===== SAVED PASSWORDS SECTION ===== */
+    .saved-header {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .saved-header .section-title { margin-bottom: 0; flex: 1; }
+    .search-input {
+      padding: 8px 14px; border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); background: rgba(255,255,255,0.5);
+      font-size: 13px; outline: none; width: 180px;
+      backdrop-filter: blur(10px);
+    }
+    .search-input:focus { border-color: var(--purple); }
+    .add-btn {
+      padding: 8px 16px; border: none; border-radius: var(--radius-sm);
+      background: var(--purple); color: #fff;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      white-space: nowrap;
+    }
+    .add-btn:hover { opacity: 0.85; }
+
+    /* Password Cards */
+    .password-list {
+      display: flex; flex-direction: column; gap: 10px; margin-top: 12px;
+    }
+    .password-card {
+      border-radius: var(--radius); padding: 16px;
+      transition: transform 0.15s;
+    }
+    .password-card:hover { transform: translateY(-1px); }
+    .card-top {
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .card-icon {
+      width: 40px; height: 40px; border-radius: var(--radius-sm);
+      background: rgba(175,82,222,0.12); color: var(--purple);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .card-info { flex: 1; min-width: 0; }
+    .card-name {
+      font-size: 15px; font-weight: 700;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .card-meta {
+      font-size: 12px; color: var(--text-secondary); margin-top: 2px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .card-pw-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 10px; padding: 8px 12px;
+      background: rgba(0,0,0,0.05); border-radius: var(--radius-sm);
+    }
+    .card-pw-text {
+      flex: 1; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 13px; font-weight: 600;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .card-btn {
+      width: 30px; height: 30px; border: none; border-radius: 8px;
+      background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .card-btn:hover { background: rgba(0,0,0,0.08); }
+    .card-btn.danger:hover { background: rgba(255,59,48,0.15); }
+    .card-notes-preview {
+      font-size: 12px; color: var(--text-tertiary); margin-top: 6px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .empty-text { font-size: 13px; color: var(--text-secondary); }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.3);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+      padding: 20px;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      width: 100%; max-width: 440px;
+      border-radius: var(--radius-lg); padding: 28px;
+      transform: scale(0.95) translateY(10px);
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-overlay.open .modal { transform: scale(1) translateY(0); }
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.5); font-size: 14px;
+      font-family: inherit; outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-input:focus { border-color: var(--purple); }
+    .form-textarea { resize: vertical; min-height: 60px; }
+    .pw-input-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    .pw-input-wrap .form-input { padding-right: 42px; }
+    .pw-toggle-vis {
+      position: absolute; right: 6px;
+      width: 30px; height: 30px; border: none; border-radius: 8px;
+      background: transparent; cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pw-toggle-vis:hover { background: rgba(0,0,0,0.06); }
+    .modal-actions {
+      display: flex; gap: 10px; margin-top: 20px;
+    }
+    .btn {
+      flex: 1; padding: 11px 16px; border: none; border-radius: var(--radius);
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-secondary {
+      background: rgba(0,0,0,0.06); color: var(--text);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--purple), var(--indigo));
+      color: #fff;
+    }
+    .btn-danger {
+      background: rgba(255,59,48,0.15); color: var(--red);
+    }
+    .btn:hover { opacity: 0.85; }
+    .confirm-text {
+      font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;
+    }
+
+    /* ===== TOAST ===== */
+    .toast-box {
+      position: fixed; bottom: 24px; right: 24px; z-index: 300;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600;
+      animation: toastIn 0.3s, toastOut 0.3s 2.8s forwards;
+      backdrop-filter: blur(30px) saturate(1.5);
+    }
+    .toast.success {
+      background: rgba(48,209,88,0.2); border: 1px solid rgba(48,209,88,0.3); color: #1a7a2e;
+    }
+    .toast.error {
+      background: rgba(255,59,48,0.2); border: 1px solid rgba(255,59,48,0.3); color: #c0392b;
+    }
+    @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes toastOut { to { opacity:0; transform:translateY(-12px); } }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 600px) {
+      .main-content { padding: 14px 12px 30px; }
+      .generator-section { padding: 18px; }
+      .toggle-grid { grid-template-columns: 1fr; }
+      .app-header { padding: 12px 14px; gap: 10px; }
+      .saved-header { flex-direction: column; align-items: stretch; }
+      .search-input { width: 100%; }
+      .password-output { font-size: 14px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg"></div>
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <div class="app" id="app">
+    <!-- HEADER -->
+    <header class="app-header glass-heavy">
+      <a href="/portal" class="back-btn">&#8592; Zur Übersicht</a>
+      <div class="app-title">Passwort-Manager</div>
+      <div class="header-right">
+        <span class="user-name" id="userName"></span>
+        <button class="logout-btn" id="logoutBtn">Abmelden</button>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main-content">
+
+      <!-- ===== GENERATOR ===== -->
+      <section class="generator-section glass-heavy">
+        <h2 class="section-title">Passwort generieren</h2>
+
+        <div class="password-display">
+          <div class="password-output" id="pwOutput">&mdash;</div>
+          <button class="icon-btn" id="copyGenBtn" title="Kopieren">&#128203;</button>
+          <button class="icon-btn" id="refreshBtn" title="Neu generieren">&#128260;</button>
+        </div>
+
+        <div class="strength-row">
+          <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+          <span class="strength-label" id="strengthLabel"></span>
+        </div>
+
+        <div class="control-row">
+          <label>Länge: <strong id="lengthValue">16</strong></label>
+          <input type="range" id="lengthSlider" min="8" max="128" value="16" class="slider">
+        </div>
+
+        <div class="toggle-grid">
+          <label class="toggle-label" id="lblUpper">
+            <input type="checkbox" id="optUpper" checked> Großbuchstaben (A-Z)
+          </label>
+          <label class="toggle-label" id="lblLower">
+            <input type="checkbox" id="optLower" checked> Kleinbuchstaben (a-z)
+          </label>
+          <label class="toggle-label" id="lblNumbers">
+            <input type="checkbox" id="optNumbers" checked> Zahlen (0-9)
+          </label>
+          <label class="toggle-label" id="lblSpecial">
+            <input type="checkbox" id="optSpecial" checked> Sonderzeichen (!@#$...)
+          </label>
+          <label class="toggle-label memorable-toggle">
+            <input type="checkbox" id="optMemorable"> Merkbar (Passphrase)
+          </label>
+        </div>
+
+        <button class="save-gen-btn" id="saveGenBtn">&#128190; Speichern</button>
+      </section>
+
+      <!-- ===== SAVED PASSWORDS ===== -->
+      <section>
+        <div class="saved-header">
+          <h2 class="section-title">Gespeicherte Passwörter</h2>
+          <input type="text" id="searchInput" placeholder="Suchen..." class="search-input">
+          <button class="add-btn" id="addManualBtn">+ Manuell hinzufügen</button>
+        </div>
+        <div class="password-list" id="passwordList"></div>
+        <div class="empty-state" id="emptyState" style="display:none">
+          <div class="empty-icon">&#128274;</div>
+          <div class="empty-title">Noch keine Passwörter gespeichert</div>
+          <div class="empty-text">Generiere ein Passwort oben und speichere es, oder füge eines manuell hinzu.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===== SAVE / EDIT MODAL ===== -->
+  <div class="modal-overlay" id="saveModal">
+    <div class="modal glass-heavy">
+      <h3 id="modalTitle">Passwort speichern</h3>
+      <div class="form-group">
+        <label class="form-label">Bezeichnung *</label>
+        <input class="form-input" id="modalName" type="text" placeholder="z.B. Netflix, Google..." maxlength="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Benutzername / E-Mail</label>
+        <input class="form-input" id="modalUsername" type="text" placeholder="user@example.com" maxlength="200">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort *</label>
+        <div class="pw-input-wrap">
+          <input class="form-input" id="modalPassword" type="password" maxlength="500">
+          <button class="pw-toggle-vis" id="modalToggleVis" type="button">&#128065;</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Website</label>
+        <input class="form-input" id="modalWebsite" type="text" placeholder="https://..." maxlength="500">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notizen</label>
+        <textarea class="form-input form-textarea" id="modalNotes" rows="3" maxlength="2000" placeholder="Optionale Notizen..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modalCancel">Abbrechen</button>
+        <button class="btn btn-primary" id="modalSave">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== DELETE CONFIRM MODAL ===== -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal glass-heavy">
+      <h3>Passwort löschen?</h3>
+      <p class="confirm-text" id="confirmText">Dieses Passwort wird unwiderruflich gelöscht.</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="confirmCancel">Abbrechen</button>
+        <button class="btn btn-danger" id="confirmDelete">Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast-box" id="toastBox"></div>
+
+  <script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+  <script nonce="__CSP_NONCE__">
+    /* ============================================================
+       PASSWORT-MANAGER — JavaScript
+       ============================================================ */
+    (function () {
+      'use strict';
+
+      var $ = function (id) { return document.getElementById(id); };
+      var API = '/api';
+
+      // --------------------------------------------------------
+      // State
+      // --------------------------------------------------------
+      var allPasswords = [];
+      var editingId = null;
+      var deleteId = null;
+      var currentGenerated = '';
+
+      // --------------------------------------------------------
+      // DOM refs
+      // --------------------------------------------------------
+      var pwOutput = $('pwOutput');
+      var lengthSlider = $('lengthSlider');
+      var lengthValue = $('lengthValue');
+      var optUpper = $('optUpper');
+      var optLower = $('optLower');
+      var optNumbers = $('optNumbers');
+      var optSpecial = $('optSpecial');
+      var optMemorable = $('optMemorable');
+      var strengthFill = $('strengthFill');
+      var strengthLabel = $('strengthLabel');
+      var passwordList = $('passwordList');
+      var emptyState = $('emptyState');
+      var searchInput = $('searchInput');
+
+      var charLabels = [$('lblUpper'), $('lblLower'), $('lblNumbers'), $('lblSpecial')];
+
+      // --------------------------------------------------------
+      // Deutsche Wortliste für Passphrasen (~200 Wörter)
+      // --------------------------------------------------------
+      var WORDS = [
+        'Apfel','Birne','Wolke','Stern','Mond','Fluss','Berg','Wald','Licht','Blume',
+        'Regen','Wind','Stein','Feuer','Erde','Sonne','Tiger','Adler','Fuchs','Baum',
+        'Blatt','Mauer','Turm','Krone','Perle','Feder','Pfeil','Schild','Tasse','Kerze',
+        'Ampel','Anker','Asche','Bach','Biene','Blitz','Boden','Draht','Eiche','Engel',
+        'Ernte','Fackel','Falke','Frost','Gabel','Garten','Geist','Glocke','Hafen','Hammer',
+        'Harfe','Herbst','Hirsch','Honig','Igel','Insel','Juwel','Kabel','Kaktus','Kette',
+        'Kiesel','Klang','Knopf','Kobalt','Korb','Lachs','Lampe','Lanze','Laube','Leine',
+        'Linse','Luchs','Markt','Meise','Mitte','Morgen','Muschel','Nadel','Nebel','Nische',
+        'Nixe','Oase','Olive','Orgel','Ozean','Palme','Pfad','Pflug','Pinie','Platz',
+        'Prise','Puls','Quarz','Quelle','Rabe','Ranke','Raupe','Riegel','Rinne','Rubin',
+        'Ruder','Sabel','Sattel','Schatz','Scholle','Segel','Silber','Sockel','Specht','Sprosse',
+        'Staub','Storch','Strahl','Strom','Tempel','Tinte','Topas','Traube','Truhe','Tulpe',
+        'Ufer','Ulme','Veilchen','Vlies','Wabe','Wachtel','Weide','Welle','Wolke','Wurzel',
+        'Zange','Zeder','Ziegel','Zinne','Zobel','Zweig','Amber','Basalt','Brise','Delphin',
+        'Diamant','Distel','Dolch','Drossel','Eiland','Elster','Falter','Fasan','Fichte','Finke',
+        'Forelle','Granit','Grille','Halm','Hering','Hummel','Jasmin','Kauz','Klippe','Kompass',
+        'Kranich','Kristall','Laterne','Lerche','Linde','Lotus','Marmor','Mohn','Murmeln','Natter',
+        'Nuss','Otter','Panther','Pelikan','Pythia','Quaste','Reiter','Riff','Saphir','Schakal',
+        'Schwalbe','Smaragd','Sperber','Spinne','Splitter','Taube','Topf','Uhu','Viper','Wiesel',
+        'Zephyr','Zinke','Zitrone','Ahorn','Distel','Falke','Granat','Haken','Jaspis','Kupfer'
+      ];
+
+      // --------------------------------------------------------
+      // CSPRNG-Helfer
+      // --------------------------------------------------------
+      function secureRandom(max) {
+        var arr = new Uint32Array(1);
+        crypto.getRandomValues(arr);
+        return arr[0] % max;
+      }
+
+      // --------------------------------------------------------
+      // Passwort-Generator
+      // --------------------------------------------------------
+      var CHARSETS = {
+        upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        lower: 'abcdefghijklmnopqrstuvwxyz',
+        numbers: '0123456789',
+        special: '!@#$%^&*()_+-=[]{}|;:,.<>?'
+      };
+
+      function generatePassword() {
+        var len = parseInt(lengthSlider.value);
+
+        if (optMemorable.checked) {
+          return generatePassphrase(len);
+        }
+
+        var pool = '';
+        if (optUpper.checked) pool += CHARSETS.upper;
+        if (optLower.checked) pool += CHARSETS.lower;
+        if (optNumbers.checked) pool += CHARSETS.numbers;
+        if (optSpecial.checked) pool += CHARSETS.special;
+
+        if (!pool) {
+          pool = CHARSETS.lower;
+          optLower.checked = true;
+        }
+
+        var values = new Uint32Array(len);
+        crypto.getRandomValues(values);
+
+        var pw = '';
+        for (var i = 0; i < len; i++) {
+          pw += pool[values[i] % pool.length];
+        }
+        return pw;
+      }
+
+      function generatePassphrase(targetLen) {
+        var wordCount = Math.max(3, Math.min(8, Math.ceil(targetLen / 7)));
+        var values = new Uint32Array(wordCount);
+        crypto.getRandomValues(values);
+        var words = [];
+        for (var i = 0; i < wordCount; i++) {
+          words.push(WORDS[values[i] % WORDS.length]);
+        }
+        return words.join('-');
+      }
+
+      // --------------------------------------------------------
+      // Stärke berechnen
+      // --------------------------------------------------------
+      function calcStrength(pw) {
+        var score = 0;
+        var len = pw.length;
+        if (len >= 8) score++;
+        if (len >= 12) score++;
+        if (len >= 16) score++;
+        if (len >= 24) score++;
+        if (/[a-z]/.test(pw)) score++;
+        if (/[A-Z]/.test(pw)) score++;
+        if (/[0-9]/.test(pw)) score++;
+        if (/[^a-zA-Z0-9]/.test(pw)) score++;
+
+        if (score <= 2) return { pct: 25, label: 'Schwach', color: 'var(--red)' };
+        if (score <= 4) return { pct: 50, label: 'Mittel', color: 'var(--orange)' };
+        if (score <= 6) return { pct: 75, label: 'Stark', color: 'var(--green)' };
+        return { pct: 100, label: 'Sehr stark', color: 'var(--blue)' };
+      }
+
+      function updatePassword() {
+        currentGenerated = generatePassword();
+        pwOutput.textContent = currentGenerated;
+        var s = calcStrength(currentGenerated);
+        strengthFill.style.width = s.pct + '%';
+        strengthFill.style.background = s.color;
+        strengthLabel.textContent = s.label;
+        strengthLabel.style.color = s.color;
+      }
+
+      // --------------------------------------------------------
+      // Zwischenablage
+      // --------------------------------------------------------
+      function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            toast('In Zwischenablage kopiert');
+            autoClear(text);
+          }).catch(function () {
+            fallbackCopy(text);
+          });
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('Kopiert');
+      }
+
+      function autoClear(text) {
+        setTimeout(function () {
+          try {
+            navigator.clipboard.readText().then(function (cur) {
+              if (cur === text) navigator.clipboard.writeText('');
+            }).catch(function () {});
+          } catch (e) {}
+        }, 30000);
+      }
+
+      // --------------------------------------------------------
+      // Toast
+      // --------------------------------------------------------
+      function toast(msg, type) {
+        type = type || 'success';
+        var el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+        $('toastBox').appendChild(el);
+        setTimeout(function () { el.remove(); }, 3200);
+      }
+
+      // --------------------------------------------------------
+      // HTML-Escape
+      // --------------------------------------------------------
+      function esc(s) {
+        if (!s) return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      // --------------------------------------------------------
+      // API-Helfer
+      // --------------------------------------------------------
+      function getCsrfToken() {
+        var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+        return m ? m[1] : '';
+      }
+
+      function api(endpoint, options) {
+        options = options || {};
+        var headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() };
+        if (options.headers) {
+          for (var k in options.headers) headers[k] = options.headers[k];
+        }
+        options.headers = headers;
+        options.credentials = 'include';
+        return fetch(API + endpoint, options).then(function (res) {
+          if (res.status === 401 || res.status === 403) {
+            window.location.href = '/portal';
+            throw new Error('auth');
+          }
+          return res.json().then(function (data) {
+            if (!res.ok) throw new Error(data.error || (data.errors && data.errors[0]) || 'Fehler');
+            return data;
+          });
+        });
+      }
+
+      // --------------------------------------------------------
+      // CRUD
+      // --------------------------------------------------------
+      function loadPasswords() {
+        return api('/passwords').then(function (data) {
+          allPasswords = data.passwords || [];
+          renderList();
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast('Laden fehlgeschlagen', 'error');
+        });
+      }
+
+      function savePassword(payload) {
+        var method = editingId ? 'PUT' : 'POST';
+        var url = editingId ? '/passwords/' + editingId : '/passwords';
+        return api(url, { method: method, body: JSON.stringify(payload) });
+      }
+
+      function deletePassword(id) {
+        return api('/passwords/' + id, { method: 'DELETE' });
+      }
+
+      // --------------------------------------------------------
+      // Render Passwort-Liste
+      // --------------------------------------------------------
+      function renderList() {
+        var query = searchInput.value.toLowerCase().trim();
+        var filtered = allPasswords;
+        if (query) {
+          filtered = allPasswords.filter(function (p) {
+            return p.name.toLowerCase().indexOf(query) !== -1 ||
+                   p.username.toLowerCase().indexOf(query) !== -1 ||
+                   p.website.toLowerCase().indexOf(query) !== -1;
+          });
+        }
+
+        if (filtered.length === 0) {
+          passwordList.innerHTML = '';
+          emptyState.style.display = '';
+          return;
+        }
+
+        emptyState.style.display = 'none';
+        passwordList.innerHTML = filtered.map(function (p) {
+          var meta = [];
+          if (p.username) meta.push(esc(p.username));
+          if (p.website) meta.push(esc(p.website));
+          return '<div class="password-card glass" data-id="' + p.id + '">' +
+            '<div class="card-top">' +
+              '<div class="card-icon">&#128274;</div>' +
+              '<div class="card-info">' +
+                '<div class="card-name">' + esc(p.name) + '</div>' +
+                (meta.length ? '<div class="card-meta">' + meta.join(' &middot; ') + '</div>' : '') +
+              '</div>' +
+            '</div>' +
+            '<div class="card-pw-row">' +
+              '<span class="card-pw-text" data-dots="' + p.id + '">' + '•'.repeat(12) + '</span>' +
+              '<span class="card-pw-text" data-plain="' + p.id + '" style="display:none">' + esc(p.password) + '</span>' +
+              '<button class="card-btn" data-reveal="' + p.id + '" title="Anzeigen">&#128065;</button>' +
+              '<button class="card-btn" data-copy="' + p.id + '" title="Kopieren">&#128203;</button>' +
+              '<button class="card-btn" data-edit="' + p.id + '" title="Bearbeiten">&#9998;</button>' +
+              '<button class="card-btn danger" data-del="' + p.id + '" title="Löschen">&#128465;</button>' +
+            '</div>' +
+            (p.notes ? '<div class="card-notes-preview">' + esc(p.notes) + '</div>' : '') +
+          '</div>';
+        }).join('');
+      }
+
+      // --------------------------------------------------------
+      // Event: Password list actions (delegation)
+      // --------------------------------------------------------
+      passwordList.addEventListener('click', function (e) {
+        var btn;
+
+        // Reveal / Hide
+        btn = e.target.closest('[data-reveal]');
+        if (btn) {
+          var id = btn.dataset.reveal;
+          var dots = document.querySelector('[data-dots="' + id + '"]');
+          var plain = document.querySelector('[data-plain="' + id + '"]');
+          if (dots && plain) {
+            var showing = plain.style.display !== 'none';
+            dots.style.display = showing ? '' : 'none';
+            plain.style.display = showing ? 'none' : '';
+          }
+          return;
+        }
+
+        // Copy
+        btn = e.target.closest('[data-copy]');
+        if (btn) {
+          var pw = allPasswords.find(function (p) { return p.id === btn.dataset.copy; });
+          if (pw) copyToClipboard(pw.password);
+          return;
+        }
+
+        // Edit
+        btn = e.target.closest('[data-edit]');
+        if (btn) {
+          openEditModal(btn.dataset.edit);
+          return;
+        }
+
+        // Delete
+        btn = e.target.closest('[data-del]');
+        if (btn) {
+          deleteId = btn.dataset.del;
+          var pw2 = allPasswords.find(function (p) { return p.id === deleteId; });
+          $('confirmText').textContent = '"' + (pw2 ? pw2.name : 'Passwort') + '" wird unwiderruflich gelöscht.';
+          $('confirmModal').classList.add('open');
+          return;
+        }
+      });
+
+      // --------------------------------------------------------
+      // Modals
+      // --------------------------------------------------------
+      function openSaveModal(pw) {
+        editingId = null;
+        $('modalTitle').textContent = 'Passwort speichern';
+        $('modalName').value = '';
+        $('modalUsername').value = '';
+        $('modalPassword').value = pw || '';
+        $('modalPassword').type = 'password';
+        $('modalWebsite').value = '';
+        $('modalNotes').value = '';
+        $('saveModal').classList.add('open');
+        $('modalName').focus();
+      }
+
+      function openEditModal(id) {
+        var entry = allPasswords.find(function (p) { return p.id === id; });
+        if (!entry) return;
+        editingId = id;
+        $('modalTitle').textContent = 'Passwort bearbeiten';
+        $('modalName').value = entry.name;
+        $('modalUsername').value = entry.username || '';
+        $('modalPassword').value = entry.password;
+        $('modalPassword').type = 'password';
+        $('modalWebsite').value = entry.website || '';
+        $('modalNotes').value = entry.notes || '';
+        $('saveModal').classList.add('open');
+        $('modalName').focus();
+      }
+
+      function closeModals() {
+        $('saveModal').classList.remove('open');
+        $('confirmModal').classList.remove('open');
+      }
+
+      // Modal: Save
+      $('modalSave').addEventListener('click', function () {
+        var name = $('modalName').value.trim();
+        var password = $('modalPassword').value;
+        if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
+        if (!password) { toast('Bitte Passwort eingeben', 'error'); return; }
+
+        var payload = {
+          name: name,
+          password: password,
+          username: $('modalUsername').value.trim(),
+          website: $('modalWebsite').value.trim(),
+          notes: $('modalNotes').value.trim()
+        };
+
+        savePassword(payload).then(function () {
+          closeModals();
+          toast(editingId ? 'Passwort aktualisiert' : 'Passwort gespeichert');
+          loadPasswords();
+        }).catch(function (err) {
+          toast(err.message || 'Speichern fehlgeschlagen', 'error');
+        });
+      });
+
+      $('modalCancel').addEventListener('click', closeModals);
+      $('modalToggleVis').addEventListener('click', function () {
+        var inp = $('modalPassword');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      });
+
+      // Modal: Delete confirm
+      $('confirmDelete').addEventListener('click', function () {
+        if (!deleteId) return;
+        deletePassword(deleteId).then(function () {
+          closeModals();
+          toast('Passwort gelöscht');
+          deleteId = null;
+          loadPasswords();
+        }).catch(function (err) {
+          toast(err.message || 'Löschen fehlgeschlagen', 'error');
+        });
+      });
+      $('confirmCancel').addEventListener('click', closeModals);
+
+      // Close modals on overlay click
+      document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+        overlay.addEventListener('click', function (e) {
+          if (e.target === overlay) closeModals();
+        });
+      });
+
+      // Close modals on Escape
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModals();
+      });
+
+      // --------------------------------------------------------
+      // Generator Controls
+      // --------------------------------------------------------
+      lengthSlider.addEventListener('input', function () {
+        lengthValue.textContent = lengthSlider.value;
+        updatePassword();
+      });
+
+      [optUpper, optLower, optNumbers, optSpecial].forEach(function (cb) {
+        cb.addEventListener('change', updatePassword);
+      });
+
+      optMemorable.addEventListener('change', function () {
+        var isMemorable = optMemorable.checked;
+        charLabels.forEach(function (lbl) {
+          if (isMemorable) lbl.classList.add('disabled');
+          else lbl.classList.remove('disabled');
+        });
+        updatePassword();
+      });
+
+      $('refreshBtn').addEventListener('click', updatePassword);
+      $('copyGenBtn').addEventListener('click', function () {
+        if (currentGenerated) copyToClipboard(currentGenerated);
+      });
+
+      $('saveGenBtn').addEventListener('click', function () {
+        if (currentGenerated) openSaveModal(currentGenerated);
+      });
+
+      $('addManualBtn').addEventListener('click', function () {
+        openSaveModal('');
+      });
+
+      // Search
+      searchInput.addEventListener('input', renderList);
+
+      // --------------------------------------------------------
+      // Logout
+      // --------------------------------------------------------
+      $('logoutBtn').addEventListener('click', function () {
+        fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' })
+          .finally(function () { window.location.href = '/portal'; });
+      });
+
+      // --------------------------------------------------------
+      // Init
+      // --------------------------------------------------------
+      function initApp() {
+        if (SessionTimeout.wasRestarted()) {
+          fetch(API + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {});
+          window.location.href = '/portal';
+          return;
+        }
+
+        api('/auth/me').then(function (data) {
+          $('userName').textContent = data.user.name;
+          return loadPasswords();
+        }).then(function () {
+          $('app').classList.add('active');
+          $('loading').classList.add('hidden');
+          updatePassword();
+          SessionTimeout.start(function () { window.location.href = '/portal'; });
+        }).catch(function () {
+          window.location.href = '/portal';
+        });
+      }
+
+      initApp();
+    })();
+  </script>
+</body>
+</html>

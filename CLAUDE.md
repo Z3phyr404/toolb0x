@@ -40,7 +40,8 @@ toolb0x/
 │       ├── income.js                    # /api/income CRUD
 │       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
 │       ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
-│       └── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
+│       ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
+│       └── passwords.js                 # /api/passwords CRUD (Passwort-Manager)
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -48,8 +49,10 @@ toolb0x/
     ├── apps/
     │   ├── finanzen/
     │   │   └── index.html               # Finanz-App (komplette SPA in einer HTML-Datei)
-    │   └── admin/
-    │       └── index.html               # Admin-Bereich (Nutzerübersicht, nur für Admins)
+    │   ├── admin/
+    │   │   └── index.html               # Admin-Bereich (Nutzerübersicht, nur für Admins)
+    │   └── passwords/
+    │       └── index.html               # Passwort-Manager (Generator + verschlüsselter Tresor)
     └── shared/
         └── session-timeout.js           # Inaktivitäts-Timeout (20min), Browser-Restart-Erkennung
 ```
@@ -65,12 +68,14 @@ toolb0x/
 | `/portal/profil` | Profilseite (HTML mit Nonce) |
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
+| `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
 | `/api/auth/*` | Auth-API |
 | `/api/categories/*` | Kategorien-API |
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
 | `/api/reminders/*` | Erinnerungs-API |
+| `/api/passwords/*` | Passwort-Manager-API (CRUD) |
 | `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
@@ -126,6 +131,7 @@ toolb0x/
 | Expense | `name`, `amount`, `tags` |
 | Income | `name`, `amount` |
 | Reminder | `note` |
+| StoredPassword | `name`, `username`, `password`, `website`, `notes` |
 
 **Nicht verschlüsselt:** `month` (Format YYYY-MM, für DB-Queries), `isRecurring`, `reminderDate`, `daysBefore`, `status`, alle IDs, Timestamps
 
@@ -188,6 +194,14 @@ Unique: [userId, month, type]
 Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 ```
 
+### StoredPassword
+```
+id (UUID), name (enc), username (enc), password (enc), website (enc), notes (enc)
+userId → User (Cascade Delete)
+Index: [userId]
+Zweck: Verschlüsselter Passwort-Tresor (Passwort-Manager)
+```
+
 ---
 
 ## API-Routen
@@ -235,6 +249,14 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
 - GET `/pdf-all` — Gesamt-PDF-Export aller Einnahmen & Ausgaben (Monatsübersicht + Details pro Monat)
+
+### Passwords (`/api/passwords/`)
+| Methode | Route | Beschreibung |
+|---------|-------|-------------|
+| GET | `/` | Alle gespeicherten Passwörter (entschlüsselt) |
+| POST | `/` | Neues Passwort speichern |
+| PUT | `/:id` | Passwort bearbeiten |
+| DELETE | `/:id` | Passwort löschen |
 
 ### Admin (`/api/admin/`)
 | Methode | Route | Beschreibung |

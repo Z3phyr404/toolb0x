@@ -256,6 +256,41 @@ function validateNote(data) {
   return errors;
 }
 
+// --------------------------------------------------------
+// Gespeichertes Passwort validieren
+// --------------------------------------------------------
+function validateStoredPassword(data) {
+  const errors = [];
+
+  if (!data.name || data.name.trim().length === 0) {
+    errors.push('Bitte gib einen Namen ein (z.B. "Netflix").');
+  }
+  if (data.name && data.name.length > 100) {
+    errors.push('Der Name darf maximal 100 Zeichen lang sein.');
+  }
+
+  if (!data.password || data.password.length === 0) {
+    errors.push('Bitte gib ein Passwort ein.');
+  }
+  if (data.password && data.password.length > 500) {
+    errors.push('Das Passwort darf maximal 500 Zeichen lang sein.');
+  }
+
+  if (data.username && data.username.length > 200) {
+    errors.push('Der Benutzername darf maximal 200 Zeichen lang sein.');
+  }
+
+  if (data.website && data.website.length > 500) {
+    errors.push('Die Website-URL darf maximal 500 Zeichen lang sein.');
+  }
+
+  if (data.notes && data.notes.length > 2000) {
+    errors.push('Notizen dürfen maximal 2000 Zeichen lang sein.');
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -264,5 +299,6 @@ module.exports = {
   validateCategory,
   validateReminder,
   validateNote,
+  validateStoredPassword,
   sanitize,
 };

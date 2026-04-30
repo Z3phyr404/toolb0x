@@ -32,7 +32,8 @@ model User {
   incomes     Income[]
   monthInits  MonthInit[]
   reminders   Reminder[]
-  notes       Note[]
+  notes           Note[]
+  storedPasswords StoredPassword[]
 
   @@map("users")
 }
@@ -170,4 +171,22 @@ model Note {
   @@index([userId, parentId])
   @@index([userId, isPinned])
   @@map("notes")
+}
+
+model StoredPassword {
+  id       String @id @default(uuid())
+  name     String // VERSCHLÜSSELT — Bezeichnung (z.B. "Netflix")
+  username String @default("") // VERSCHLÜSSELT — Benutzername/E-Mail
+  password String // VERSCHLÜSSELT — Das gespeicherte Passwort
+  website  String @default("") // VERSCHLÜSSELT — URL (optional)
+  notes    String @default("") // VERSCHLÜSSELT — Notizen (optional)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("stored_passwords")
 }
