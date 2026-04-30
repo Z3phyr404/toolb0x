@@ -689,7 +689,7 @@
 
     if (allServers.length === 0) {
       list.innerHTML = '<div class="empty-state">'
-        + '<div class="empty-state-icon">&#128421;</div>'
+        + '<div class="empty-state-icon">🖥️</div>'
         + '<div class="empty-state-title">Noch keine Server</div>'
         + '<div class="empty-state-desc">Füge deinen ersten Server hinzu, um loszulegen.</div>'
         + '</div>';
@@ -706,13 +706,13 @@
         + '<div class="server-info" id="info-' + s.id + '">' + (s.notes ? escapeHtml(s.notes) : 'Klicke auf &quot;Status&quot; um den Server zu prüfen.') + '</div>'
         + '<div class="stats-grid hidden-init" id="stats-' + s.id + '"></div>'
         + '<div class="action-row">'
-        + '<button class="action-btn btn-status" data-action="status" data-id="' + s.id + '">&#9889; Status</button>'
-        + '<button class="action-btn btn-stats" data-action="stats" data-id="' + s.id + '">&#128202; Stats</button>'
-        + '<button class="action-btn btn-services" data-action="services" data-id="' + s.id + '">&#9881; Services</button>'
-        + '<button class="action-btn btn-update" id="updateBtn-' + s.id + '" data-action="update" data-id="' + s.id + '">&#11014; Update</button>'
-        + '<button class="action-btn btn-restart" data-action="restart" data-id="' + s.id + '">&#128260; Neustart</button>'
-        + '<button class="action-btn btn-edit" data-action="edit" data-id="' + s.id + '">&#9998;</button>'
-        + '<button class="action-btn btn-delete" data-action="delete" data-id="' + s.id + '">&#128465;</button>'
+        + '<button class="action-btn btn-status" data-action="status" data-id="' + s.id + '">⚡ Status</button>'
+        + '<button class="action-btn btn-stats" data-action="stats" data-id="' + s.id + '">📊 Stats</button>'
+        + '<button class="action-btn btn-services" data-action="services" data-id="' + s.id + '">⚙️ Services</button>'
+        + '<button class="action-btn btn-update" id="updateBtn-' + s.id + '" data-action="update" data-id="' + s.id + '">⬆️ Update</button>'
+        + '<button class="action-btn btn-restart" data-action="restart" data-id="' + s.id + '">🔄 Neustart</button>'
+        + '<button class="action-btn btn-edit" data-action="edit" data-id="' + s.id + '">✏️ Bearbeiten</button>'
+        + '<button class="action-btn btn-delete" data-action="delete" data-id="' + s.id + '">🗑️ Löschen</button>'
         + '</div>'
         + '<div class="services-panel" id="services-' + s.id + '"></div>'
         + '<div class="update-log" id="updateLog-' + s.id + '">'
@@ -753,11 +753,11 @@
       + '<div class="stat-value">' + escapeHtml(data.load.l1) + ' / ' + escapeHtml(data.load.l5) + ' / ' + escapeHtml(data.load.l15) + '</div>'
       + '</div>'
       + '<div class="stat-item">'
-      + '<div class="stat-label">Netzwerk &#8595;</div>'
+      + '<div class="stat-label">Netzwerk ↓</div>'
       + '<div class="stat-value">' + formatBytes(data.network.rx) + '</div>'
       + '</div>'
       + '<div class="stat-item">'
-      + '<div class="stat-label">Netzwerk &#8593;</div>'
+      + '<div class="stat-label">Netzwerk ↑</div>'
       + '<div class="stat-value">' + formatBytes(data.network.tx) + '</div>'
       + '</div>'
       + '<div class="stat-item full-width">'
@@ -838,7 +838,7 @@
         + services.map(function(s) {
           return '<div class="service-item">'
             + '<span class="service-name">' + escapeHtml(s) + '</span>'
-            + '<button class="service-restart-btn" data-action="service-restart" data-server="' + id + '" data-service="' + escapeHtml(s) + '">&#8635; Neustarten</button>'
+            + '<button class="service-restart-btn" data-action="service-restart" data-server="' + id + '" data-service="' + escapeHtml(s) + '">↻ Neustarten</button>'
             + '</div>';
         }).join('');
     }).catch(function(err) {
@@ -881,7 +881,7 @@
           if (output) output.value += '\nFehler: ' + (err.error || 'Unbekannter Fehler');
           toast(err.error || 'Update fehlgeschlagen.', 'error');
         }).finally(function() {
-          if (btn) { btn.disabled = false; btn.innerHTML = '&#11014; Update'; }
+          if (btn) { btn.disabled = false; btn.textContent = '⬆️ Update'; }
         });
       }
     );
