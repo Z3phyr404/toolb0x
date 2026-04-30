@@ -291,6 +291,59 @@ function validateStoredPassword(data) {
   return errors;
 }
 
+// --------------------------------------------------------
+// Server validieren
+// --------------------------------------------------------
+function validateServer(data) {
+  const errors = [];
+
+  if (!data.label || data.label.trim().length === 0) {
+    errors.push('Bitte gib einen Namen ein (z.B. "Hetzner VPS").');
+  }
+  if (data.label && data.label.length > 100) {
+    errors.push('Der Name darf maximal 100 Zeichen lang sein.');
+  }
+
+  if (!data.host || data.host.trim().length === 0) {
+    errors.push('Bitte gib einen Hostnamen oder eine IP-Adresse ein.');
+  }
+  if (data.host && data.host.length > 255) {
+    errors.push('Der Hostname darf maximal 255 Zeichen lang sein.');
+  }
+
+  if (data.port !== undefined && data.port !== '') {
+    const port = parseInt(data.port);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      errors.push('Der Port muss zwischen 1 und 65535 liegen.');
+    }
+  }
+
+  if (!data.username || data.username.trim().length === 0) {
+    errors.push('Bitte gib einen SSH-Benutzernamen ein.');
+  }
+  if (data.username && data.username.length > 100) {
+    errors.push('Der Benutzername darf maximal 100 Zeichen lang sein.');
+  }
+
+  if (!data.authType || !['password', 'key'].includes(data.authType)) {
+    errors.push('Ungültiger Authentifizierungstyp.');
+  }
+
+  if (data.authType === 'password' && (!data.password || data.password.length === 0)) {
+    errors.push('Bitte gib ein SSH-Passwort ein.');
+  }
+
+  if (data.authType === 'key' && (!data.privateKey || data.privateKey.length === 0)) {
+    errors.push('Bitte gib einen SSH Private Key ein.');
+  }
+
+  if (data.notes && data.notes.length > 2000) {
+    errors.push('Notizen dürfen maximal 2000 Zeichen lang sein.');
+  }
+
+  return errors;
+}
+
 module.exports = {
   validateRegistration,
   validateLogin,
@@ -300,5 +353,6 @@ module.exports = {
   validateReminder,
   validateNote,
   validateStoredPassword,
+  validateServer,
   sanitize,
 };

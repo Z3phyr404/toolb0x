@@ -205,6 +205,14 @@ a.portal-user-name:hover { color:var(--blue); }
       <span class="tool-badge active">✓ Verfügbar</span>
     </a>
 
+    <!-- SERVER-VERWALTUNG (nur für Admins sichtbar) -->
+    <a href="/app/servers" class="tool-card glass" id="serverCard" style="display:none">
+      <div class="tool-icon" style="background:rgba(0,199,190,0.12);color:var(--mint)">&#128421;</div>
+      <div class="tool-name">Server</div>
+      <div class="tool-desc">Verwalte deine Server: Status, Updates, Neustart und Live-Statistiken per SSH.</div>
+      <span class="tool-badge active">&#10003; Verfügbar</span>
+    </a>
+
     <div class="tool-card glass" style="opacity:0.6;cursor:default">
       <div class="tool-icon" style="background:rgba(48,209,88,0.12);color:var(--green)">✅</div>
       <div class="tool-name">Aufgaben</div>
@@ -318,10 +326,14 @@ async function checkAuth() {
     document.getElementById('portalUserName').textContent = user.name;
     document.getElementById('portalGreeting').textContent = user.name.split(' ')[0];
 
-    // Admin-Karte anzeigen
+    // Admin-Karten anzeigen
     var adminCard = document.getElementById('adminCard');
     if (adminCard) {
       adminCard.style.display = (user.role === 'admin') ? '' : 'none';
+    }
+    var serverCard = document.getElementById('serverCard');
+    if (serverCard) {
+      serverCard.style.display = (user.role === 'admin') ? '' : 'none';
     }
 
     // Session-Timeout starten

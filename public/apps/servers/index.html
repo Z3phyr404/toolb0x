@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Toolb0x — Server-Verwaltung</title>
+  <style nonce="__CSP_NONCE__">
+    @font-face {
+      font-family: 'SF';
+      src: local('SF Pro Display'), local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Helvetica Neue');
+    }
+
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.12);
+      --glass-bg-heavy: rgba(255, 255, 255, 0.18);
+      --glass-border: rgba(255, 255, 255, 0.22);
+      --glass-border-light: rgba(255, 255, 255, 0.12);
+      --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 2px 12px rgba(0, 0, 0, 0.1);
+      --glass-shadow-elevated: 0 12px 60px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.15);
+      --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+      --glass-blur: 40px;
+      --glass-saturate: 1.8;
+
+      --text: rgba(0, 0, 0, 0.85);
+      --text-secondary: rgba(0, 0, 0, 0.55);
+      --text-tertiary: rgba(0, 0, 0, 0.35);
+
+      --blue: #007AFF;
+      --green: #30D158;
+      --red: #FF3B30;
+      --orange: #FF9500;
+      --purple: #AF52DE;
+      --pink: #FF2D55;
+      --teal: #5AC8FA;
+      --indigo: #5856D6;
+      --mint: #00C7BE;
+      --yellow: #FFCC00;
+
+      --radius-sm: 12px;
+      --radius: 20px;
+      --radius-lg: 26px;
+      --radius-xl: 32px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      font-family: 'SF', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: linear-gradient(135deg, #a8c8f0 0%, #d4b8e8 25%, #f0c8c8 50%, #b8d8f0 75%, #c8e8d0 100%);
+      background-size: 400% 400%;
+      animation: bgShift 20s ease infinite;
+    }
+    .bg::before {
+      content: ''; position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 600px 600px at 20% 20%, rgba(168, 200, 240, 0.6), transparent),
+        radial-gradient(ellipse 500px 500px at 80% 80%, rgba(212, 184, 232, 0.5), transparent),
+        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(240, 200, 200, 0.4), transparent);
+    }
+    @keyframes bgShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), var(--glass-inset);
+    }
+    .glass-heavy {
+      background: var(--glass-bg-heavy);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
+    }
+
+    .loading-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.6);
+      backdrop-filter: blur(20px);
+      transition: opacity 0.4s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--mint);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .app {
+      position: relative; z-index: 1;
+      height: 100%; display: flex; flex-direction: column;
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .app.active { opacity: 1; }
+
+    .app-header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      z-index: 10; flex-shrink: 0;
+    }
+    .back-btn {
+      color: var(--mint); text-decoration: none; font-size: 14px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .back-btn:hover { opacity: 0.7; }
+    .app-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-name { font-size: 13px; color: var(--text-secondary); }
+    .logout-btn {
+      background: rgba(255,59,48,0.12); color: var(--red);
+      border: none; padding: 6px 14px; border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .logout-btn:hover { background: rgba(255,59,48,0.2); }
+
+    .main-content {
+      flex: 1; overflow-y: auto; padding: 20px 24px 40px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    /* ===== TOOLBAR ===== */
+    .toolbar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .toolbar .section-title { margin: 0; flex: 1; font-size: 18px; font-weight: 700; }
+    .add-btn {
+      padding: 8px 16px; border: none; border-radius: var(--radius-sm);
+      background: var(--mint); color: #fff;
+      font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .add-btn:hover { opacity: 0.85; }
+
+    /* ===== SERVER CARDS ===== */
+    .server-list { display: flex; flex-direction: column; gap: 16px; }
+
+    .server-card {
+      border-radius: var(--radius-lg); padding: 20px;
+      transition: transform 0.15s;
+    }
+    .server-card:hover { transform: translateY(-1px); }
+
+    .server-top {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+    }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+      background: var(--text-tertiary);
+    }
+    .status-dot.online { background: var(--green); box-shadow: 0 0 8px rgba(48,209,88,0.5); }
+    .status-dot.offline { background: var(--red); box-shadow: 0 0 8px rgba(255,59,48,0.5); }
+    .status-dot.loading { background: var(--orange); animation: pulse 1.2s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .server-label { font-size: 16px; font-weight: 700; flex: 1; }
+    .server-host { font-size: 12px; color: var(--text-secondary); }
+
+    .server-info {
+      font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;
+      min-height: 18px;
+    }
+
+    /* ===== STATS GRID ===== */
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat-item {
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.04); border-radius: var(--radius-sm);
+    }
+    .stat-label {
+      font-size: 11px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+    }
+    .stat-value { font-size: 15px; font-weight: 700; }
+    .stat-bar {
+      height: 6px; background: rgba(0,0,0,0.08);
+      border-radius: 3px; margin-top: 6px; overflow: hidden;
+    }
+    .stat-bar-fill {
+      height: 100%; border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .stat-bar-fill.low { background: var(--green); }
+    .stat-bar-fill.mid { background: var(--orange); }
+    .stat-bar-fill.high { background: var(--red); }
+
+    .stat-item.full-width { grid-column: 1 / -1; }
+
+    /* ===== ACTION BUTTONS ===== */
+    .action-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .action-btn {
+      padding: 7px 14px; border: none; border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .action-btn:hover { opacity: 0.85; }
+    .action-btn:active { transform: scale(0.96); }
+    .action-btn:disabled { opacity: 0.4; pointer-events: none; }
+
+    .btn-status { background: rgba(0,199,190,0.12); color: var(--mint); }
+    .btn-stats { background: rgba(0,122,255,0.12); color: var(--blue); }
+    .btn-services { background: rgba(88,86,214,0.12); color: var(--indigo); }
+    .btn-update { background: rgba(255,149,0,0.12); color: var(--orange); }
+    .btn-restart { background: rgba(255,59,48,0.12); color: var(--red); }
+    .btn-edit { background: rgba(0,0,0,0.06); color: var(--text-secondary); }
+    .btn-delete { background: rgba(255,59,48,0.08); color: var(--red); }
+
+    /* ===== SERVICES PANEL ===== */
+    .services-panel {
+      margin-top: 12px; padding: 14px;
+      background: rgba(0,0,0,0.04); border-radius: var(--radius);
+      display: none;
+    }
+    .services-panel.open { display: block; }
+    .services-panel-title {
+      font-size: 13px; font-weight: 700; margin-bottom: 10px;
+      color: var(--text-secondary);
+    }
+    .service-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05);
+      font-size: 13px;
+    }
+    .service-item:last-child { border-bottom: none; }
+    .service-name { flex: 1; font-weight: 500; font-family: 'SF Mono', monospace; }
+    .service-restart-btn {
+      padding: 4px 10px; border: none; border-radius: 8px;
+      background: rgba(88,86,214,0.12); color: var(--indigo);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .service-restart-btn:hover { opacity: 0.7; }
+    .service-restart-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+    /* ===== UPDATE LOG ===== */
+    .update-log {
+      margin-top: 12px; display: none;
+    }
+    .update-log.open { display: block; }
+    .update-log-title {
+      font-size: 13px; font-weight: 700; margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+    .update-log-output {
+      width: 100%; height: 200px; padding: 12px;
+      background: rgba(0,0,0,0.7); color: #00ff41;
+      border: none; border-radius: var(--radius-sm);
+      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 11px; line-height: 1.5; resize: vertical;
+      overflow-y: auto;
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .empty-state-desc { font-size: 14px; }
+
+    /* ===== MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      width: 100%; max-width: 480px;
+      border-radius: var(--radius-xl); padding: 28px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block; font-size: 13px; font-weight: 600;
+      margin-bottom: 6px; color: var(--text-secondary);
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.5);
+      font-size: 14px; font-family: inherit; outline: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      border-color: var(--mint);
+    }
+    .form-textarea {
+      min-height: 80px; resize: vertical;
+      font-family: 'SF Mono', 'Menlo', monospace; font-size: 12px;
+    }
+
+    .auth-toggle {
+      display: flex; gap: 0; margin-bottom: 16px;
+      border-radius: var(--radius-sm); overflow: hidden;
+      border: 1px solid var(--glass-border);
+    }
+    .auth-toggle-btn {
+      flex: 1; padding: 8px; border: none;
+      background: rgba(0,0,0,0.04); color: var(--text-secondary);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .auth-toggle-btn.active {
+      background: var(--mint); color: #fff;
+    }
+
+    .modal-actions {
+      display: flex; gap: 10px; margin-top: 24px;
+    }
+    .modal-btn {
+      flex: 1; padding: 12px; border: none; border-radius: var(--radius);
+      font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .modal-btn.primary {
+      background: linear-gradient(135deg, var(--mint), var(--teal));
+      color: #fff;
+    }
+    .modal-btn.primary:hover { opacity: 0.85; }
+    .modal-btn.secondary {
+      background: rgba(0,0,0,0.06); color: var(--text-secondary);
+    }
+    .modal-btn.danger {
+      background: linear-gradient(135deg, var(--red), var(--pink));
+      color: #fff;
+    }
+
+    .form-error {
+      color: var(--red); font-size: 13px; margin-top: 4px;
+      display: none;
+    }
+    .form-error.show { display: block; }
+
+    /* ===== CONFIRM MODAL ===== */
+    .confirm-text {
+      font-size: 15px; line-height: 1.6; color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .confirm-warning {
+      padding: 12px; border-radius: var(--radius-sm);
+      background: rgba(255,59,48,0.08); color: var(--red);
+      font-size: 13px; font-weight: 500; margin-bottom: 16px;
+    }
+
+    /* ===== TOAST ===== */
+    .toast-box {
+      position: fixed; bottom: 30px; right: 24px; z-index: 300;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      padding: 12px 20px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600;
+      backdrop-filter: blur(20px);
+      animation: toastIn 0.3s ease, toastOut 0.3s ease 2.8s forwards;
+      max-width: 360px;
+    }
+    .toast.success { background: rgba(48,209,88,0.9); color: #fff; }
+    .toast.error { background: rgba(255,59,48,0.9); color: #fff; }
+    @keyframes toastIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes toastOut { to{opacity:0;transform:translateY(-10px)} }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 600px) {
+      .app-header { padding: 12px 16px; gap: 10px; }
+      .main-content { padding: 16px 16px 32px; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .action-row { gap: 6px; }
+      .action-btn { padding: 6px 10px; font-size: 11px; }
+      .server-card { padding: 16px; }
+      .modal { padding: 20px; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="bg"></div>
+<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div></div>
+
+<div class="app" id="app">
+  <header class="app-header glass-heavy">
+    <a href="/portal" class="back-btn">&larr; Zur &Uuml;bersicht</a>
+    <div class="app-title">Server-Verwaltung</div>
+    <div class="header-right">
+      <span class="user-name" id="userName"></span>
+      <button class="logout-btn" id="logoutBtn">Abmelden</button>
+    </div>
+  </header>
+
+  <div class="main-content">
+    <div class="toolbar">
+      <div class="section-title">Meine Server</div>
+      <button class="add-btn" id="addServerBtn">+ Server hinzuf&uuml;gen</button>
+    </div>
+    <div class="server-list" id="serverList"></div>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="serverModal">
+  <div class="modal glass-heavy">
+    <div class="modal-title" id="modalTitle">Server hinzuf&uuml;gen</div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="fLabel" placeholder="z.B. Hetzner VPS">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Host / IP</label>
+      <input class="form-input" id="fHost" placeholder="z.B. 116.203.xx.xx oder toolb0x.eu">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Port</label>
+      <input class="form-input" id="fPort" type="number" value="22" min="1" max="65535">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Benutzername</label>
+      <input class="form-input" id="fUsername" placeholder="root">
+    </div>
+
+    <label class="form-label">Authentifizierung</label>
+    <div class="auth-toggle">
+      <button class="auth-toggle-btn active" id="authPwBtn" type="button">Passwort</button>
+      <button class="auth-toggle-btn" id="authKeyBtn" type="button">SSH Key</button>
+    </div>
+
+    <div id="pwFields">
+      <div class="form-group">
+        <label class="form-label">SSH-Passwort</label>
+        <input class="form-input" id="fPassword" type="password">
+      </div>
+    </div>
+    <div id="keyFields" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Private Key</label>
+        <textarea class="form-textarea" id="fPrivateKey" rows="4" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passphrase (optional)</label>
+        <input class="form-input" id="fPassphrase" type="password">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notizen (optional)</label>
+      <textarea class="form-textarea" id="fNotes" rows="2" style="font-family:inherit;font-size:14px" placeholder="z.B. Ubuntu 24.04, 4GB RAM"></textarea>
+    </div>
+
+    <div class="form-error" id="formError"></div>
+
+    <div class="modal-actions">
+      <button class="modal-btn secondary" id="modalCancel">Abbrechen</button>
+      <button class="modal-btn primary" id="modalSave">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal glass-heavy">
+    <div class="modal-title" id="confirmTitle">Best&auml;tigung</div>
+    <div class="confirm-text" id="confirmText"></div>
+    <div class="confirm-warning" id="confirmWarning"></div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" id="confirmCancel">Abbrechen</button>
+      <button class="modal-btn danger" id="confirmOk">Best&auml;tigen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-box" id="toasts"></div>
+
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+<script nonce="__CSP_NONCE__">
+(function() {
+  'use strict';
+
+  var API = '/api';
+  var allServers = [];
+  var editingId = null;
+  var confirmCallback = null;
+  var statsTimers = {};
+  var currentAuthType = 'password';
+
+  function $(id) { return document.getElementById(id); }
+
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function getCsrfToken() {
+    var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+    return m ? m[1] : '';
+  }
+
+  function toast(msg, type) {
+    var el = document.createElement('div');
+    el.className = 'toast ' + (type || 'success');
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3100);
+  }
+
+  function showLoading() { $('loadingOverlay').classList.remove('hidden'); }
+  function hideLoading() { $('loadingOverlay').classList.add('hidden'); }
+
+  function api(endpoint, options) {
+    var opts = options || {};
+    var headers = opts.headers || {};
+    headers['Content-Type'] = 'application/json';
+    if (opts.method && opts.method !== 'GET') {
+      headers['X-CSRF-Token'] = getCsrfToken();
+    }
+    return fetch(API + endpoint, {
+      method: opts.method || 'GET',
+      credentials: 'include',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function(res) {
+      return res.json().then(function(data) {
+        if (!res.ok) throw data;
+        return data;
+      });
+    });
+  }
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+
+  function logout() {
+    SessionTimeout.stop();
+    fetch(API + '/auth/logout', {
+      method: 'POST', credentials: 'include',
+      headers: { 'X-CSRF-Token': getCsrfToken() }
+    }).catch(function() {});
+    window.location.href = '/portal';
+  }
+
+  function checkAuth() {
+    showLoading();
+    if (SessionTimeout.wasRestarted()) {
+      fetch(API + '/auth/logout', {
+        method: 'POST', credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      }).catch(function() {});
+      window.location.href = '/portal';
+      return;
+    }
+
+    api('/auth/me').then(function(data) {
+      if (data.user.role !== 'admin') {
+        window.location.href = '/portal';
+        return;
+      }
+      $('userName').textContent = data.user.name;
+      $('app').classList.add('active');
+      hideLoading();
+
+      SessionTimeout.start(function() {
+        window.location.href = '/portal';
+      });
+
+      loadServers();
+    }).catch(function() {
+      window.location.href = '/portal';
+    });
+  }
+
+  // ============================================================
+  // CRUD
+  // ============================================================
+
+  function loadServers() {
+    api('/servers').then(function(data) {
+      allServers = data.servers || [];
+      renderServerList();
+    }).catch(function(err) {
+      toast(err.error || 'Server konnten nicht geladen werden.', 'error');
+    });
+  }
+
+  function saveServer() {
+    var body = {
+      label: $('fLabel').value.trim(),
+      host: $('fHost').value.trim(),
+      port: $('fPort').value || '22',
+      username: $('fUsername').value.trim(),
+      authType: currentAuthType,
+      password: currentAuthType === 'password' ? $('fPassword').value : '',
+      privateKey: currentAuthType === 'key' ? $('fPrivateKey').value : '',
+      passphrase: currentAuthType === 'key' ? $('fPassphrase').value : '',
+      notes: $('fNotes').value.trim(),
+    };
+
+    var endpoint = editingId ? '/servers/' + editingId : '/servers';
+    var method = editingId ? 'PUT' : 'POST';
+
+    $('modalSave').disabled = true;
+    api(endpoint, { method: method, body: body }).then(function() {
+      closeModal();
+      toast(editingId ? 'Server aktualisiert.' : 'Server hinzugefügt.');
+      loadServers();
+    }).catch(function(err) {
+      var msg = err.errors ? err.errors.join(' ') : (err.error || 'Fehler beim Speichern.');
+      $('formError').textContent = msg;
+      $('formError').classList.add('show');
+    }).finally(function() {
+      $('modalSave').disabled = false;
+    });
+  }
+
+  function deleteServer(id) {
+    showConfirm(
+      'Server löschen',
+      'Möchtest du diesen Server wirklich löschen?',
+      'Alle gespeicherten Zugangsdaten werden unwiderruflich entfernt.',
+      function() {
+        api('/servers/' + id, { method: 'DELETE' }).then(function() {
+          toast('Server gelöscht.');
+          loadServers();
+        }).catch(function(err) {
+          toast(err.error || 'Fehler beim Löschen.', 'error');
+        });
+      }
+    );
+  }
+
+  // ============================================================
+  // RENDERING
+  // ============================================================
+
+  function formatUptime(seconds) {
+    var d = Math.floor(seconds / 86400);
+    var h = Math.floor((seconds % 86400) / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return d + 'd ' + h + 'h';
+    if (h > 0) return h + 'h ' + m + 'm';
+    return m + 'm';
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+    return (bytes / 1073741824).toFixed(2) + ' GB';
+  }
+
+  function barClass(pct) {
+    if (pct < 60) return 'low';
+    if (pct < 85) return 'mid';
+    return 'high';
+  }
+
+  function renderServerList() {
+    var list = $('serverList');
+
+    if (allServers.length === 0) {
+      list.innerHTML = '<div class="empty-state">'
+        + '<div class="empty-state-icon">&#128421;</div>'
+        + '<div class="empty-state-title">Noch keine Server</div>'
+        + '<div class="empty-state-desc">Füge deinen ersten Server hinzu, um loszulegen.</div>'
+        + '</div>';
+      return;
+    }
+
+    list.innerHTML = allServers.map(function(s) {
+      return '<div class="server-card glass" data-id="' + s.id + '">'
+        + '<div class="server-top">'
+        + '<div class="status-dot" id="dot-' + s.id + '"></div>'
+        + '<div class="server-label">' + escapeHtml(s.label) + '</div>'
+        + '<div class="server-host">' + escapeHtml(s.host) + '</div>'
+        + '</div>'
+        + '<div class="server-info" id="info-' + s.id + '">' + (s.notes ? escapeHtml(s.notes) : 'Klicke auf &quot;Status&quot; um den Server zu prüfen.') + '</div>'
+        + '<div class="stats-grid" id="stats-' + s.id + '" style="display:none"></div>'
+        + '<div class="action-row">'
+        + '<button class="action-btn btn-status" onclick="SRV.fetchStatus(\'' + s.id + '\')">&#9889; Status</button>'
+        + '<button class="action-btn btn-stats" onclick="SRV.fetchStats(\'' + s.id + '\')">&#128202; Stats</button>'
+        + '<button class="action-btn btn-services" onclick="SRV.toggleServices(\'' + s.id + '\')">&#9881; Services</button>'
+        + '<button class="action-btn btn-update" id="updateBtn-' + s.id + '" onclick="SRV.runUpdate(\'' + s.id + '\')">&#11014; Update</button>'
+        + '<button class="action-btn btn-restart" onclick="SRV.confirmRestart(\'' + s.id + '\')">&#128260; Neustart</button>'
+        + '<button class="action-btn btn-edit" onclick="SRV.openEdit(\'' + s.id + '\')">&#9998;</button>'
+        + '<button class="action-btn btn-delete" onclick="SRV.deleteServer(\'' + s.id + '\')">&#128465;</button>'
+        + '</div>'
+        + '<div class="services-panel" id="services-' + s.id + '"></div>'
+        + '<div class="update-log" id="updateLog-' + s.id + '">'
+        + '<div class="update-log-title">Update-Log</div>'
+        + '<textarea class="update-log-output" id="updateOutput-' + s.id + '" readonly></textarea>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderStats(id, data) {
+    var grid = $('stats-' + id);
+    if (!grid) return;
+
+    var cpuPct = Math.round(data.cpu);
+    var ramPct = data.ram.total > 0 ? Math.round((data.ram.used / data.ram.total) * 100) : 0;
+    var diskPct = parseInt(data.disk.percent) || 0;
+
+    grid.style.display = 'grid';
+    grid.innerHTML = ''
+      + '<div class="stat-item">'
+      + '<div class="stat-label">CPU</div>'
+      + '<div class="stat-value">' + cpuPct + '%</div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(cpuPct) + '" style="width:' + cpuPct + '%"></div></div>'
+      + '</div>'
+      + '<div class="stat-item">'
+      + '<div class="stat-label">RAM</div>'
+      + '<div class="stat-value">' + (data.ram.used / 1024).toFixed(1) + ' / ' + (data.ram.total / 1024).toFixed(1) + ' GB</div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(ramPct) + '" style="width:' + ramPct + '%"></div></div>'
+      + '</div>'
+      + '<div class="stat-item">'
+      + '<div class="stat-label">Disk</div>'
+      + '<div class="stat-value">' + escapeHtml(data.disk.used) + ' / ' + escapeHtml(data.disk.total) + '</div>'
+      + '<div class="stat-bar"><div class="stat-bar-fill ' + barClass(diskPct) + '" style="width:' + diskPct + '%"></div></div>'
+      + '</div>'
+      + '<div class="stat-item">'
+      + '<div class="stat-label">Load</div>'
+      + '<div class="stat-value">' + escapeHtml(data.load.l1) + ' / ' + escapeHtml(data.load.l5) + ' / ' + escapeHtml(data.load.l15) + '</div>'
+      + '</div>'
+      + '<div class="stat-item">'
+      + '<div class="stat-label">Netzwerk &#8595;</div>'
+      + '<div class="stat-value">' + formatBytes(data.network.rx) + '</div>'
+      + '</div>'
+      + '<div class="stat-item">'
+      + '<div class="stat-label">Netzwerk &#8593;</div>'
+      + '<div class="stat-value">' + formatBytes(data.network.tx) + '</div>'
+      + '</div>'
+      + '<div class="stat-item full-width">'
+      + '<div class="stat-label">Uptime</div>'
+      + '<div class="stat-value">' + formatUptime(data.uptime) + '</div>'
+      + '</div>';
+  }
+
+  // ============================================================
+  // SSH ACTIONS
+  // ============================================================
+
+  function setDot(id, cls) {
+    var dot = $('dot-' + id);
+    if (dot) { dot.className = 'status-dot ' + cls; }
+  }
+
+  function setInfo(id, text) {
+    var el = $('info-' + id);
+    if (el) { el.textContent = text; }
+  }
+
+  window.SRV = {};
+
+  SRV.fetchStatus = function(id) {
+    setDot(id, 'loading');
+    setInfo(id, 'Prüfe Verbindung...');
+    api('/servers/' + id + '/status', { method: 'POST' }).then(function(data) {
+      if (data.online) {
+        setDot(id, 'online');
+        setInfo(id, (data.os || '') + ' · ' + (data.uptime || ''));
+      } else {
+        setDot(id, 'offline');
+        setInfo(id, data.error || 'Server nicht erreichbar.');
+      }
+    }).catch(function(err) {
+      setDot(id, 'offline');
+      setInfo(id, err.error || 'Fehler bei der Statusprüfung.');
+    });
+  };
+
+  SRV.fetchStats = function(id) {
+    setDot(id, 'loading');
+    api('/servers/' + id + '/stats', { method: 'POST' }).then(function(data) {
+      setDot(id, 'online');
+      renderStats(id, data);
+    }).catch(function(err) {
+      setDot(id, 'offline');
+      toast(err.error || 'Stats konnten nicht geladen werden.', 'error');
+    });
+  };
+
+  SRV.toggleServices = function(id) {
+    var panel = $('services-' + id);
+    if (!panel) return;
+
+    if (panel.classList.contains('open')) {
+      panel.classList.remove('open');
+      return;
+    }
+
+    panel.innerHTML = '<div class="services-panel-title">Lade Services...</div>';
+    panel.classList.add('open');
+
+    api('/servers/' + id + '/services', { method: 'POST' }).then(function(data) {
+      var services = data.services || [];
+      if (services.length === 0) {
+        panel.innerHTML = '<div class="services-panel-title">Keine laufenden Services gefunden.</div>';
+        return;
+      }
+      panel.innerHTML = '<div class="services-panel-title">Laufende Services (' + services.length + ')</div>'
+        + services.map(function(s) {
+          return '<div class="service-item">'
+            + '<span class="service-name">' + escapeHtml(s) + '</span>'
+            + '<button class="service-restart-btn" onclick="SRV.restartService(\'' + id + '\',\'' + escapeHtml(s) + '\', this)">&#8635; Neustarten</button>'
+            + '</div>';
+        }).join('');
+    }).catch(function(err) {
+      panel.innerHTML = '<div class="services-panel-title" style="color:var(--red)">' + escapeHtml(err.error || 'Fehler beim Laden.') + '</div>';
+    });
+  };
+
+  SRV.restartService = function(serverId, serviceName, btn) {
+    if (btn) btn.disabled = true;
+    api('/servers/' + serverId + '/service-restart', {
+      method: 'POST',
+      body: { service: serviceName }
+    }).then(function(data) {
+      toast(data.message || serviceName + ' neu gestartet.');
+      if (btn) { btn.disabled = false; }
+    }).catch(function(err) {
+      toast(err.error || 'Fehler beim Neustarten.', 'error');
+      if (btn) { btn.disabled = false; }
+    });
+  };
+
+  SRV.runUpdate = function(id) {
+    showConfirm(
+      'System-Update',
+      'Möchtest du ein System-Update auf diesem Server durchführen?',
+      'Es wird apt-get update && apt-get upgrade -y ausgeführt. Das kann einige Minuten dauern.',
+      function() {
+        var btn = $('updateBtn-' + id);
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Läuft...'; }
+        var log = $('updateLog-' + id);
+        var output = $('updateOutput-' + id);
+        if (log) log.classList.add('open');
+        if (output) output.value = 'Update wird ausgeführt...\n';
+
+        api('/servers/' + id + '/update', { method: 'POST' }).then(function(data) {
+          if (output) output.value = data.output || '';
+          if (data.stderr) { output.value += '\n--- STDERR ---\n' + data.stderr; }
+          toast(data.success ? 'Update erfolgreich.' : 'Update abgeschlossen (mit Warnungen).', data.success ? 'success' : 'error');
+        }).catch(function(err) {
+          if (output) output.value += '\nFehler: ' + (err.error || 'Unbekannter Fehler');
+          toast(err.error || 'Update fehlgeschlagen.', 'error');
+        }).finally(function() {
+          if (btn) { btn.disabled = false; btn.innerHTML = '&#11014; Update'; }
+        });
+      }
+    );
+  };
+
+  SRV.confirmRestart = function(id) {
+    showConfirm(
+      'Server neustarten',
+      'Möchtest du diesen Server wirklich neu starten?',
+      'Der Server wird per sudo reboot sofort neu gestartet. Alle laufenden Prozesse werden beendet.',
+      function() {
+        setDot(id, 'loading');
+        setInfo(id, 'Neustart wird ausgeführt...');
+        api('/servers/' + id + '/restart', { method: 'POST' }).then(function() {
+          setDot(id, 'offline');
+          setInfo(id, 'Server wird neu gestartet... (ca. 30–60 Sekunden)');
+          toast('Neustart-Befehl gesendet.');
+        }).catch(function(err) {
+          toast(err.error || 'Neustart fehlgeschlagen.', 'error');
+        });
+      }
+    );
+  };
+
+  SRV.openEdit = function(id) {
+    var server = allServers.find(function(s) { return s.id === id; });
+    if (!server) return;
+    editingId = id;
+    $('modalTitle').textContent = 'Server bearbeiten';
+    $('fLabel').value = server.label;
+    $('fHost').value = server.host;
+    $('fPort').value = parseInt(server.port) || 22;
+    $('fUsername').value = server.username;
+    $('fNotes').value = server.notes || '';
+    $('fPassword').value = '';
+    $('fPrivateKey').value = '';
+    $('fPassphrase').value = '';
+    setAuthType(server.authType || 'password');
+    $('formError').classList.remove('show');
+    $('serverModal').classList.add('open');
+  };
+
+  SRV.deleteServer = function(id) { deleteServer(id); };
+
+  // ============================================================
+  // MODAL
+  // ============================================================
+
+  function setAuthType(type) {
+    currentAuthType = type;
+    $('authPwBtn').classList.toggle('active', type === 'password');
+    $('authKeyBtn').classList.toggle('active', type === 'key');
+    $('pwFields').style.display = type === 'password' ? '' : 'none';
+    $('keyFields').style.display = type === 'key' ? '' : 'none';
+  }
+
+  function openAddModal() {
+    editingId = null;
+    $('modalTitle').textContent = 'Server hinzufügen';
+    $('fLabel').value = '';
+    $('fHost').value = '';
+    $('fPort').value = '22';
+    $('fUsername').value = 'root';
+    $('fPassword').value = '';
+    $('fPrivateKey').value = '';
+    $('fPassphrase').value = '';
+    $('fNotes').value = '';
+    setAuthType('password');
+    $('formError').classList.remove('show');
+    $('serverModal').classList.add('open');
+  }
+
+  function closeModal() {
+    $('serverModal').classList.remove('open');
+    editingId = null;
+  }
+
+  // ============================================================
+  // CONFIRM
+  // ============================================================
+
+  function showConfirm(title, text, warning, callback) {
+    $('confirmTitle').textContent = title;
+    $('confirmText').textContent = text;
+    $('confirmWarning').textContent = warning;
+    confirmCallback = callback;
+    $('confirmModal').classList.add('open');
+  }
+
+  function closeConfirm() {
+    $('confirmModal').classList.remove('open');
+    confirmCallback = null;
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  document.addEventListener('DOMContentLoaded', function() {
+    $('logoutBtn').addEventListener('click', logout);
+    $('addServerBtn').addEventListener('click', openAddModal);
+    $('modalCancel').addEventListener('click', closeModal);
+    $('modalSave').addEventListener('click', saveServer);
+    $('authPwBtn').addEventListener('click', function() { setAuthType('password'); });
+    $('authKeyBtn').addEventListener('click', function() { setAuthType('key'); });
+    $('confirmCancel').addEventListener('click', closeConfirm);
+    $('confirmOk').addEventListener('click', function() {
+      if (confirmCallback) confirmCallback();
+      closeConfirm();
+    });
+
+    // ESC schließt Modals
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if ($('confirmModal').classList.contains('open')) closeConfirm();
+        else if ($('serverModal').classList.contains('open')) closeModal();
+      }
+    });
+
+    // Klick auf Overlay schließt Modal
+    $('serverModal').addEventListener('click', function(e) {
+      if (e.target === $('serverModal')) closeModal();
+    });
+    $('confirmModal').addEventListener('click', function(e) {
+      if (e.target === $('confirmModal')) closeConfirm();
+    });
+
+    checkAuth();
+  });
+
+})();
+</script>
+</body>
+</html>

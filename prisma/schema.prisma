@@ -34,6 +34,7 @@ model User {
   reminders   Reminder[]
   notes           Note[]
   storedPasswords StoredPassword[]
+  servers         Server[]
 
   @@map("users")
 }
@@ -189,4 +190,32 @@ model StoredPassword {
 
   @@index([userId])
   @@map("stored_passwords")
+}
+
+// ============================================================
+// SERVER — Verwaltete Remote-Server (SSH-Zugang)
+// ============================================================
+// Sensible Felder sind VERSCHLÜSSELT (Zero-Knowledge).
+// label, authType sind NICHT verschlüsselt (für Anzeige/Queries).
+// ============================================================
+model Server {
+  id         String  @id @default(uuid())
+  label      String  // NICHT verschlüsselt — Anzeigename
+  host       String  // VERSCHLÜSSELT
+  port       String  @default("22") // VERSCHLÜSSELT (String weil verschlüsselt)
+  username   String  // VERSCHLÜSSELT
+  authType   String  @default("password") // "password" | "key" — NICHT verschlüsselt
+  password   String  @default("") // VERSCHLÜSSELT
+  privateKey String  @default("") @db.Text // VERSCHLÜSSELT
+  passphrase String  @default("") // VERSCHLÜSSELT
+  notes      String  @default("") // VERSCHLÜSSELT
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("servers")
 }
