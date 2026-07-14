@@ -5,26 +5,38 @@
 
 /**
  * Cursor-reaktiver Glow (Parallax + Bereichsfarbe)
- * @param {HTMLElement} scope — Root-Element mit overflow:hidden + position:relative
+ * @param {HTMLElement|string} scopeOrId — Root-Element oder ID-String
  */
-function initGlow(scope) {
-  if (!scope || scope.dataset.glowReady) return;
+function initGlow(scopeOrId) {
+  var scope = typeof scopeOrId === 'string' ? document.getElementById(scopeOrId) : scopeOrId;
+  if (!scope) scope = document.body;
+  if (scope.dataset.glowReady) return;
   scope.dataset.glowReady = '1';
+
   var glows = scope.querySelectorAll('[data-glow]');
-  var primary = scope.querySelector('[data-glow-primary]');
+  if (!glows.length) {
+    // Fallback: Glow-Elemente könnten auf Body-Level liegen
+    glows = document.querySelectorAll('[data-glow]');
+  }
+  if (!glows.length) return;
+
+  var primary = null;
+  glows.forEach(function(g) { if (g.hasAttribute('data-glow-primary')) primary = g; });
   var baseBg = primary ? primary.style.background : '';
-  scope.addEventListener('mousemove', function(e) {
-    var r = scope.getBoundingClientRect();
-    var rx = (e.clientX - r.left) / Math.max(r.width, 1) - 0.5;
-    var ry = (e.clientY - r.top) / Math.max(r.height, 1) - 0.5;
+
+  // Mousemove auf dem gesamten Dokument (nicht nur scope), damit der Glow immer reagiert
+  document.addEventListener('mousemove', function(e) {
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var rx = e.clientX / Math.max(vw, 1) - 0.5;
+    var ry = e.clientY / Math.max(vh, 1) - 0.5;
     glows.forEach(function(g) {
       var d = parseFloat(g.dataset.depth || '40');
       g.style.transform = 'translate(' + (rx * d).toFixed(1) + 'px,' + (ry * d).toFixed(1) + 'px)';
     });
   });
-  scope.addEventListener('mouseleave', function() {
-    glows.forEach(function(g) { g.style.transform = 'translate(0,0)'; });
-  });
+
+  // Farb-Wechsel bei Karten-Hover
   scope.querySelectorAll('[data-glow-color]').forEach(function(card) {
     var c = card.getAttribute('data-glow-color');
     card.addEventListener('mouseenter', function() {
@@ -38,12 +50,17 @@ function initGlow(scope) {
 
 /**
  * Scroll-Reveal (gestaffeltes Einblenden)
- * @param {HTMLElement} scope — Container mit [data-reveal]-Elementen
+ * @param {HTMLElement|string} scopeOrId — Container oder ID-String
  */
-function initReveal(scope) {
-  if (!scope || scope.dataset.revealReady) return;
+function initReveal(scopeOrId) {
+  var scope = typeof scopeOrId === 'string' ? document.getElementById(scopeOrId) : scopeOrId;
+  if (!scope) scope = document.body;
+  if (scope.dataset.revealReady) return;
   scope.dataset.revealReady = '1';
+
   var els = scope.querySelectorAll('[data-reveal]');
+  if (!els.length) return;
+
   els.forEach(function(el) {
     el.style.opacity = '0';
     el.style.transform = 'translateY(22px)';

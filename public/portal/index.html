@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Tool-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/shared/obsidian.css">
 <style nonce="__CSP_NONCE__">
 /* ===== AUTH ===== */
@@ -26,12 +29,13 @@
 .auth-switch a { color:#f97316; cursor:pointer; text-decoration:none; font-weight:500; }
 .auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--error-text); font-size:13px; padding:10px 14px; border-radius:var(--radius-btn); display:none; }
 .auth-error.show { display:block; }
+.auth-name-hidden { display:none !important; }
 
 /* ===== PORTAL ===== */
 .portal { position:relative; z-index:1; min-height:100vh; overflow:hidden; padding:40px 24px 80px; opacity:0; pointer-events:none; transition:opacity 0.4s; }
 .portal.active { opacity:1; pointer-events:all; }
 
-.portal-header { display:flex; justify-content:space-between; align-items:center; max-width:1040px; margin:0 auto 52px; flex-wrap:wrap; gap:16px; }
+.portal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:52px; flex-wrap:wrap; gap:16px; }
 .portal-brand { display:flex; align-items:center; gap:14px; }
 .portal-brand-mark { width:38px; height:38px; border-radius:11px; background:linear-gradient(135deg,#ffa83d,#f97316); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(249,115,22,0.4); }
 .portal-brand-mark-inner { width:14px; height:14px; border:2px solid #2a1405; border-radius:4px; }
@@ -42,13 +46,13 @@
 .portal-user-name { font-size:14px; font-weight:500; text-decoration:none; color:inherit; transition:color 0.2s; }
 .portal-user-name:hover { color:#f97316; }
 
-.portal-welcome { max-width:1040px; margin:0 auto 40px; }
+.portal-welcome { margin-bottom:40px; }
 .portal-section-label { font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.14em; color:#ff9f43; margin-bottom:12px; }
 .portal-welcome h1 { margin-bottom:12px; }
 .portal-welcome p { font-size:16px; color:var(--text-2); max-width:520px; line-height:1.5; }
 
 /* ===== ERINNERUNGEN ===== */
-.reminder-panel { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:22px 24px; max-width:1040px; margin:0 auto 24px; }
+.reminder-panel { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:22px 24px; margin-bottom:24px; }
 .reminder-panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .reminder-panel-title { display:flex; align-items:center; gap:11px; font-size:16px; font-weight:600; }
 .reminder-panel-title svg { color:#fb9a3c; }
@@ -70,7 +74,7 @@
 .reminder-more a { color:#f97316; text-decoration:none; font-weight:500; }
 
 /* ===== TOOL GRID ===== */
-.tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:18px; max-width:1040px; margin:0 auto; }
+.tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:18px; }
 .tool-card {
   display:block; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:26px;
   transition:border-color 0.25s, box-shadow 0.25s, transform 0.25s;
@@ -115,7 +119,7 @@
     <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
     <div class="auth-error" id="authError"></div>
     <form class="auth-form" id="authForm">
-      <input class="auth-input" id="authName" type="text" placeholder="Name" autocomplete="name" style="display:none">
+      <input class="auth-input auth-name-hidden" id="authName" type="text" placeholder="Name" autocomplete="name">
       <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
       <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
       <button class="auth-btn" type="submit" id="authBtn">Anmelden</button>
@@ -133,7 +137,7 @@
   <div data-glow data-glow-primary data-depth="60" style="position:absolute;top:-180px;right:-140px;width:620px;height:620px;background:radial-gradient(circle,rgba(255,146,32,0.28),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;"></div>
   <div data-glow data-depth="32" style="position:absolute;bottom:-200px;left:-160px;width:540px;height:540px;background:radial-gradient(circle,rgba(255,184,70,0.09),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
 
-  <div style="position:relative;max-width:1040px;margin:0 auto;">
+  <div style="position:relative;max-width:100%;margin:0 auto;">
 
     <!-- HEADER -->
     <header class="portal-header" data-reveal data-reveal-index="0">
@@ -291,7 +295,7 @@ function hideLoading() { document.getElementById('loadingOverlay').classList.add
 
 function toggleAuthMode() {
   isLoginMode = !isLoginMode;
-  document.getElementById('authName').style.display = isLoginMode ? 'none' : '';
+  document.getElementById('authName').classList.toggle('auth-name-hidden', isLoginMode);
   document.getElementById('authSubtitle').textContent = isLoginMode ? 'Melde dich an, um fortzufahren' : 'Erstelle ein neues Konto';
   document.getElementById('authBtn').textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
   document.getElementById('authSwitchText').textContent = isLoginMode ? 'Noch kein Konto?' : 'Bereits registriert?';
