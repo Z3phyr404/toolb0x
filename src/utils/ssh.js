@@ -1,4 +1,10 @@
 const { Client } = require('ssh2');
+const crypto = require('crypto');
+
+const HOST_KEY_MISMATCH =
+  'SSH-Host-Key hat sich geändert! Mögliche Man-in-the-Middle-Attacke. ' +
+  'Falls der Server neu installiert wurde, bearbeite und speichere den Server-Eintrag, ' +
+  'um den gespeicherten Host-Key zurückzusetzen.';
 
 function mapSSHError(err) {
   const msg = err.message || '';
@@ -20,6 +26,9 @@ function mapSSHError(err) {
   return 'SSH-Fehler: ' + msg;
 }
 
+// config.hostKeyFingerprint: erwarteter SHA-256-Fingerprint (hex) des Host-Keys.
+// Leer = Trust-on-first-use: Key wird akzeptiert und der Fingerprint im
+// Ergebnis (result.hostKeyFingerprint) zurückgegeben, damit der Aufrufer ihn speichert.
 function execSSH(config, command, timeout) {
   if (timeout === undefined) timeout = 30000;
 
@@ -28,6 +37,8 @@ function execSSH(config, command, timeout) {
     var stdout = '';
     var stderr = '';
     var timedOut = false;
+    var seenFingerprint = '';
+    var keyMismatch = false;
 
     var timer = setTimeout(function () {
       timedOut = true;
@@ -47,7 +58,12 @@ function execSSH(config, command, timeout) {
           clearTimeout(timer);
           conn.end();
           if (!timedOut) {
-            resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code });
+            resolve({
+              stdout: stdout.trim(),
+              stderr: stderr.trim(),
+              code: code,
+              hostKeyFingerprint: seenFingerprint,
+            });
           }
         });
 
@@ -59,7 +75,11 @@ function execSSH(config, command, timeout) {
     conn.on('error', function (err) {
       clearTimeout(timer);
       if (!timedOut) {
-        reject(new Error(mapSSHError(err)));
+        if (keyMismatch) {
+          reject(new Error(HOST_KEY_MISMATCH));
+        } else {
+          reject(new Error(mapSSHError(err)));
+        }
       }
     });
 
@@ -68,6 +88,14 @@ function execSSH(config, command, timeout) {
       port: parseInt(config.port) || 22,
       username: config.username,
       readyTimeout: 10000,
+      hostVerifier: function (key) {
+        seenFingerprint = crypto.createHash('sha256').update(key).digest('hex');
+        if (config.hostKeyFingerprint && config.hostKeyFingerprint !== seenFingerprint) {
+          keyMismatch = true;
+          return false;
+        }
+        return true;
+      },
     };
 
     if (config.privateKey) {
@@ -81,4 +109,4 @@ function execSSH(config, command, timeout) {
   });
 }
 
-module.exports = { execSSH, mapSSHError };
+module.exports = { execSSH, mapSSHError, HOST_KEY_MISMATCH };

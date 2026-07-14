@@ -5,456 +5,631 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Toolb0x — Passwort-Manager</title>
+  <link rel="stylesheet" href="/shared/obsidian.css">
   <style nonce="__CSP_NONCE__">
     /* ============================================================
-       iOS 26 LIQUID GLASS — PASSWORT-MANAGER
+       OBSIDIAN — PASSWORT-MANAGER
        ============================================================ */
+    input[type=range] { accent-color:#fbbf24; }
 
-    @font-face {
-      font-family: 'SF';
-      src: local('SF Pro Display'), local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Helvetica Neue');
-    }
-
-    :root {
-      --glass-bg: rgba(255, 255, 255, 0.12);
-      --glass-bg-heavy: rgba(255, 255, 255, 0.18);
-      --glass-border: rgba(255, 255, 255, 0.22);
-      --glass-border-light: rgba(255, 255, 255, 0.12);
-      --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 2px 12px rgba(0, 0, 0, 0.1);
-      --glass-shadow-elevated: 0 12px 60px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.15);
-      --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
-      --glass-blur: 40px;
-      --glass-saturate: 1.8;
-
-      --text: rgba(0, 0, 0, 0.85);
-      --text-secondary: rgba(0, 0, 0, 0.55);
-      --text-tertiary: rgba(0, 0, 0, 0.35);
-
-      --blue: #007AFF;
-      --green: #30D158;
-      --red: #FF3B30;
-      --orange: #FF9500;
-      --purple: #AF52DE;
-      --pink: #FF2D55;
-      --teal: #5AC8FA;
-      --indigo: #5856D6;
-      --mint: #00C7BE;
-      --yellow: #FFCC00;
-
-      --radius-sm: 12px;
-      --radius: 20px;
-      --radius-lg: 26px;
-      --radius-xl: 32px;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      height: 100%;
-      font-family: 'SF', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      color: var(--text);
+    .pw-app {
+      position: relative;
+      min-height: 100vh;
       overflow: hidden;
-    }
-
-    /* ===== ANIMATED BACKGROUND ===== */
-    .bg {
-      position: fixed; inset: 0; z-index: 0;
-      background: linear-gradient(135deg, #a8c8f0 0%, #d4b8e8 25%, #f0c8c8 50%, #b8d8f0 75%, #c8e8d0 100%);
-      background-size: 400% 400%;
-      animation: bgShift 20s ease infinite;
-    }
-    .bg::before {
-      content: ''; position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse 600px 600px at 20% 20%, rgba(168, 200, 240, 0.6), transparent),
-        radial-gradient(ellipse 500px 500px at 80% 80%, rgba(212, 184, 232, 0.5), transparent),
-        radial-gradient(ellipse 400px 400px at 50% 50%, rgba(240, 200, 200, 0.4), transparent);
-    }
-    @keyframes bgShift { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
-
-    /* ===== GLASS SYSTEM ===== */
-    .glass {
-      background: var(--glass-bg);
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-shadow), var(--glass-inset);
-    }
-    .glass-heavy {
-      background: var(--glass-bg-heavy);
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
-    }
-
-    /* ===== LOADING ===== */
-    .loading-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(255,255,255,0.6);
-      backdrop-filter: blur(20px);
+      padding: 0 0 72px;
+      opacity: 0;
       transition: opacity 0.4s;
     }
-    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
-    .spinner {
-      width: 36px; height: 36px;
-      border: 3px solid rgba(0,0,0,0.1);
-      border-top-color: var(--purple);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ===== APP SHELL ===== */
-    .app {
-      position: relative; z-index: 1;
-      height: 100%; display: flex; flex-direction: column;
-      opacity: 0; transition: opacity 0.4s;
-    }
-    .app.active { opacity: 1; }
+    .pw-app.active { opacity: 1; }
 
     /* ===== HEADER ===== */
-    .app-header {
-      display: flex; align-items: center; gap: 16px;
-      padding: 14px 24px;
-      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-      z-index: 10; flex-shrink: 0;
+    .pw-header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 34px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(18,22,29,0.6);
     }
-    .back-btn {
-      color: var(--purple); text-decoration: none; font-size: 14px; font-weight: 600;
+    .pw-header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .pw-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--text-3);
+      transition: color 0.2s;
+    }
+    .pw-back:hover { color: var(--text); }
+    .pw-brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+    .pw-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg,#fcd34d,#f59e0b);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 5px 16px rgba(245,158,11,0.35);
+    }
+    .pw-logo-inner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #2a1c02;
+      border-radius: 3px;
+    }
+    .pw-brand-name {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .pw-header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .pw-user-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ===== MAIN ===== */
+    .pw-main {
+      position: relative;
+      z-index: 1;
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 34px 24px;
+    }
+
+    /* ===== GENERATOR CARD ===== */
+    .gen-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px;
+      margin-bottom: 28px;
+    }
+    .gen-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      color: rgba(251,191,36,0.9);
+      margin-bottom: 14px;
+    }
+    .gen-output-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel-inset);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .gen-pw-text {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 19px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #fcd34d;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
+      user-select: all;
+      min-height: 28px;
+      line-height: 1.5;
     }
-    .back-btn:hover { opacity: 0.7; }
-    .app-title { flex: 1; text-align: center; font-size: 17px; font-weight: 700; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .user-name { font-size: 13px; color: var(--text-secondary); }
-    .logout-btn {
-      background: rgba(255,59,48,0.12); color: var(--red);
-      border: none; padding: 6px 14px; border-radius: var(--radius-sm);
-      font-size: 12px; font-weight: 600; cursor: pointer;
-    }
-    .logout-btn:hover { background: rgba(255,59,48,0.2); }
-
-    /* ===== MAIN CONTENT ===== */
-    .main-content {
-      flex: 1; overflow-y: auto; padding: 20px 24px 40px;
-      display: flex; flex-direction: column; gap: 24px;
-    }
-
-    /* ===== GENERATOR SECTION ===== */
-    .generator-section {
-      border-radius: var(--radius-lg); padding: 24px;
-    }
-    .section-title {
-      font-size: 18px; font-weight: 700; margin-bottom: 16px;
-    }
-
-    /* Password Output */
-    .password-display {
-      display: flex; align-items: center; gap: 8px;
-      background: rgba(0,0,0,0.06); border-radius: var(--radius);
-      padding: 14px 16px; margin-bottom: 12px;
-    }
-    .password-output {
-      flex: 1; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
-      font-size: 16px; font-weight: 600;
-      word-break: break-all; user-select: all;
-      min-height: 24px; line-height: 1.5;
-    }
-    .icon-btn {
-      width: 36px; height: 36px; border: none; border-radius: var(--radius-sm);
-      background: rgba(0,0,0,0.06); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; transition: background 0.15s;
+    .gen-icon-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
       flex-shrink: 0;
+      color: rgba(238,241,246,0.7);
+      background: rgba(255,255,255,0.05);
     }
-    .icon-btn:hover { background: rgba(0,0,0,0.12); }
-    .icon-btn:active { transform: scale(0.92); }
+    .gen-icon-btn:hover { background: rgba(255,255,255,0.12); }
+    .gen-icon-btn.amber {
+      background: rgba(251,191,36,0.12);
+      color: #fbbf24;
+    }
+    .gen-icon-btn.amber:hover { background: rgba(251,191,36,0.2); }
 
-    /* Strength Bar */
+    /* Strength */
     .strength-row {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
     }
     .strength-bar {
-      flex: 1; height: 6px; background: rgba(0,0,0,0.08);
-      border-radius: 3px; overflow: hidden;
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.06);
+      overflow: hidden;
     }
     .strength-fill {
-      height: 100%; width: 0%; border-radius: 3px;
+      height: 100%;
+      width: 0%;
+      border-radius: 3px;
       transition: width 0.3s, background 0.3s;
     }
     .strength-label {
-      font-size: 12px; font-weight: 600; white-space: nowrap;
-    }
-
-    /* Controls */
-    .control-row {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
-    }
-    .control-row label {
-      font-size: 14px; font-weight: 600; white-space: nowrap; min-width: 100px;
-    }
-    .slider {
-      flex: 1; -webkit-appearance: none; appearance: none;
-      height: 6px; border-radius: 3px;
-      background: rgba(0,0,0,0.1); outline: none;
-    }
-    .slider::-webkit-slider-thumb {
-      -webkit-appearance: none; appearance: none;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--purple); cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-    .slider::-moz-range-thumb {
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--purple); cursor: pointer; border: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-
-    .toggle-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-      margin-bottom: 16px;
-    }
-    .toggle-label {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 13px; font-weight: 500; cursor: pointer;
-      padding: 8px 12px; border-radius: var(--radius-sm);
-      background: rgba(0,0,0,0.04); transition: background 0.15s;
-    }
-    .toggle-label:hover { background: rgba(0,0,0,0.08); }
-    .toggle-label.disabled {
-      opacity: 0.4; pointer-events: none;
-    }
-    .toggle-label input[type="checkbox"] {
-      width: 18px; height: 18px; accent-color: var(--purple);
-      flex-shrink: 0;
-    }
-    .memorable-toggle {
-      grid-column: 1 / -1;
-      background: rgba(175,82,222,0.08);
-      border: 1px solid rgba(175,82,222,0.15);
-    }
-
-    .save-gen-btn {
-      width: 100%; padding: 12px; border: none; border-radius: var(--radius);
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
-      color: #fff; font-size: 15px; font-weight: 700;
-      cursor: pointer; transition: opacity 0.15s;
-    }
-    .save-gen-btn:hover { opacity: 0.85; }
-    .save-gen-btn:active { transform: scale(0.98); }
-
-    /* ===== SAVED PASSWORDS SECTION ===== */
-    .saved-header {
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    }
-    .saved-header .section-title { margin-bottom: 0; flex: 1; }
-    .search-input {
-      padding: 8px 14px; border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm); background: rgba(255,255,255,0.5);
-      font-size: 13px; outline: none; width: 180px;
-      backdrop-filter: blur(10px);
-    }
-    .search-input:focus { border-color: var(--purple); }
-    .add-btn {
-      padding: 8px 16px; border: none; border-radius: var(--radius-sm);
-      background: var(--purple); color: #fff;
-      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
       white-space: nowrap;
     }
-    .add-btn:hover { opacity: 0.85; }
 
-    /* Password Cards */
-    .password-list {
-      display: flex; flex-direction: column; gap: 10px; margin-top: 12px;
+    /* Slider */
+    .gen-slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
     }
-    .password-card {
-      border-radius: var(--radius); padding: 16px;
-      transition: transform 0.15s;
+    .gen-slider-label {
+      font-size: 13px;
+      color: rgba(238,241,246,0.7);
     }
-    .password-card:hover { transform: translateY(-1px); }
-    .card-top {
-      display: flex; align-items: flex-start; gap: 12px;
+    .gen-slider-label strong {
+      color: var(--text);
     }
-    .card-icon {
-      width: 40px; height: 40px; border-radius: var(--radius-sm);
-      background: rgba(175,82,222,0.12); color: var(--purple);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; flex-shrink: 0;
+    .gen-slider {
+      width: 100%;
+      margin-bottom: 18px;
+      cursor: pointer;
     }
-    .card-info { flex: 1; min-width: 0; }
-    .card-name {
-      font-size: 15px; font-weight: 700;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+    /* Toggle Grid */
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
     }
-    .card-meta {
-      font-size: 12px; color: var(--text-secondary); margin-top: 2px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .toggle-pill {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: rgba(238,241,246,0.75);
+      padding: 10px 12px;
+      border: 1px solid rgba(251,191,36,0.25);
+      background: rgba(251,191,36,0.08);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .card-pw-row {
-      display: flex; align-items: center; gap: 6px;
-      margin-top: 10px; padding: 8px 12px;
-      background: rgba(0,0,0,0.05); border-radius: var(--radius-sm);
+    .toggle-pill:hover {
+      background: rgba(251,191,36,0.12);
     }
-    .card-pw-text {
-      flex: 1; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
-      font-size: 13px; font-weight: 600;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .card-btn {
-      width: 30px; height: 30px; border: none; border-radius: 8px;
-      background: transparent; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; transition: background 0.15s;
+    .toggle-pill input[type="checkbox"] {
+      accent-color: #fbbf24;
+      width: 16px;
+      height: 16px;
       flex-shrink: 0;
     }
-    .card-btn:hover { background: rgba(0,0,0,0.08); }
-    .card-btn.danger:hover { background: rgba(255,59,48,0.15); }
-    .card-notes-preview {
-      font-size: 12px; color: var(--text-tertiary); margin-top: 6px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .toggle-pill.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .toggle-pill.memorable {
+      grid-column: span 2;
+      border-color: rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: rgba(238,241,246,0.6);
     }
 
-    /* Empty State */
+    .gen-save-btn {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border: none;
+      border-radius: 11px;
+      background: linear-gradient(135deg,#fcd34d,#f59e0b);
+      color: #2a1c02;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(245,158,11,0.3);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .gen-save-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 26px rgba(245,158,11,0.42);
+    }
+    .gen-save-btn:active { transform: scale(0.98); }
+
+    /* ===== SAVED PASSWORDS ===== */
+    .saved-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .saved-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .saved-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .search-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+    .search-wrap svg { flex-shrink: 0; }
+    .search-input {
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      width: 130px;
+    }
+    .search-input::placeholder { color: var(--text-3); }
+    .manual-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 15px;
+      border: 1px solid rgba(251,191,36,0.25);
+      background: rgba(251,191,36,0.1);
+      color: #fbbf24;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .manual-btn:hover { background: rgba(251,191,36,0.18); }
+
+    /* Password Cards */
+    .pw-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .pw-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 20px;
+      transition: border-color 0.25s, transform 0.2s;
+    }
+    .pw-card:hover {
+      border-color: rgba(251,191,36,0.25);
+      transform: translateY(-1px);
+    }
+    .pw-tile {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .pw-card-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .pw-card-name {
+      font-size: 15px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pw-card-meta {
+      font-size: 12px;
+      color: rgba(238,241,246,0.45);
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pw-card-dots {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      color: rgba(238,241,246,0.5);
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+    .pw-card-plain {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #fcd34d;
+      word-break: break-all;
+      display: none;
+    }
+    .pw-card-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .pw-action-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: rgba(238,241,246,0.6);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+    .pw-action-btn:hover {
+      background: rgba(255,255,255,0.12);
+      color: rgba(238,241,246,0.85);
+    }
+    .pw-action-btn.danger:hover {
+      background: rgba(255,59,48,0.15);
+      color: #ff6b60;
+    }
+    .pw-card-notes {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ===== EMPTY STATE ===== */
     .empty-state {
-      text-align: center; padding: 60px 20px;
+      text-align: center;
+      padding: 60px 20px;
     }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
-    .empty-text { font-size: 13px; color: var(--text-secondary); }
+    .empty-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      border-radius: 14px;
+      background: rgba(251,191,36,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .empty-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .empty-text {
+      font-size: 13px;
+      color: var(--text-2);
+    }
 
-    /* ===== MODAL ===== */
-    .modal-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(0,0,0,0.3);
-      backdrop-filter: blur(8px);
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0; pointer-events: none;
+    /* ===== MODALS ===== */
+    .pw-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
       transition: opacity 0.25s;
       padding: 20px;
     }
-    .modal-overlay.open { opacity: 1; pointer-events: all; }
-    .modal {
-      width: 100%; max-width: 440px;
-      border-radius: var(--radius-lg); padding: 28px;
+    .pw-modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .pw-modal {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      width: 100%;
+      max-width: 440px;
       transform: scale(0.95) translateY(10px);
       transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-      max-height: 90vh; overflow-y: auto;
+      max-height: 90vh;
+      overflow-y: auto;
     }
-    .modal-overlay.open .modal { transform: scale(1) translateY(0); }
-    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
-    .form-group { margin-bottom: 14px; }
+    .pw-modal-overlay.open .pw-modal {
+      transform: scale(1) translateY(0);
+    }
+    .pw-modal h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
     .form-label {
-      display: block; font-size: 12px; font-weight: 600;
-      color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase;
-      letter-spacing: 0.5px;
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
     }
     .form-input {
-      width: 100%; padding: 10px 14px;
-      border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
-      background: rgba(255,255,255,0.5); font-size: 14px;
-      font-family: inherit; outline: none;
-      transition: border-color 0.15s;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius-btn);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
     }
-    .form-input:focus { border-color: var(--purple); }
-    .form-textarea { resize: vertical; min-height: 60px; }
+    .form-input:focus {
+      border-color: rgba(251,191,36,0.5);
+      background: rgba(255,255,255,0.07);
+    }
+    .form-input::placeholder { color: var(--text-3); }
+    .form-textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
     .pw-input-wrap {
-      position: relative; display: flex; align-items: center;
+      position: relative;
+      display: flex;
+      align-items: center;
     }
     .pw-input-wrap .form-input { padding-right: 42px; }
     .pw-toggle-vis {
-      position: absolute; right: 6px;
-      width: 30px; height: 30px; border: none; border-radius: 8px;
-      background: transparent; cursor: pointer; font-size: 14px;
-      display: flex; align-items: center; justify-content: center;
+      position: absolute;
+      right: 6px;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: rgba(238,241,246,0.5);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
     }
-    .pw-toggle-vis:hover { background: rgba(0,0,0,0.06); }
+    .pw-toggle-vis:hover { background: rgba(255,255,255,0.08); }
     .modal-actions {
-      display: flex; gap: 10px; margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
     }
-    .btn {
-      flex: 1; padding: 11px 16px; border: none; border-radius: var(--radius);
-      font-size: 14px; font-weight: 700; cursor: pointer;
-      transition: opacity 0.15s;
+    .modal-btn {
+      flex: 1;
+      padding: 11px 16px;
+      border: none;
+      border-radius: var(--radius-btn);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
     }
-    .btn:active { transform: scale(0.98); }
-    .btn-secondary {
-      background: rgba(0,0,0,0.06); color: var(--text);
+    .modal-btn:active { transform: scale(0.98); }
+    .modal-btn:hover { opacity: 0.88; }
+    .modal-btn-cancel {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-2);
     }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
-      color: #fff;
+    .modal-btn-save {
+      background: linear-gradient(135deg,#fcd34d,#f59e0b);
+      color: #2a1c02;
     }
-    .btn-danger {
-      background: rgba(255,59,48,0.15); color: var(--red);
+    .modal-btn-delete {
+      background: rgba(255,59,48,0.15);
+      color: #ff6b60;
     }
-    .btn:hover { opacity: 0.85; }
     .confirm-text {
-      font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;
+      font-size: 14px;
+      color: var(--text-2);
+      margin-bottom: 8px;
+      line-height: 1.5;
     }
-
-    /* ===== TOAST ===== */
-    .toast-box {
-      position: fixed; bottom: 24px; right: 24px; z-index: 300;
-      display: flex; flex-direction: column; gap: 8px;
-    }
-    .toast {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 20px; border-radius: var(--radius-sm);
-      font-size: 13px; font-weight: 600;
-      animation: toastIn 0.3s, toastOut 0.3s 2.8s forwards;
-      backdrop-filter: blur(30px) saturate(1.5);
-    }
-    .toast.success {
-      background: rgba(48,209,88,0.2); border: 1px solid rgba(48,209,88,0.3); color: #1a7a2e;
-    }
-    .toast.error {
-      background: rgba(255,59,48,0.2); border: 1px solid rgba(255,59,48,0.3); color: #c0392b;
-    }
-    @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes toastOut { to { opacity:0; transform:translateY(-12px); } }
 
     /* ===== RESPONSIVE ===== */
     @media (max-width: 600px) {
-      .main-content { padding: 14px 12px 30px; }
-      .generator-section { padding: 18px; }
+      .pw-header { padding: 16px 16px; gap: 10px; }
+      .pw-header-left { gap: 12px; }
+      .pw-main { padding: 20px 14px; }
+      .gen-card { padding: 20px; }
+      .gen-pw-text { font-size: 15px; }
       .toggle-grid { grid-template-columns: 1fr; }
-      .app-header { padding: 12px 14px; gap: 10px; }
+      .toggle-pill.memorable { grid-column: span 1; }
       .saved-header { flex-direction: column; align-items: stretch; }
+      .saved-actions { flex-wrap: wrap; }
       .search-input { width: 100%; }
-      .password-output { font-size: 14px; }
+      .pw-card { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+      .pw-card-dots, .pw-card-plain { width: 100%; }
     }
   </style>
 </head>
 
 <body>
-  <div class="bg"></div>
-  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+  <!-- Loading -->
+  <div class="ob-loading" id="loading"><div class="ob-spinner"></div></div>
 
-  <div class="app" id="app">
+  <div class="pw-app" id="app">
+    <!-- Glow -->
+    <div data-glow data-glow-primary data-depth="55" style="position:absolute;top:-160px;right:-120px;width:600px;height:600px;background:radial-gradient(circle,rgba(251,191,36,0.2),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1),background 0.5s ease;"></div>
+    <div data-glow data-depth="30" style="position:absolute;bottom:-200px;left:-140px;width:520px;height:520px;background:radial-gradient(circle,rgba(255,146,32,0.07),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
+
     <!-- HEADER -->
-    <header class="app-header glass-heavy">
-      <a href="/portal" class="back-btn">← Zur Übersicht</a>
-      <div class="app-title">Passwort-Manager</div>
-      <div class="header-right">
-        <span class="user-name" id="userName"></span>
-        <button class="logout-btn" id="logoutBtn">Abmelden</button>
+    <header class="pw-header">
+      <div class="pw-header-left">
+        <a href="/portal" class="pw-back">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Zur Übersicht
+        </a>
+        <div class="pw-brand">
+          <div class="pw-logo"><div class="pw-logo-inner"></div></div>
+          <span class="pw-brand-name jitter">Passwort-Manager</span>
+        </div>
+      </div>
+      <div class="pw-header-right">
+        <span class="pw-user-name" id="userName"></span>
+        <button class="ob-btn-logout" id="logoutBtn">Abmelden</button>
       </div>
     </header>
 
     <!-- MAIN -->
-    <main class="main-content">
+    <main class="pw-main">
 
       <!-- ===== GENERATOR ===== -->
-      <section class="generator-section glass-heavy">
-        <h2 class="section-title">Passwort generieren</h2>
+      <div class="gen-card" data-reveal data-reveal-index="0">
+        <div class="gen-label">// GENERATOR</div>
 
-        <div class="password-display">
-          <div class="password-output" id="pwOutput">&mdash;</div>
-          <button class="icon-btn" id="copyGenBtn" title="Kopieren">📋</button>
-          <button class="icon-btn" id="refreshBtn" title="Neu generieren">🔄</button>
+        <div class="gen-output-row">
+          <div class="gen-pw-text" id="pwOutput">&mdash;</div>
+          <button class="gen-icon-btn" id="copyGenBtn" title="Kopieren">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="gen-icon-btn amber" id="refreshBtn" title="Neu generieren">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
         </div>
 
         <div class="strength-row">
@@ -462,52 +637,63 @@
           <span class="strength-label" id="strengthLabel"></span>
         </div>
 
-        <div class="control-row">
-          <label>Länge: <strong id="lengthValue">16</strong></label>
-          <input type="range" id="lengthSlider" min="8" max="128" value="16" class="slider">
+        <div class="gen-slider-row">
+          <span class="gen-slider-label">Länge: <strong id="lengthValue">16</strong></span>
         </div>
+        <input type="range" id="lengthSlider" min="8" max="128" value="16" class="gen-slider">
 
         <div class="toggle-grid">
-          <label class="toggle-label" id="lblUpper">
+          <label class="toggle-pill" id="lblUpper">
             <input type="checkbox" id="optUpper" checked> Großbuchstaben (A-Z)
           </label>
-          <label class="toggle-label" id="lblLower">
+          <label class="toggle-pill" id="lblLower">
             <input type="checkbox" id="optLower" checked> Kleinbuchstaben (a-z)
           </label>
-          <label class="toggle-label" id="lblNumbers">
+          <label class="toggle-pill" id="lblNumbers">
             <input type="checkbox" id="optNumbers" checked> Zahlen (0-9)
           </label>
-          <label class="toggle-label" id="lblSpecial">
-            <input type="checkbox" id="optSpecial" checked> Sonderzeichen (!@#$...)
+          <label class="toggle-pill" id="lblSpecial">
+            <input type="checkbox" id="optSpecial" checked> Sonderzeichen (!@#$)
           </label>
-          <label class="toggle-label memorable-toggle">
+          <label class="toggle-pill memorable" id="lblMemorable">
             <input type="checkbox" id="optMemorable"> Merkbar (Passphrase)
           </label>
         </div>
 
-        <button class="save-gen-btn" id="saveGenBtn">💾 Speichern</button>
-      </section>
+        <button class="gen-save-btn" id="saveGenBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Speichern
+        </button>
+      </div>
 
       <!-- ===== SAVED PASSWORDS ===== -->
-      <section>
+      <div data-reveal data-reveal-index="1">
         <div class="saved-header">
-          <h2 class="section-title">Gespeicherte Passwörter</h2>
-          <input type="text" id="searchInput" placeholder="Suchen..." class="search-input">
-          <button class="add-btn" id="addManualBtn">+ Manuell hinzufügen</button>
+          <h2 class="saved-title jitter">Gespeicherte Passwörter</h2>
+          <div class="saved-actions">
+            <div class="search-wrap">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="searchInput" placeholder="Suchen..." class="search-input">
+            </div>
+            <button class="manual-btn" id="addManualBtn">+ Manuell</button>
+          </div>
         </div>
-        <div class="password-list" id="passwordList"></div>
-        <div class="empty-state" id="emptyState" style="display:none">
-          <div class="empty-icon">🔒</div>
-          <div class="empty-title">Noch keine Passwörter gespeichert</div>
-          <div class="empty-text">Generiere ein Passwort oben und speichere es, oder füge eines manuell hinzu.</div>
+      </div>
+
+      <div class="pw-list" id="passwordList"></div>
+      <div class="empty-state" id="emptyState" style="display:none">
+        <div class="empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         </div>
-      </section>
+        <div class="empty-title">Noch keine Passwörter gespeichert</div>
+        <div class="empty-text">Generiere ein Passwort oben und speichere es, oder füge eines manuell hinzu.</div>
+      </div>
     </main>
   </div>
 
   <!-- ===== SAVE / EDIT MODAL ===== -->
-  <div class="modal-overlay" id="saveModal">
-    <div class="modal glass-heavy">
+  <div class="pw-modal-overlay" id="saveModal">
+    <div class="pw-modal">
       <h3 id="modalTitle">Passwort speichern</h3>
       <div class="form-group">
         <label class="form-label">Bezeichnung *</label>
@@ -521,7 +707,9 @@
         <label class="form-label">Passwort *</label>
         <div class="pw-input-wrap">
           <input class="form-input" id="modalPassword" type="password" maxlength="500">
-          <button class="pw-toggle-vis" id="modalToggleVis" type="button">👁️</button>
+          <button class="pw-toggle-vis" id="modalToggleVis" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
       </div>
       <div class="form-group">
@@ -533,31 +721,32 @@
         <textarea class="form-input form-textarea" id="modalNotes" rows="3" maxlength="2000" placeholder="Optionale Notizen..."></textarea>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" id="modalCancel">Abbrechen</button>
-        <button class="btn btn-primary" id="modalSave">Speichern</button>
+        <button class="modal-btn modal-btn-cancel" id="modalCancel">Abbrechen</button>
+        <button class="modal-btn modal-btn-save" id="modalSave">Speichern</button>
       </div>
     </div>
   </div>
 
   <!-- ===== DELETE CONFIRM MODAL ===== -->
-  <div class="modal-overlay" id="confirmModal">
-    <div class="modal glass-heavy">
+  <div class="pw-modal-overlay" id="confirmModal">
+    <div class="pw-modal">
       <h3>Passwort löschen?</h3>
       <p class="confirm-text" id="confirmText">Dieses Passwort wird unwiderruflich gelöscht.</p>
       <div class="modal-actions">
-        <button class="btn btn-secondary" id="confirmCancel">Abbrechen</button>
-        <button class="btn btn-danger" id="confirmDelete">Löschen</button>
+        <button class="modal-btn modal-btn-cancel" id="confirmCancel">Abbrechen</button>
+        <button class="modal-btn modal-btn-delete" id="confirmDelete">Löschen</button>
       </div>
     </div>
   </div>
 
   <!-- TOAST -->
-  <div class="toast-box" id="toastBox"></div>
+  <div class="ob-toast-box" id="toastBox"></div>
 
   <script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+  <script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
   <script nonce="__CSP_NONCE__">
     /* ============================================================
-       PASSWORT-MANAGER — JavaScript
+       PASSWORT-MANAGER — JavaScript (Obsidian)
        ============================================================ */
     (function () {
       'use strict';
@@ -591,6 +780,26 @@
       var searchInput = $('searchInput');
 
       var charLabels = [$('lblUpper'), $('lblLower'), $('lblNumbers'), $('lblSpecial')];
+
+      // --------------------------------------------------------
+      // Tile colors for letter-based avatars
+      // --------------------------------------------------------
+      var TILE_COLORS = [
+        { bg: 'rgba(251,113,133,0.14)', fg: '#fb7185' },
+        { bg: 'rgba(129,140,248,0.14)', fg: '#818cf8' },
+        { bg: 'rgba(251,146,60,0.14)',  fg: '#fb923c' },
+        { bg: 'rgba(52,211,153,0.14)',  fg: '#34d399' },
+        { bg: 'rgba(251,191,36,0.14)',  fg: '#fbbf24' },
+        { bg: 'rgba(96,165,250,0.14)',  fg: '#60a5fa' },
+        { bg: 'rgba(167,139,250,0.14)', fg: '#a78bfa' },
+        { bg: 'rgba(244,114,182,0.14)', fg: '#f472b6' }
+      ];
+
+      function tileColor(name) {
+        var code = 0;
+        for (var i = 0; i < name.length; i++) code += name.charCodeAt(i);
+        return TILE_COLORS[code % TILE_COLORS.length];
+      }
 
       // --------------------------------------------------------
       // Deutsche Wortliste für Passphrasen (~200 Wörter)
@@ -691,10 +900,10 @@
         if (/[0-9]/.test(pw)) score++;
         if (/[^a-zA-Z0-9]/.test(pw)) score++;
 
-        if (score <= 2) return { pct: 25, label: 'Schwach', color: 'var(--red)' };
-        if (score <= 4) return { pct: 50, label: 'Mittel', color: 'var(--orange)' };
-        if (score <= 6) return { pct: 75, label: 'Stark', color: 'var(--green)' };
-        return { pct: 100, label: 'Sehr stark', color: 'var(--blue)' };
+        if (score <= 2) return { pct: 25, label: 'Schwach', color: '#ff6b60' };
+        if (score <= 4) return { pct: 50, label: 'Mittel', color: '#fbbf24' };
+        if (score <= 6) return { pct: 75, label: 'Stark', color: '#34d399' };
+        return { pct: 100, label: 'Sehr stark', color: '#34d399' };
       }
 
       function updatePassword() {
@@ -702,7 +911,7 @@
         pwOutput.textContent = currentGenerated;
         var s = calcStrength(currentGenerated);
         strengthFill.style.width = s.pct + '%';
-        strengthFill.style.background = s.color;
+        strengthFill.style.background = s.pct >= 75 ? 'linear-gradient(90deg,#34d399,#10b981)' : s.color;
         strengthLabel.textContent = s.label;
         strengthLabel.style.color = s.color;
       }
@@ -750,8 +959,8 @@
       function toast(msg, type) {
         type = type || 'success';
         var el = document.createElement('div');
-        el.className = 'toast ' + type;
-        el.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+        el.className = 'ob-toast ' + type;
+        el.textContent = (type === 'success' ? '\u2713 ' : '\u2717 ') + msg;
         $('toastBox').appendChild(el);
         setTimeout(function () { el.remove(); }, 3200);
       }
@@ -765,6 +974,17 @@
         d.textContent = s;
         return d.innerHTML;
       }
+
+      // --------------------------------------------------------
+      // SVG Icons (stroke line icons)
+      // --------------------------------------------------------
+      var ICONS = {
+        eye: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+        eyeOff: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+        copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+        edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+      };
 
       // --------------------------------------------------------
       // API-Helfer
@@ -837,29 +1057,33 @@
         }
 
         emptyState.style.display = 'none';
+        var revealIdx = 2;
         passwordList.innerHTML = filtered.map(function (p) {
           var meta = [];
           if (p.username) meta.push(esc(p.username));
           if (p.website) meta.push(esc(p.website));
-          return '<div class="password-card glass" data-id="' + p.id + '">' +
-            '<div class="card-top">' +
-              '<div class="card-icon">🔒</div>' +
-              '<div class="card-info">' +
-                '<div class="card-name">' + esc(p.name) + '</div>' +
-                (meta.length ? '<div class="card-meta">' + meta.join(' &middot; ') + '</div>' : '') +
-              '</div>' +
+          var letter = (p.name || '?')[0].toUpperCase();
+          var tc = tileColor(p.name || '');
+          var idx = revealIdx++;
+          return '<div class="pw-card" data-reveal data-reveal-index="' + idx + '" data-glow-color="' + tc.bg.replace('0.14', '0.2') + '" data-id="' + p.id + '">' +
+            '<div class="pw-tile" style="background:' + tc.bg + ';color:' + tc.fg + ';">' + letter + '</div>' +
+            '<div class="pw-card-info">' +
+              '<div class="pw-card-name">' + esc(p.name) + '</div>' +
+              (meta.length ? '<div class="pw-card-meta">' + meta.join(' &middot; ') + '</div>' : '') +
             '</div>' +
-            '<div class="card-pw-row">' +
-              '<span class="card-pw-text" data-dots="' + p.id + '">' + '•'.repeat(12) + '</span>' +
-              '<span class="card-pw-text" data-plain="' + p.id + '" style="display:none">' + esc(p.password) + '</span>' +
-              '<button class="card-btn" data-reveal="' + p.id + '" title="Anzeigen">👁️</button>' +
-              '<button class="card-btn" data-copy="' + p.id + '" title="Kopieren">📋</button>' +
-              '<button class="card-btn" data-edit="' + p.id + '" title="Bearbeiten">✏️</button>' +
-              '<button class="card-btn danger" data-del="' + p.id + '" title="Löschen">🗑️</button>' +
+            '<span class="pw-card-dots" data-dots="' + p.id + '">' + '\u2022'.repeat(10) + '</span>' +
+            '<span class="pw-card-plain" data-plain="' + p.id + '">' + esc(p.password) + '</span>' +
+            '<div class="pw-card-actions">' +
+              '<button class="pw-action-btn" data-reveal-pw="' + p.id + '" title="Anzeigen">' + ICONS.eye + '</button>' +
+              '<button class="pw-action-btn" data-copy="' + p.id + '" title="Kopieren">' + ICONS.copy + '</button>' +
+              '<button class="pw-action-btn" data-edit="' + p.id + '" title="Bearbeiten">' + ICONS.edit + '</button>' +
+              '<button class="pw-action-btn danger" data-del="' + p.id + '" title="Löschen">' + ICONS.trash + '</button>' +
             '</div>' +
-            (p.notes ? '<div class="card-notes-preview">' + esc(p.notes) + '</div>' : '') +
           '</div>';
         }).join('');
+
+        // Re-init reveal for new cards
+        initReveal(document.getElementById('app'));
       }
 
       // --------------------------------------------------------
@@ -869,15 +1093,16 @@
         var btn;
 
         // Reveal / Hide
-        btn = e.target.closest('[data-reveal]');
+        btn = e.target.closest('[data-reveal-pw]');
         if (btn) {
-          var id = btn.dataset.reveal;
+          var id = btn.dataset.revealPw;
           var dots = document.querySelector('[data-dots="' + id + '"]');
           var plain = document.querySelector('[data-plain="' + id + '"]');
           if (dots && plain) {
             var showing = plain.style.display !== 'none';
             dots.style.display = showing ? '' : 'none';
             plain.style.display = showing ? 'none' : '';
+            btn.innerHTML = showing ? ICONS.eye : ICONS.eyeOff;
           }
           return;
         }
@@ -989,7 +1214,7 @@
       $('confirmCancel').addEventListener('click', closeModals);
 
       // Close modals on overlay click
-      document.querySelectorAll('.modal-overlay').forEach(function (overlay) {
+      document.querySelectorAll('.pw-modal-overlay').forEach(function (overlay) {
         overlay.addEventListener('click', function (e) {
           if (e.target === overlay) closeModals();
         });
@@ -1059,9 +1284,15 @@
           $('userName').textContent = data.user.name;
           return loadPasswords();
         }).then(function () {
-          $('app').classList.add('active');
+          var appEl = $('app');
+          appEl.classList.add('active');
           $('loading').classList.add('hidden');
           updatePassword();
+
+          // Init Obsidian interactions
+          initGlow(appEl);
+          initReveal(appEl);
+
           SessionTimeout.start(function () { window.location.href = '/portal'; });
         }).catch(function () {
           window.location.href = '/portal';

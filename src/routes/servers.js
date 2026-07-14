@@ -8,7 +8,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { validateServer } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
-const { execSSH } = require('../utils/ssh');
+const { execSSH, HOST_KEY_MISMATCH } = require('../utils/ssh');
 
 const router = express.Router();
 
@@ -74,6 +74,24 @@ function getSSHConfig(entry, key) {
 
 async function findServer(id, userId) {
   return prisma.server.findFirst({ where: { id: id, userId: userId } });
+}
+
+// SSH-Befehl mit Host-Key-Pinning ausführen.
+// Erster erfolgreicher Connect speichert den Fingerprint (Trust-on-first-use),
+// danach wird jede Verbindung dagegen verifiziert (Schutz vor MITM).
+async function runServerSSH(server, encryptionKey, command, timeout) {
+  var config = getSSHConfig(server, encryptionKey);
+  config.hostKeyFingerprint = server.hostKeyFingerprint || '';
+
+  var result = await execSSH(config, command, timeout);
+
+  if (!server.hostKeyFingerprint && result.hostKeyFingerprint) {
+    await prisma.server.update({
+      where: { id: server.id },
+      data: { hostKeyFingerprint: result.hostKeyFingerprint },
+    });
+  }
+  return result;
 }
 
 // ============================================================
@@ -150,6 +168,9 @@ router.put('/:id', async (req, res) => {
         privateKey: encrypt(req.body.privateKey || '', key),
         passphrase: encrypt(req.body.passphrase || '', key),
         notes: encrypt(req.body.notes || '', key),
+        // Beim Bearbeiten zurücksetzen — Host könnte sich geändert haben
+        // oder der Server wurde neu installiert (neuer Host-Key).
+        hostKeyFingerprint: '',
       },
     });
 
@@ -184,8 +205,7 @@ router.post('/:id/test', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
-    var result = await execSSH(config, COMMANDS.test, 10000);
+    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.test, 10000);
     var lines = result.stdout.split('\n');
     res.json({ success: true, hostname: lines[1] || lines[0] });
   } catch (error) {
@@ -199,8 +219,7 @@ router.post('/:id/status', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
-    var result = await execSSH(config, COMMANDS.status, 30000);
+    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.status, 30000);
     var lines = result.stdout.split('\n');
     res.json({
       online: true,
@@ -219,8 +238,7 @@ router.post('/:id/stats', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
-    var result = await execSSH(config, COMMANDS.stats, 30000);
+    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.stats, 30000);
     var parts = result.stdout.split('---SEP---');
 
     var cpu = parseFloat(parts[0]) || 0;
@@ -265,8 +283,7 @@ router.post('/:id/update', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
-    var result = await execSSH(config, COMMANDS.update, 300000);
+    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.update, 300000);
     res.json({ success: result.code === 0, output: result.stdout, stderr: result.stderr });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -279,11 +296,14 @@ router.post('/:id/restart', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
     try {
-      await execSSH(config, COMMANDS.restart, 10000);
-    } catch (_) {
-      // reboot trennt die SSH-Verbindung — das ist normal
+      await runServerSSH(server, req.encryptionKey, COMMANDS.restart, 10000);
+    } catch (error) {
+      // reboot trennt die SSH-Verbindung — das ist normal.
+      // Host-Key-Fehler aber NICHT verschlucken (möglicher MITM).
+      if (error.message === HOST_KEY_MISMATCH) {
+        return res.status(400).json({ error: error.message });
+      }
     }
     res.json({ success: true, message: 'Server wird neu gestartet...' });
   } catch (error) {
@@ -297,8 +317,7 @@ router.post('/:id/services', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
-    var config = getSSHConfig(server, req.encryptionKey);
-    var result = await execSSH(config, COMMANDS.services, 30000);
+    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.services, 30000);
     var services = result.stdout.split('\n').filter(function (s) { return s.trim().length > 0; });
     res.json({ services: services });
   } catch (error) {
@@ -322,9 +341,8 @@ router.post('/:id/service-restart', sshLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Ungültiger Service-Name.' });
     }
 
-    var config = getSSHConfig(server, req.encryptionKey);
     var command = 'sudo systemctl restart ' + serviceName;
-    var result = await execSSH(config, command, 60000);
+    var result = await runServerSSH(server, req.encryptionKey, command, 60000);
     res.json({ success: result.code === 0, message: serviceName + ' wurde neu gestartet.' });
   } catch (error) {
     res.status(400).json({ error: error.message });

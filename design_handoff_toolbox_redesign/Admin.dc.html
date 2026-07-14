@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { background:#12161d; }
+  body { font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { text-decoration:none; color:inherit; }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:8px; }
+  @keyframes jitter { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-0.5px,0.5px);} 66%{transform:translate(0.5px,-0.5px);} }
+</style>
+</helmet>
+
+<div id="scrAdmin" style="position:relative;display:flex;min-height:100vh;background:#12161d;color:#eef1f6;font-family:'Space Grotesk',system-ui,sans-serif;overflow:hidden;">
+  <div data-glow data-glow-primary data-depth="55" style="position:absolute;top:-160px;right:-120px;width:600px;height:600px;background:radial-gradient(circle,rgba(129,140,248,0.22),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;"></div>
+  <div data-glow data-depth="30" style="position:absolute;bottom:-200px;left:100px;width:520px;height:520px;background:radial-gradient(circle,rgba(167,139,250,0.08),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
+
+  <aside style="position:relative;z-index:1;width:230px;flex-shrink:0;padding:20px 16px;display:flex;flex-direction:column;gap:4px;border-right:1px solid rgba(255,255,255,0.06);background:rgba(18,22,29,0.6);">
+    <div style="display:flex;align-items:center;gap:12px;padding:6px 12px 18px;">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#a5b4fc,#6366f1);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(99,102,241,0.35);">
+        <div style="width:13px;height:13px;border:2px solid #0f1030;border-radius:4px;"></div>
+      </div>
+      <span style="font-size:19px;font-weight:700;letter-spacing:-0.02em;cursor:default;" style-hover="animation:jitter 0.4s ease;">Admin</span>
+    </div>
+    <button style="display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid rgba(129,140,248,0.25);background:rgba(129,140,248,0.12);color:#eef1f6;font-family:inherit;font-size:14px;font-weight:600;border-radius:11px;cursor:pointer;text-align:left;width:100%;">
+      <span style="color:#818cf8;display:flex;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg></span>
+      Übersicht
+    </button>
+    <a href="#" style="display:flex;align-items:center;gap:8px;margin-top:auto;padding:10px 13px;font-size:13px;color:rgba(238,241,246,0.5);border-radius:10px;transition:color 0.2s,background 0.2s;" style-hover="color:#eef1f6;background:rgba(255,255,255,0.05);">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Zur Übersicht
+    </a>
+  </aside>
+
+  <main style="position:relative;z-index:1;flex:1;padding:34px 40px 40px;overflow-x:hidden;">
+    <div data-reveal data-reveal-index="0" style="margin-bottom:28px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.14em;color:rgba(129,140,248,0.9);margin-bottom:8px;">// ADMINISTRATION</div>
+      <h1 style="font-size:34px;font-weight:700;letter-spacing:-0.03em;cursor:default;" style-hover="animation:jitter 0.45s ease;">System-Übersicht</h1>
+      <p style="font-size:14px;color:rgba(238,241,246,0.55);margin-top:6px;">Nutzerverwaltung und System-Statistiken.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+      <div data-card data-reveal data-reveal-index="1" data-glow-color="rgba(129,140,248,0.24)" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;transition:transform 0.25s,border-color 0.25s;" style-hover="transform:translateY(-2px);border-color:rgba(129,140,248,0.3);">
+        <div style="width:38px;height:38px;border-radius:11px;background:rgba(129,140,248,0.14);color:#818cf8;display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.02em;">3</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(238,241,246,0.42);margin-top:2px;">Nutzer gesamt</div>
+      </div>
+      <div data-card data-reveal data-reveal-index="2" data-glow-color="rgba(52,211,153,0.24)" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;transition:transform 0.25s,border-color 0.25s;" style-hover="transform:translateY(-2px);border-color:rgba(52,211,153,0.3);">
+        <div style="width:38px;height:38px;border-radius:11px;background:rgba(52,211,153,0.14);color:#34d399;display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.02em;">2</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(238,241,246,0.42);margin-top:2px;">Aktiv</div>
+      </div>
+      <div data-card data-reveal data-reveal-index="3" data-glow-color="rgba(255,107,96,0.24)" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;transition:transform 0.25s,border-color 0.25s;" style-hover="transform:translateY(-2px);border-color:rgba(255,107,96,0.3);">
+        <div style="width:38px;height:38px;border-radius:11px;background:rgba(255,59,48,0.14);color:#ff6b60;display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg></div>
+        <div style="font-size:26px;font-weight:700;letter-spacing:-0.02em;">1</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(238,241,246,0.42);margin-top:2px;">Gesperrt</div>
+      </div>
+      <div data-card data-reveal data-reveal-index="4" data-glow-color="rgba(56,189,248,0.24)" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:20px;transition:transform 0.25s,border-color 0.25s;" style-hover="transform:translateY(-2px);border-color:rgba(56,189,248,0.3);">
+        <div style="width:38px;height:38px;border-radius:11px;background:rgba(56,189,248,0.14);color:#38bdf8;display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div style="font-size:18px;font-weight:700;letter-spacing:-0.02em;">12.03.2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(238,241,246,0.42);margin-top:2px;">Letzte Registrierung</div>
+      </div>
+    </div>
+
+    <div data-reveal data-reveal-index="5" style="font-size:16px;font-weight:700;margin-bottom:14px;">Alle Nutzer</div>
+    <div data-reveal data-reveal-index="6" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:8px 4px;overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(238,241,246,0.42);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Nutzer</th>
+            <th style="text-align:left;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(238,241,246,0.42);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Rolle</th>
+            <th style="text-align:left;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(238,241,246,0.42);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Registriert</th>
+            <th style="text-align:left;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(238,241,246,0.42);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Daten</th>
+            <th style="text-align:right;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(238,241,246,0.42);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Aktion</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.03);">
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);"><div style="font-size:14px;font-weight:600;">Michael</div><div style="font-size:12px;color:rgba(238,241,246,0.42);margin-top:2px;">michael@test.de</div></td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(129,140,248,0.14);color:#a5b4fc;">Admin</span></td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;color:rgba(238,241,246,0.7);">12.03.2026</td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:rgba(238,241,246,0.55);">18 Ausg. · 4 Einn. · 7 Kat.</td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-size:12px;color:rgba(238,241,246,0.4);">Du</td>
+          </tr>
+          <tr style="transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.03);">
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);"><div style="font-size:14px;font-weight:600;">Sarah Weber</div><div style="font-size:12px;color:rgba(238,241,246,0.42);margin-top:2px;">sarah.weber@mail.de</div></td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);"><span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(52,211,153,0.14);color:#34d399;">Nutzer</span></td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;color:rgba(238,241,246,0.7);">28.04.2026</td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;color:rgba(238,241,246,0.55);">9 Ausg. · 2 Einn. · 5 Kat.</td>
+            <td style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;"><button style="font-family:inherit;font-size:12px;font-weight:600;padding:6px 13px;border:1px solid rgba(255,59,48,0.25);background:rgba(255,59,48,0.08);color:#ff6b60;border-radius:9px;cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,59,48,0.16);">Sperren</button></td>
+          </tr>
+          <tr style="transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.03);">
+            <td style="padding:14px 16px;"><div style="font-size:14px;font-weight:600;">Jonas Krüger</div><div style="font-size:12px;color:rgba(238,241,246,0.42);margin-top:2px;">jonas.k@web.de</div></td>
+            <td style="padding:14px 16px;"><span style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px;background:rgba(255,59,48,0.14);color:#ff6b60;">Gesperrt</span></td>
+            <td style="padding:14px 16px;font-size:13px;color:rgba(238,241,246,0.7);">02.05.2026</td>
+            <td style="padding:14px 16px;font-size:12px;color:rgba(238,241,246,0.55);">3 Ausg. · 1 Einn. · 3 Kat.</td>
+            <td style="padding:14px 16px;text-align:right;"><button style="font-family:inherit;font-size:12px;font-weight:600;padding:6px 13px;border:1px solid rgba(52,211,153,0.25);background:rgba(52,211,153,0.08);color:#34d399;border-radius:9px;cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(52,211,153,0.16);">Entsperren</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount(){ this._init(); this._reveal(); }
+  _init(){
+    const scope = document.getElementById('scrAdmin');
+    if(!scope){ requestAnimationFrame(()=>this._init()); return; }
+    if(scope.dataset.glowReady) return;
+    scope.dataset.glowReady = '1';
+    const glows = scope.querySelectorAll('[data-glow]');
+    const primary = scope.querySelector('[data-glow-primary]');
+    const baseBg = primary ? primary.style.background : '';
+    scope.addEventListener('mousemove', (e) => {
+      const r = scope.getBoundingClientRect();
+      const rx = (e.clientX - r.left) / Math.max(r.width,1) - 0.5;
+      const ry = (e.clientY - r.top) / Math.max(r.height,1) - 0.5;
+      glows.forEach(g => { const d = parseFloat(g.dataset.depth||'40'); g.style.transform = 'translate(' + (rx*d).toFixed(1) + 'px,' + (ry*d).toFixed(1) + 'px)'; });
+    });
+    scope.addEventListener('mouseleave', () => { glows.forEach(g => { g.style.transform = 'translate(0,0)'; }); });
+    scope.querySelectorAll('[data-card]').forEach(card => {
+      const c = card.getAttribute('data-glow-color');
+      card.addEventListener('mouseenter', () => { if (primary) primary.style.background = 'radial-gradient(circle,' + c + ',transparent 70%)'; });
+      card.addEventListener('mouseleave', () => { if (primary) primary.style.background = baseBg; });
+    });
+  }
+  _reveal(){
+    const scope = document.getElementById('scrAdmin');
+    if(!scope){ requestAnimationFrame(()=>this._reveal()); return; }
+    if(scope.dataset.revealReady) return;
+    scope.dataset.revealReady = '1';
+    const els = scope.querySelectorAll('[data-reveal]');
+    els.forEach(el => { el.style.opacity='0'; el.style.transform='translateY(22px)'; el.style.transition='opacity 0.7s cubic-bezier(0.2,0.8,0.2,1), transform 0.7s cubic-bezier(0.2,0.8,0.2,1)'; });
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          const el = en.target;
+          const delay = (parseInt(el.dataset.revealIndex)||0) * 60;
+          setTimeout(() => { el.style.opacity='1'; el.style.transform='translateY(0)'; }, delay);
+          io.unobserve(el);
+        }
+      });
+    }, { threshold: 0.1 });
+    els.forEach(el => io.observe(el));
+  }
+}
+</script>
+</body>
+</html>

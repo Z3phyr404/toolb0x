@@ -11,9 +11,15 @@ const {
 } = require('../src/utils/encryption');
 
 async function main() {
+  // Schutz: Der Seed erstellt einen Admin mit bekanntem Passwort —
+  // darf NIEMALS gegen die Produktions-DB laufen.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seed ist in Produktion gesperrt (würde Admin mit Test-Passwort anlegen).');
+  }
+
   console.log('🌱 Seed: Erstelle verschlüsselte Testdaten...\n');
 
-  const password = 'Test1234!';
+  const password = process.env.SEED_PASSWORD || 'Test1234!';
   const hashedPassword = await bcrypt.hash(password, 12);
 
   const encKey = generateEncryptionKey();
@@ -130,7 +136,7 @@ async function main() {
 
   console.log(`\n   📊 ${expenseData.length} Ausgaben erstellt (alle verschlüsselt)`);
   console.log(`\n✅ Seed abgeschlossen!`);
-  console.log(`\n📧 Login-Daten: michael@test.de / Test1234!`);
+  console.log(`\n📧 Login: michael@test.de (Passwort: ${process.env.SEED_PASSWORD ? 'aus SEED_PASSWORD' : 'Test1234!'})`);
   console.log(`\n🔒 In der Datenbank sind ALLE Finanzdaten verschlüsselt.`);
   console.log(`   Als Betreiber siehst du nur Kauderwelsch.\n`);
 }

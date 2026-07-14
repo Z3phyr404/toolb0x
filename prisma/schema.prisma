@@ -210,6 +210,10 @@ model Server {
   passphrase String  @default("") // VERSCHLÜSSELT
   notes      String  @default("") // VERSCHLÜSSELT
 
+  // SHA-256-Fingerprint des SSH-Host-Keys (Trust-on-first-use).
+  // NICHT verschlüsselt — der Host-Key ist öffentlich, kein Geheimnis.
+  hostKeyFingerprint String @default("")
+
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

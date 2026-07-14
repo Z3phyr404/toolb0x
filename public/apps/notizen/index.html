@@ -5,118 +5,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Toolb0x — Notizen</title>
+  <link rel="stylesheet" href="/shared/obsidian.css" nonce="__CSP_NONCE__">
   <style nonce="__CSP_NONCE__">
     /* ============================================================
-   iOS 26 LIQUID GLASS — NOTIZEN APP
-   ============================================================ */
+       OBSIDIAN DARK — NOTIZEN APP
+       ============================================================ */
 
-    @font-face {
-      font-family: 'SF';
-      src: local('SF Pro Display'), local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'), local('Helvetica Neue');
-    }
-
-    :root {
-      --glass-bg: rgba(255, 255, 255, 0.12);
-      --glass-bg-heavy: rgba(255, 255, 255, 0.18);
-      --glass-border: rgba(255, 255, 255, 0.22);
-      --glass-border-light: rgba(255, 255, 255, 0.12);
-      --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 2px 12px rgba(0, 0, 0, 0.1);
-      --glass-shadow-elevated: 0 12px 60px rgba(0, 0, 0, 0.2), 0 4px 20px rgba(0, 0, 0, 0.15);
-      --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
-      --glass-blur: 40px;
-      --glass-saturate: 1.8;
-
-      --text: rgba(0, 0, 0, 0.85);
-      --text-secondary: rgba(0, 0, 0, 0.55);
-      --text-tertiary: rgba(0, 0, 0, 0.35);
-
-      --blue: #007AFF;
-      --green: #30D158;
-      --red: #FF3B30;
-      --orange: #FF9500;
-      --purple: #AF52DE;
-      --pink: #FF2D55;
-      --teal: #5AC8FA;
-      --indigo: #5856D6;
-      --mint: #00C7BE;
-      --yellow: #FFCC00;
-
-      --radius-sm: 12px;
-      --radius: 20px;
-      --radius-lg: 26px;
-      --radius-xl: 32px;
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
+    html, body {
       height: 100%;
-      font-family: 'SF', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-      -webkit-font-smoothing: antialiased;
-      color: var(--text);
       overflow: hidden;
     }
 
-    /* ===== ANIMATED BACKGROUND ===== */
-    .bg {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      background: linear-gradient(135deg, #a8c8f0 0%, #d4b8e8 25%, #f0c8c8 50%, #b8d8f0 75%, #c8e8d0 100%);
-      background-size: 400% 400%;
-      animation: bgShift 20s ease infinite;
-    }
-
-    .bg::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 600px 600px at 20% 20%, rgba(168, 200, 240, 0.6), transparent),
-        radial-gradient(ellipse 500px 500px at 80% 30%, rgba(212, 184, 232, 0.5), transparent),
-        radial-gradient(ellipse 400px 400px at 50% 80%, rgba(184, 216, 240, 0.5), transparent);
-    }
-
-    @keyframes bgShift {
-
-      0%,
-      100% {
-        background-position: 0% 50%;
-      }
-
-      25% {
-        background-position: 100% 0%;
-      }
-
-      50% {
-        background-position: 100% 100%;
-      }
-
-      75% {
-        background-position: 0% 100%;
-      }
-    }
-
-    .glass {
-      background: var(--glass-bg);
-      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-shadow), var(--glass-inset);
-    }
-
-    .glass-heavy {
-      background: var(--glass-bg-heavy);
-      backdrop-filter: blur(50px) saturate(2);
-      -webkit-backdrop-filter: blur(50px) saturate(2);
-      border: 1px solid var(--glass-border);
-      box-shadow: var(--glass-shadow-elevated), var(--glass-inset);
-    }
+    ::-webkit-scrollbar { width: 9px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 8px; }
 
     /* ===== LOADING ===== */
     .loading-overlay {
@@ -126,7 +27,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(18,22,29,0.85);
       backdrop-filter: blur(20px);
       transition: opacity 0.3s;
     }
@@ -139,16 +40,10 @@
     .spinner {
       width: 36px;
       height: 36px;
-      border: 3px solid rgba(0, 0, 0, 0.1);
-      border-top-color: var(--purple);
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: #a78bfa;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
     }
 
     /* ===== APP LAYOUT ===== */
@@ -158,6 +53,9 @@
       display: flex;
       height: 100vh;
       height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.4s;
@@ -168,100 +66,118 @@
       pointer-events: all;
     }
 
+    /* Glow orbs */
+    .glow-orb {
+      position: absolute;
+      pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;
+    }
+
     /* ===== SIDEBAR ===== */
     .sidebar {
-      width: 280px;
-      padding: 16px 12px;
-      display: flex;
-      flex-direction: column;
+      position: relative;
+      z-index: 1;
+      width: 268px;
       flex-shrink: 0;
-      overflow: hidden;
-    }
-
-    .sidebar-inner {
-      border-radius: var(--radius-xl);
-      padding: 16px 10px;
+      padding: 20px 14px;
       display: flex;
       flex-direction: column;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .sidebar-logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      padding: 8px 14px 12px;
-      color: var(--text);
-    }
-
-    .sidebar-logo span {
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      gap: 6px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      background: rgba(18,22,29,0.6);
     }
 
     .back-portal-btn {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      text-decoration: none;
-      color: var(--text-tertiary);
+      gap: 7px;
       font-size: 13px;
-      font-weight: 500;
-      border-radius: var(--radius-sm);
-      transition: all 0.2s;
-      margin-bottom: 4px;
+      color: var(--text-3);
+      padding: 6px 10px;
+      border-radius: 9px;
+      transition: color 0.2s, background 0.2s;
+      text-decoration: none;
     }
 
     .back-portal-btn:hover {
       color: var(--text);
-      background: rgba(255, 255, 255, 0.12);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .sidebar-logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 8px 10px 14px;
+    }
+
+    .sidebar-logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg,#c4b5fd,#8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 5px 16px rgba(139,92,246,0.35);
+      flex-shrink: 0;
+    }
+
+    .sidebar-logo-icon-inner {
+      width: 12px;
+      height: 12px;
+      border: 2px solid #1a0f33;
+      border-radius: 3px;
+    }
+
+    .sidebar-logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-logo-text:hover {
+      animation: jitter 0.4s ease;
+      cursor: default;
     }
 
     /* Search */
     .sidebar-search {
-      padding: 0 6px;
-      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-inset);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      padding: 9px 12px;
+      margin-bottom: 8px;
     }
 
     .sidebar-search input {
-      width: 100%;
-      padding: 9px 12px 9px 34px;
-      border: 1px solid var(--glass-border-light);
-      border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(20px);
+      border: none;
+      background: transparent;
+      color: var(--text);
       font-family: inherit;
       font-size: 13px;
-      color: var(--text);
       outline: none;
-      transition: border-color 0.2s, background 0.2s;
-    }
-
-    .sidebar-search input:focus {
-      border-color: var(--purple);
-      background: rgba(255, 255, 255, 0.2);
+      width: 100%;
     }
 
     .sidebar-search input::placeholder {
-      color: var(--text-tertiary);
+      color: var(--text-3);
     }
 
-    .sidebar-search-wrap {
-      position: relative;
-    }
-
-    .sidebar-search-icon {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 16px;
-      height: 16px;
-      color: var(--text-tertiary);
-      pointer-events: none;
+    /* Section label */
+    .nav-group-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(238,241,246,0.32);
+      padding: 8px 10px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     /* Tree */
@@ -277,49 +193,34 @@
     }
 
     .sidebar-tree-wrap::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.15);
+      background: rgba(255,255,255,0.08);
       border-radius: 2px;
-    }
-
-    .nav-group-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-tertiary);
-      padding: 12px 14px 4px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
     }
 
     .tree-item {
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 7px 10px;
-      border-radius: var(--radius-sm);
+      padding: 9px 11px;
+      border-radius: 9px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background 0.2s;
       font-size: 14px;
-      color: var(--text-secondary);
+      color: rgba(238,241,246,0.7);
       position: relative;
       user-select: none;
     }
 
     .tree-item:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: var(--text);
+      background: rgba(255,255,255,0.05);
+      color: rgba(238,241,246,0.8);
     }
 
     .tree-item.active {
-      background: rgba(255, 255, 255, 0.3);
-      backdrop-filter: blur(20px) saturate(1.5);
-      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      background: rgba(167,139,250,0.12);
+      border: 1px solid rgba(167,139,250,0.22);
       color: var(--text);
       font-weight: 600;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.25);
     }
 
     .tree-toggle {
@@ -329,15 +230,15 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      color: var(--text-tertiary);
-      font-size: 10px;
+      color: var(--text-3);
+      font-size: 13px;
       transition: transform 0.2s;
       cursor: pointer;
       border-radius: 4px;
     }
 
     .tree-toggle:hover {
-      background: rgba(0, 0, 0, 0.06);
+      background: rgba(255,255,255,0.05);
     }
 
     .tree-toggle.expanded {
@@ -382,7 +283,7 @@
       justify-content: center;
       border: none;
       background: none;
-      color: var(--text-tertiary);
+      color: var(--text-3);
       cursor: pointer;
       border-radius: 4px;
       font-size: 14px;
@@ -390,7 +291,7 @@
     }
 
     .tree-action-btn:hover {
-      background: rgba(0, 0, 0, 0.08);
+      background: rgba(255,255,255,0.08);
       color: var(--text);
     }
 
@@ -405,26 +306,21 @@
 
     /* New page button */
     .sidebar-new-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      margin: 8px 6px;
-      border: 1px dashed var(--glass-border);
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--text-tertiary);
+      margin-top: 10px;
+      padding: 11px;
+      border: 1px dashed rgba(167,139,250,0.35);
+      background: rgba(167,139,250,0.06);
+      color: #a78bfa;
       font-family: inherit;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
+      border-radius: var(--radius-btn);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.2s;
     }
 
     .sidebar-new-btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: var(--text);
-      border-color: var(--purple);
+      background: rgba(167,139,250,0.14);
     }
 
     /* Archive section */
@@ -432,8 +328,8 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
-      color: var(--text-tertiary);
+      padding: 8px 10px;
+      color: var(--text-3);
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
@@ -446,7 +342,7 @@
     }
 
     .sidebar-archive-toggle:hover {
-      color: var(--text-secondary);
+      color: var(--text-2);
     }
 
     .sidebar-archive-toggle .arrow {
@@ -473,15 +369,15 @@
       gap: 6px;
       padding: 6px 10px;
       font-size: 13px;
-      color: var(--text-tertiary);
-      border-radius: var(--radius-sm);
+      color: var(--text-3);
+      border-radius: 9px;
       cursor: pointer;
       transition: all 0.15s;
     }
 
     .archive-item:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: var(--text-secondary);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-2);
     }
 
     .archive-item-actions {
@@ -499,27 +395,19 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 12px 14px;
-      margin-top: 8px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: background 0.2s;
-      border-top: 1px solid var(--glass-border-light);
-    }
-
-    .sidebar-user:hover {
-      background: rgba(255, 255, 255, 0.12);
+      padding: 12px 8px 4px;
+      margin-top: auto;
     }
 
     .sidebar-avatar {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
+      background: #232b37;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
+      color: #a9bccd;
       font-size: 13px;
       font-weight: 600;
       flex-shrink: 0;
@@ -533,14 +421,11 @@
     .sidebar-user-name {
       font-size: 13px;
       font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .sidebar-user-email {
       font-size: 11px;
-      color: var(--text-tertiary);
+      color: var(--text-3);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -549,35 +434,40 @@
     .sidebar-logout {
       background: none;
       border: none;
-      color: var(--text-tertiary);
+      color: var(--text-3);
       cursor: pointer;
       padding: 4px;
+      display: flex;
       transition: color 0.2s;
     }
 
     .sidebar-logout:hover {
-      color: var(--red);
+      color: #ff8a70;
     }
 
     .sidebar-logout svg {
-      width: 18px;
-      height: 18px;
+      width: 17px;
+      height: 17px;
     }
 
     /* ===== MAIN CONTENT ===== */
     main {
+      position: relative;
+      z-index: 1;
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      padding: 16px 24px 16px 0;
+      padding: 32px 44px;
     }
 
     .editor-wrap {
       flex: 1;
       display: flex;
       flex-direction: column;
-      border-radius: var(--radius-xl);
+      max-width: 720px;
+      margin: 0 auto;
+      width: 100%;
       overflow: hidden;
     }
 
@@ -585,10 +475,11 @@
     .breadcrumbs {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 14px 24px 0;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 12px;
-      color: var(--text-tertiary);
+      color: var(--text-3);
+      margin-bottom: 20px;
       flex-wrap: wrap;
     }
 
@@ -598,24 +489,27 @@
     }
 
     .breadcrumb-item:hover {
-      color: var(--purple);
+      color: #a78bfa;
     }
 
     .breadcrumb-sep {
-      font-size: 10px;
-      color: var(--text-tertiary);
+      color: rgba(238,241,246,0.25);
+    }
+
+    .breadcrumb-current {
+      color: rgba(167,139,250,0.9);
     }
 
     /* Title area */
     .note-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px 24px 8px;
+      gap: 14px;
+      margin-bottom: 22px;
     }
 
     .note-icon-btn {
-      font-size: 32px;
+      font-size: 36px;
       background: none;
       border: none;
       cursor: pointer;
@@ -626,66 +520,66 @@
     }
 
     .note-icon-btn:hover {
-      background: rgba(0, 0, 0, 0.06);
+      background: rgba(255,255,255,0.05);
     }
 
     .note-title-input {
       flex: 1;
-      font-size: 28px;
+      font-size: 34px;
       font-weight: 700;
       letter-spacing: -0.03em;
       background: none;
       border: none;
       outline: none;
-      font-family: inherit;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
       color: var(--text);
       min-width: 0;
     }
 
+    .note-title-input:hover {
+      animation: jitter 0.45s ease;
+    }
+
     .note-title-input::placeholder {
-      color: var(--text-tertiary);
+      color: var(--text-3);
     }
 
     .note-header-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       flex-shrink: 0;
-    }
-
-    .header-btn {
-      width: 34px;
-      height: 34px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid var(--glass-border-light);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-secondary);
-      cursor: pointer;
-      font-size: 16px;
-      transition: all 0.15s;
-    }
-
-    .header-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
-      color: var(--text);
-    }
-
-    .header-btn.pinned {
-      color: var(--purple);
-      background: rgba(175, 82, 222, 0.12);
-      border-color: rgba(175, 82, 222, 0.25);
+      margin-left: auto;
     }
 
     .save-status {
-      font-size: 12px;
-      color: var(--text-tertiary);
-      padding: 0 24px;
-      height: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: rgba(52,211,153,0.9);
+    }
+
+    .header-btn {
+      width: 32px;
+      height: 32px;
       display: flex;
       align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+      color: rgba(238,241,246,0.6);
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+
+    .header-btn:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .header-btn.pinned {
+      color: #a78bfa;
+      background: rgba(167,139,250,0.12);
     }
 
     /* Editor Toolbar */
@@ -693,60 +587,67 @@
       display: flex;
       align-items: center;
       gap: 2px;
-      padding: 8px 24px;
-      border-bottom: 1px solid var(--glass-border-light);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px;
+      margin-bottom: 22px;
       flex-wrap: wrap;
     }
 
     .toolbar-btn {
-      width: 32px;
+      min-width: 32px;
       height: 32px;
       display: flex;
       align-items: center;
       justify-content: center;
       border: none;
-      background: none;
-      color: var(--text-secondary);
+      border-radius: 7px;
+      background: transparent;
+      color: rgba(238,241,246,0.75);
       cursor: pointer;
-      border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
       font-family: inherit;
-      transition: all 0.15s;
+      transition: background 0.2s;
     }
 
     .toolbar-btn:hover {
-      background: rgba(0, 0, 0, 0.06);
-      color: var(--text);
+      background: rgba(255,255,255,0.08);
     }
 
     .toolbar-btn.active {
-      background: rgba(175, 82, 222, 0.12);
-      color: var(--purple);
+      background: rgba(167,139,250,0.15);
+      color: #a78bfa;
     }
 
     .toolbar-sep {
       width: 1px;
       height: 20px;
-      background: var(--glass-border-light);
-      margin: 0 4px;
+      background: rgba(255,255,255,0.1);
+      margin: 0 6px;
+    }
+
+    .toolbar-btn-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
     }
 
     /* WYSIWYG Editor */
     .editor-content {
       flex: 1;
       overflow-y: auto;
-      padding: 20px 24px 40px;
+      padding: 4px 0 40px;
       outline: none;
       font-size: 15px;
       line-height: 1.7;
-      color: var(--text);
+      color: rgba(238,241,246,0.85);
       min-height: 200px;
     }
 
     .editor-content:empty::before {
       content: 'Beginne zu schreiben...';
-      color: var(--text-tertiary);
+      color: var(--text-3);
       pointer-events: none;
     }
 
@@ -755,7 +656,7 @@
     }
 
     .editor-content::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.12);
+      background: rgba(255,255,255,0.08);
       border-radius: 3px;
     }
 
@@ -769,86 +670,88 @@
     }
 
     .editor-content h2 {
-      font-size: 21px;
+      font-size: 20px;
       font-weight: 700;
-      letter-spacing: -0.01em;
-      margin: 20px 0 6px;
+      margin: 20px 0 12px;
       color: var(--text);
     }
 
     .editor-content h3 {
-      font-size: 17px;
-      font-weight: 600;
-      margin: 16px 0 4px;
+      font-size: 16px;
+      font-weight: 700;
+      margin: 20px 0 10px;
       color: var(--text);
     }
 
     .editor-content p {
-      margin: 0 0 8px;
+      margin: 0 0 16px;
+    }
+
+    .editor-content strong {
+      color: var(--text);
     }
 
     .editor-content ul,
     .editor-content ol {
-      margin: 4px 0 8px;
-      padding-left: 24px;
+      margin: 4px 0 16px 22px;
+      color: rgba(238,241,246,0.8);
     }
 
     .editor-content li {
-      margin: 2px 0;
+      margin: 0 0 8px;
     }
 
     .editor-content blockquote {
-      border-left: 3px solid var(--purple);
-      margin: 8px 0;
-      padding: 8px 16px;
-      background: rgba(175, 82, 222, 0.06);
-      border-radius: 0 8px 8px 0;
-      color: var(--text-secondary);
+      border-left: 3px solid rgba(167,139,250,0.6);
+      margin: 16px 0;
+      padding: 4px 0 4px 16px;
+      color: rgba(238,241,246,0.6);
+      font-style: italic;
     }
 
     .editor-content code {
-      background: rgba(0, 0, 0, 0.06);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 13px;
-      color: var(--purple);
+      color: #fbbf24;
+      background: rgba(251,191,36,0.1);
+      padding: 2px 6px;
+      border-radius: 5px;
     }
 
     .editor-content pre {
-      background: rgba(0, 0, 0, 0.06);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: var(--radius-sm);
-      padding: 14px 18px;
-      margin: 8px 0;
+      background: var(--panel-inset);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 8px 0 16px;
       overflow-x: auto;
     }
 
     .editor-content pre code {
       background: none;
       padding: 0;
-      color: var(--text);
+      color: #a78bfa;
       font-size: 13px;
-      line-height: 1.6;
+      line-height: 1.9;
     }
 
     .editor-content a {
-      color: var(--purple);
+      color: #a78bfa;
       text-decoration: underline;
-      text-decoration-color: rgba(175, 82, 222, 0.3);
+      text-decoration-color: rgba(167,139,250,0.3);
       text-underline-offset: 2px;
     }
 
     .editor-content hr {
       border: none;
       height: 1px;
-      background: var(--glass-border);
+      background: var(--border);
       margin: 16px 0;
     }
 
     .editor-content img {
       max-width: 100%;
-      border-radius: var(--radius-sm);
+      border-radius: 12px;
     }
 
     /* ===== EMPTY STATE ===== */
@@ -863,7 +766,9 @@
       text-align: center;
       max-width: 360px;
       padding: 48px 32px;
-      border-radius: var(--radius-xl);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
     }
 
     .empty-state-icon {
@@ -879,7 +784,7 @@
 
     .empty-state-text {
       font-size: 14px;
-      color: var(--text-secondary);
+      color: var(--text-2);
       margin-bottom: 24px;
       line-height: 1.5;
     }
@@ -890,14 +795,15 @@
       gap: 8px;
       padding: 12px 24px;
       border: none;
-      border-radius: var(--radius-sm);
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
+      border-radius: var(--radius-btn);
+      background: linear-gradient(135deg,#c4b5fd,#8b5cf6);
       color: #fff;
       font-family: inherit;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: opacity 0.2s, transform 0.1s;
+      box-shadow: 0 5px 16px rgba(139,92,246,0.35);
     }
 
     .empty-state-btn:hover {
@@ -913,7 +819,9 @@
       position: absolute;
       z-index: 50;
       padding: 12px;
-      border-radius: var(--radius);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
       display: none;
       max-width: 280px;
     }
@@ -943,7 +851,7 @@
     }
 
     .emoji-pick:hover {
-      background: rgba(0, 0, 0, 0.08);
+      background: rgba(255,255,255,0.08);
     }
 
     /* ===== CONTEXT MENU ===== */
@@ -952,7 +860,9 @@
       z-index: 100;
       min-width: 180px;
       padding: 6px;
-      border-radius: var(--radius-sm);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
       display: none;
     }
 
@@ -978,16 +888,16 @@
     }
 
     .context-menu-item:hover {
-      background: rgba(0, 0, 0, 0.06);
+      background: rgba(255,255,255,0.06);
     }
 
     .context-menu-item.danger {
-      color: var(--red);
+      color: var(--error-text);
     }
 
     .context-menu-sep {
       height: 1px;
-      background: var(--glass-border-light);
+      background: var(--border);
       margin: 4px 6px;
     }
 
@@ -996,7 +906,7 @@
       position: fixed;
       inset: 0;
       z-index: 120;
-      background: rgba(0, 0, 0, 0.25);
+      background: rgba(0,0,0,0.5);
       backdrop-filter: blur(8px);
       display: none;
       align-items: center;
@@ -1010,7 +920,9 @@
     .modal {
       width: 100%;
       max-width: 420px;
-      border-radius: var(--radius-xl);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
       padding: 28px;
     }
 
@@ -1028,17 +940,16 @@
       display: block;
       font-size: 13px;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--text-2);
       margin-bottom: 6px;
     }
 
     .form-input {
       width: 100%;
       padding: 10px 14px;
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-sm);
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      background: var(--panel-inset);
       font-family: inherit;
       font-size: 14px;
       color: var(--text);
@@ -1047,7 +958,7 @@
     }
 
     .form-input:focus {
-      border-color: var(--purple);
+      border-color: #a78bfa;
     }
 
     .modal-actions {
@@ -1060,7 +971,7 @@
     .btn {
       padding: 10px 20px;
       border: none;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-btn);
       font-family: inherit;
       font-size: 14px;
       font-weight: 600;
@@ -1069,12 +980,12 @@
     }
 
     .btn-secondary {
-      background: rgba(0, 0, 0, 0.06);
-      color: var(--text-secondary);
+      background: rgba(255,255,255,0.06);
+      color: var(--text-2);
     }
 
     .btn-primary {
-      background: linear-gradient(135deg, var(--purple), var(--indigo));
+      background: linear-gradient(135deg,#c4b5fd,#8b5cf6);
       color: #fff;
     }
 
@@ -1085,26 +996,26 @@
     /* ===== CONFIRM MODAL ===== */
     .confirm-text {
       font-size: 14px;
-      color: var(--text-secondary);
+      color: var(--text-2);
       line-height: 1.5;
       margin-bottom: 8px;
     }
 
     .btn-danger {
-      background: var(--red);
+      background: var(--error-btn);
       color: #fff;
     }
 
     /* ===== SEARCH RESULTS ===== */
     .search-result {
       padding: 8px 10px;
-      border-radius: var(--radius-sm);
+      border-radius: 9px;
       cursor: pointer;
       transition: background 0.15s;
     }
 
     .search-result:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255,255,255,0.05);
     }
 
     .search-result-title {
@@ -1118,7 +1029,7 @@
 
     .search-result-snippet {
       font-size: 12px;
-      color: var(--text-tertiary);
+      color: var(--text-3);
       margin-top: 2px;
       white-space: nowrap;
       overflow: hidden;
@@ -1138,40 +1049,34 @@
 
     .toast {
       padding: 12px 20px;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-btn);
       font-size: 13px;
       font-weight: 500;
       animation: toastIn 0.3s;
+      backdrop-filter: blur(12px);
     }
 
     .toast.error {
-      background: rgba(255, 59, 48, 0.15);
-      border: 1px solid rgba(255, 59, 48, 0.25);
-      color: var(--red);
+      background: rgba(255,59,48,0.12);
+      border: 1px solid rgba(255,59,48,0.2);
+      color: var(--error-text);
     }
 
     .toast.success {
-      background: rgba(48, 209, 88, 0.15);
-      border: 1px solid rgba(48, 209, 88, 0.25);
-      color: var(--green);
+      background: rgba(52,211,153,0.12);
+      border: 1px solid rgba(52,211,153,0.2);
+      color: var(--success);
     }
 
     @keyframes toastIn {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: none;
-      }
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: none; }
     }
 
     /* ===== DRAG INDICATOR ===== */
     .tree-item.drag-over {
-      background: rgba(175, 82, 222, 0.12);
-      border: 1px dashed var(--purple);
+      background: rgba(167,139,250,0.12);
+      border: 1px dashed #a78bfa;
     }
 
     .tree-item.dragging {
@@ -1189,8 +1094,10 @@
       height: 40px;
       align-items: center;
       justify-content: center;
-      border: none;
-      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-btn);
+      background: var(--panel);
+      color: var(--text);
       font-size: 20px;
       cursor: pointer;
     }
@@ -1200,7 +1107,7 @@
       position: fixed;
       inset: 0;
       z-index: 9;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0,0,0,0.5);
     }
 
     @media (max-width: 768px) {
@@ -1212,7 +1119,8 @@
         z-index: 10;
         transform: translateX(-100%);
         transition: transform 0.3s;
-        width: 280px;
+        width: 268px;
+        background: var(--bg);
       }
 
       .sidebar.open {
@@ -1233,19 +1141,11 @@
       }
 
       .note-header {
-        padding: 12px 16px 8px;
+        gap: 10px;
       }
 
-      .breadcrumbs {
-        padding: 10px 16px 0;
-      }
-
-      .editor-toolbar {
-        padding: 8px 16px;
-      }
-
-      .editor-content {
-        padding: 16px;
+      .note-title-input {
+        font-size: 24px;
       }
     }
 
@@ -1257,63 +1157,71 @@
 </head>
 
 <body>
-  <div class="bg"></div>
   <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
 
-  <button class="mobile-toggle glass" id="mobileToggle">☰</button>
+  <button class="mobile-toggle" id="mobileToggle">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
   <div class="app" id="app">
+    <!-- Glow orbs -->
+    <div class="glow-orb" data-glow data-glow-primary data-depth="55" style="top:-160px;right:-120px;width:600px;height:600px;background:radial-gradient(circle,rgba(167,139,250,0.2),transparent 70%);"></div>
+    <div class="glow-orb" data-glow data-depth="30" style="bottom:-200px;left:180px;width:520px;height:520px;background:radial-gradient(circle,rgba(56,189,248,0.06),transparent 72%);"></div>
+
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-inner glass-heavy">
-        <a href="/portal" class="back-portal-btn">← Zur Übersicht</a>
-        <div class="sidebar-logo"><span>Notizen</span></div>
+      <a href="/portal" class="back-portal-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Zur Übersicht
+      </a>
 
-        <div class="sidebar-search">
-          <div class="sidebar-search-wrap">
-            <svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-            <input type="text" id="searchInput" placeholder="Suchen… (Ctrl+F)">
-          </div>
+      <div class="sidebar-logo-wrap">
+        <div class="sidebar-logo-icon"><div class="sidebar-logo-icon-inner"></div></div>
+        <span class="sidebar-logo-text">Notizen</span>
+      </div>
+
+      <div class="sidebar-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="Suchen… (Ctrl+F)">
+      </div>
+
+      <div class="sidebar-tree-wrap" id="treeWrap">
+        <!-- Pinned -->
+        <div id="pinnedSection" class="hidden">
+          <div class="nav-group-label">ANGEPINNT</div>
+          <div id="pinnedTree"></div>
         </div>
 
-        <div class="sidebar-tree-wrap" id="treeWrap">
-          <!-- Pinned -->
-          <div id="pinnedSection" class="hidden">
-            <div class="nav-group-label">★ Angepinnt</div>
-            <div id="pinnedTree"></div>
-          </div>
-
-          <!-- Pages -->
-          <div id="pagesSection">
-            <div class="nav-group-label">Seiten</div>
-            <div id="pageTree"></div>
-          </div>
-
-          <!-- Search Results -->
-          <div id="searchResults" class="hidden"></div>
-
-          <!-- Archive -->
-          <div id="archiveSection" class="hidden" style="margin-top:8px">
-            <button class="sidebar-archive-toggle" id="archiveToggle">
-              <span class="arrow">▶</span> Archiv
-            </button>
-            <div class="sidebar-archive-list" id="archiveList"></div>
-          </div>
+        <!-- Pages -->
+        <div id="pagesSection">
+          <div class="nav-group-label">SEITEN</div>
+          <div id="pageTree"></div>
         </div>
 
-        <button class="sidebar-new-btn" id="newPageBtn">+ Neue Seite</button>
+        <!-- Search Results -->
+        <div id="searchResults" class="hidden"></div>
 
-        <div class="sidebar-user" id="sidebarUser">
-          <div class="sidebar-avatar" id="userAvatar"></div>
-          <div class="sidebar-user-info">
-            <div class="sidebar-user-name" id="userName"></div>
-            <div class="sidebar-user-email" id="userEmail"></div>
-          </div>
-          <button class="sidebar-logout" id="logoutBtn" title="Abmelden">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <!-- Archive -->
+        <div id="archiveSection" class="hidden" style="margin-top:8px">
+          <button class="sidebar-archive-toggle" id="archiveToggle">
+            <span class="arrow">&#9654;</span> Archiv
           </button>
+          <div class="sidebar-archive-list" id="archiveList"></div>
         </div>
+      </div>
+
+      <button class="sidebar-new-btn" id="newPageBtn">+ Neue Seite</button>
+
+      <div class="sidebar-user" id="sidebarUser">
+        <div class="sidebar-avatar" id="userAvatar"></div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="userName"></div>
+          <div class="sidebar-user-email" id="userEmail"></div>
+        </div>
+        <button class="sidebar-logout" id="logoutBtn" title="Abmelden">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
     </aside>
 
@@ -1321,8 +1229,10 @@
     <main>
       <!-- Empty State -->
       <div class="empty-state" id="emptyState">
-        <div class="empty-state-inner glass">
-          <div class="empty-state-icon">📝</div>
+        <div class="empty-state-inner" data-reveal data-reveal-index="0">
+          <div class="empty-state-icon">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
           <div class="empty-state-title">Erstelle deine erste Seite</div>
           <div class="empty-state-text">Halte alles zu deinen Web-Projekten fest — verschlüsselt und hierarchisch organisiert.</div>
           <button class="empty-state-btn" id="emptyNewBtn">+ Neue Seite erstellen</button>
@@ -1330,55 +1240,69 @@
       </div>
 
       <!-- Editor -->
-      <div class="editor-wrap glass-heavy" id="editorWrap" style="display:none">
-        <div class="breadcrumbs" id="breadcrumbs"></div>
+      <div class="editor-wrap" id="editorWrap" style="display:none">
+        <div class="breadcrumbs" id="breadcrumbs" data-reveal data-reveal-index="0"></div>
 
-        <div class="note-header">
+        <div class="note-header" data-reveal data-reveal-index="0">
           <button class="note-icon-btn" id="noteIconBtn" title="Icon ändern">📄</button>
           <input type="text" class="note-title-input" id="noteTitleInput" placeholder="Ohne Titel" maxlength="200">
           <div class="note-header-actions">
             <div class="save-status" id="saveStatus"></div>
-            <button class="header-btn" id="pinBtn" title="Anpinnen">📌</button>
-            <button class="header-btn" id="moreBtn" title="Mehr">⋯</button>
+            <button class="header-btn" id="pinBtn" title="Anpinnen">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 11l-4 4"/><path d="M15 11l4 4"/><path d="M5 15l7-7 7 7"/></svg>
+            </button>
+            <button class="header-btn" id="moreBtn" title="Mehr">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+            </button>
           </div>
         </div>
 
-        <div class="editor-toolbar" id="editorToolbar">
-          <button class="toolbar-btn" data-cmd="bold" title="Fett (Ctrl+B)"><b>B</b></button>
-          <button class="toolbar-btn" data-cmd="italic" title="Kursiv (Ctrl+I)"><i>I</i></button>
-          <button class="toolbar-btn" data-cmd="underline" title="Unterstrichen (Ctrl+U)"><u>U</u></button>
-          <button class="toolbar-btn" data-cmd="strikeThrough" title="Durchgestrichen"><s>S</s></button>
+        <div class="editor-toolbar" id="editorToolbar" data-reveal data-reveal-index="1">
+          <button class="toolbar-btn" data-cmd="bold" title="Fett (Ctrl+B)" style="font-weight:700;">B</button>
+          <button class="toolbar-btn" data-cmd="italic" title="Kursiv (Ctrl+I)" style="font-style:italic;">I</button>
+          <button class="toolbar-btn" data-cmd="underline" title="Unterstrichen (Ctrl+U)" style="text-decoration:underline;">U</button>
+          <button class="toolbar-btn" data-cmd="strikeThrough" title="Durchgestrichen" style="text-decoration:line-through;">S</button>
           <div class="toolbar-sep"></div>
-          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H1" title="Überschrift 1">H1</button>
-          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H2" title="Überschrift 2">H2</button>
-          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H3" title="Überschrift 3">H3</button>
+          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H1" title="Überschrift 1" style="font-size:12px;font-weight:700;">H1</button>
+          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H2" title="Überschrift 2" style="font-size:12px;font-weight:700;">H2</button>
+          <button class="toolbar-btn" data-cmd="formatBlock" data-val="H3" title="Überschrift 3" style="font-size:12px;font-weight:700;">H3</button>
           <div class="toolbar-sep"></div>
-          <button class="toolbar-btn" data-cmd="insertUnorderedList" title="Aufzählung">•</button>
-          <button class="toolbar-btn" data-cmd="insertOrderedList" title="Nummerierung">1.</button>
-          <button class="toolbar-btn" data-cmd="formatBlock" data-val="BLOCKQUOTE" title="Zitat">❝</button>
+          <button class="toolbar-btn" data-cmd="insertUnorderedList" title="Aufzählung" style="font-size:13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button class="toolbar-btn" data-cmd="insertOrderedList" title="Nummerierung" style="font-size:12px;font-weight:700;">1.</button>
+          <button class="toolbar-btn" data-cmd="formatBlock" data-val="BLOCKQUOTE" title="Zitat">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg>
+          </button>
           <div class="toolbar-sep"></div>
-          <button class="toolbar-btn" id="codeBtn" title="Code">⟨/⟩</button>
-          <button class="toolbar-btn" id="codeBlockBtn" title="Code-Block">▤</button>
-          <button class="toolbar-btn" id="linkBtn" title="Link (Ctrl+K)">🔗</button>
-          <button class="toolbar-btn" data-cmd="insertHorizontalRule" title="Trennlinie">―</button>
+          <button class="toolbar-btn toolbar-btn-code" id="codeBtn" title="Code">&lt;/&gt;</button>
+          <button class="toolbar-btn" id="codeBlockBtn" title="Code-Block">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10l3 3-3 3"/><line x1="14" y1="16" x2="18" y2="16"/></svg>
+          </button>
+          <button class="toolbar-btn" id="linkBtn" title="Link (Ctrl+K)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </button>
+          <button class="toolbar-btn" data-cmd="insertHorizontalRule" title="Trennlinie">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>
+          </button>
         </div>
 
-        <div class="editor-content" id="editorContent" contenteditable="true"></div>
+        <div class="editor-content" id="editorContent" contenteditable="true" data-reveal data-reveal-index="1"></div>
       </div>
     </main>
   </div>
 
   <!-- Emoji Picker -->
-  <div class="emoji-picker glass-heavy" id="emojiPicker">
+  <div class="emoji-picker" id="emojiPicker">
     <div class="emoji-picker-grid" id="emojiGrid"></div>
   </div>
 
   <!-- Context Menu -->
-  <div class="context-menu glass-heavy" id="contextMenu"></div>
+  <div class="context-menu" id="contextMenu"></div>
 
   <!-- Link Modal -->
   <div class="modal-overlay" id="linkModal">
-    <div class="modal glass-heavy">
+    <div class="modal">
       <h3>Link einfügen</h3>
       <div class="form-group">
         <label class="form-label">Text</label>
@@ -1397,7 +1321,7 @@
 
   <!-- Confirm Modal -->
   <div class="modal-overlay" id="confirmModal">
-    <div class="modal glass-heavy">
+    <div class="modal">
       <h3 id="confirmTitle">Seite löschen?</h3>
       <p class="confirm-text" id="confirmText"></p>
       <div class="modal-actions">
@@ -1411,9 +1335,10 @@
   <div class="toast-box" id="toastBox"></div>
 
   <script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+  <script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
   <script nonce="__CSP_NONCE__">
     // ============================================================
-    // NOTIZEN APP — Vanilla JS
+    // NOTIZEN APP — Vanilla JS (Obsidian Dark)
     // ============================================================
 
     const API = '/api';
@@ -1456,11 +1381,11 @@
 
     // ---- Emojis ----
     const EMOJIS = [
-      '📄','📝','📋','📌','📎','📂','📁','🗂️',
-      '🌐','💻','🖥️','📱','🔧','⚙️','🛠️','🔩',
-      '🎨','🎯','🚀','✨','💡','🔒','🔑','🛡️',
-      '📊','📈','📉','🗃️','💾','☁️','🔌','📡',
-      '🐛','🧪','📦','🏗️','🧩','🔍','📐','🗓️',
+      '\u{1F4C4}','\u{1F4DD}','\u{1F4CB}','\u{1F4CC}','\u{1F4CE}','\u{1F4C2}','\u{1F4C1}','\u{1F5C2}\uFE0F',
+      '\u{1F310}','\u{1F4BB}','\u{1F5A5}\uFE0F','\u{1F4F1}','\u{1F527}','\u2699\uFE0F','\u{1F6E0}\uFE0F','\u{1F529}',
+      '\u{1F3A8}','\u{1F3AF}','\u{1F680}','\u2728','\u{1F4A1}','\u{1F512}','\u{1F511}','\u{1F6E1}\uFE0F',
+      '\u{1F4CA}','\u{1F4C8}','\u{1F4C9}','\u{1F5C3}\uFE0F','\u{1F4BE}','\u2601\uFE0F','\u{1F50C}','\u{1F4E1}',
+      '\u{1F41B}','\u{1F9EA}','\u{1F4E6}','\u{1F3D7}\uFE0F','\u{1F9E9}','\u{1F50D}','\u{1F4D0}','\u{1F5D3}\uFE0F',
     ];
 
     // ============================================================
@@ -1493,7 +1418,7 @@
     // ============================================================
     function toast(msg, type = 'error') {
       const el = document.createElement('div');
-      el.className = `toast glass ${type}`;
+      el.className = `toast ${type}`;
       el.textContent = msg;
       toastBox.appendChild(el);
       setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
@@ -1520,6 +1445,10 @@
         await loadNotes();
         app.classList.add('active');
         loading.classList.add('hidden');
+
+        // Init Obsidian glow + reveal
+        initGlow(app);
+        initReveal(app);
 
         if (typeof SessionTimeout !== 'undefined') {
           SessionTimeout.start(() => { window.location.href = '/portal'; });
@@ -1576,11 +1505,15 @@
         archived.forEach(n => {
           const el = document.createElement('div');
           el.className = 'archive-item';
-          el.innerHTML = `<span class="tree-icon">${n.icon || '📄'}</span>
+          el.innerHTML = `<span class="tree-icon">${n.icon || '\u{1F4C4}'}</span>
             <span class="tree-label">${esc(n.title || 'Ohne Titel')}</span>
             <div class="archive-item-actions">
-              <button class="tree-action-btn" data-restore="${n.id}" title="Wiederherstellen">↩</button>
-              <button class="tree-action-btn" data-permdelete="${n.id}" title="Endgültig löschen" style="color:var(--red)">✕</button>
+              <button class="tree-action-btn" data-restore="${n.id}" title="Wiederherstellen">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              </button>
+              <button class="tree-action-btn" data-permdelete="${n.id}" title="Endgültig löschen" style="color:var(--error-text)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>`;
           archiveList.appendChild(el);
         });
@@ -1614,16 +1547,23 @@
       el.dataset.id = note.id;
       el.draggable = true;
 
+      const toggleChar = hasChildren
+        ? (isExpanded ? '\u25BE' : '\u25B8')
+        : '';
       const toggle = hasChildren
-        ? `<span class="tree-toggle ${isExpanded ? 'expanded' : ''}" data-toggle="${note.id}">▶</span>`
+        ? `<span class="tree-toggle ${isExpanded ? 'expanded' : ''}" data-toggle="${note.id}" style="font-size:13px;color:var(--text-3);">${toggleChar}</span>`
         : `<span class="tree-toggle invisible"></span>`;
 
       el.innerHTML = `${toggle}
-        <span class="tree-icon">${note.icon || '📄'}</span>
+        <span class="tree-icon">${note.icon || '\u{1F4C4}'}</span>
         <span class="tree-label">${esc(note.title || 'Ohne Titel')}</span>
         <div class="tree-actions">
-          <button class="tree-action-btn" data-addchild="${note.id}" title="Unterseite">+</button>
-          <button class="tree-action-btn" data-ctxmenu="${note.id}" title="Mehr">⋯</button>
+          <button class="tree-action-btn" data-addchild="${note.id}" title="Unterseite">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="tree-action-btn" data-ctxmenu="${note.id}" title="Mehr">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          </button>
         </div>`;
 
       return el;
@@ -1641,7 +1581,7 @@
         editorWrap.style.display = '';
 
         noteTitleInput.value = note.title || '';
-        noteIconBtn.textContent = note.icon || '📄';
+        noteIconBtn.textContent = note.icon || '\u{1F4C4}';
         editorContent.innerHTML = note.content || '';
         pinBtn.classList.toggle('pinned', note.isPinned);
 
@@ -1672,9 +1612,9 @@
       }
       breadcrumbs.innerHTML = chain.map((n, i) => {
         const isLast = i === chain.length - 1;
-        return (i > 0 ? '<span class="breadcrumb-sep">›</span>' : '') +
+        return (i > 0 ? '<span class="breadcrumb-sep">/</span>' : '') +
           (isLast
-            ? `<span class="breadcrumb-item" style="color:var(--text-secondary)">${esc(n.title || 'Ohne Titel')}</span>`
+            ? `<span class="breadcrumb-item breadcrumb-current">${esc(n.title || 'Ohne Titel')}</span>`
             : `<span class="breadcrumb-item" data-nav="${n.id}">${esc(n.title || 'Ohne Titel')}</span>`);
       }).join('');
     }
@@ -1732,8 +1672,8 @@
           allNotes[idx] = { ...allNotes[idx], title: note.title, icon: note.icon, updatedAt: note.updatedAt };
         }
         renderSidebar();
-        saveStatus.textContent = 'Gespeichert ✓';
-        setTimeout(() => { if (saveStatus.textContent === 'Gespeichert ✓') saveStatus.textContent = ''; }, 2000);
+        saveStatus.textContent = '\u2713 Gespeichert';
+        setTimeout(() => { if (saveStatus.textContent === '\u2713 Gespeichert') saveStatus.textContent = ''; }, 2000);
       } catch (err) {
         saveStatus.textContent = 'Fehler beim Speichern';
         toast('Speichern fehlgeschlagen.');
@@ -1854,12 +1794,12 @@
           archiveSection.classList.add('hidden');
           searchResults.classList.remove('hidden');
           searchResults.innerHTML = results.length > 0
-            ? `<div class="nav-group-label">Ergebnisse (${results.length})</div>` +
+            ? `<div class="nav-group-label">ERGEBNISSE (${results.length})</div>` +
               results.map(r => `<div class="search-result" data-nav="${r.id}">
-                <div class="search-result-title"><span>${r.icon || '📄'}</span> ${esc(r.title)}</div>
+                <div class="search-result-title"><span>${r.icon || '\u{1F4C4}'}</span> ${esc(r.title)}</div>
                 ${r.snippet ? `<div class="search-result-snippet">${esc(r.snippet)}</div>` : ''}
               </div>`).join('')
-            : '<div style="padding:16px;text-align:center;color:var(--text-tertiary);font-size:13px">Keine Ergebnisse</div>';
+            : '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">Keine Ergebnisse</div>';
         } catch (err) {
           toast('Suche fehlgeschlagen.');
         }
@@ -1899,11 +1839,23 @@
       if (!note) return;
 
       contextMenu.innerHTML = `
-        <button class="context-menu-item" data-action="addchild" data-id="${noteId}">+ Unterseite</button>
-        <button class="context-menu-item" data-action="pin" data-id="${noteId}">${note.isPinned ? '★ Entpinnen' : '☆ Anpinnen'}</button>
+        <button class="context-menu-item" data-action="addchild" data-id="${noteId}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Unterseite
+        </button>
+        <button class="context-menu-item" data-action="pin" data-id="${noteId}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 11l-4 4"/><path d="M15 11l4 4"/><path d="M5 15l7-7 7 7"/></svg>
+          ${note.isPinned ? 'Entpinnen' : 'Anpinnen'}
+        </button>
         <div class="context-menu-sep"></div>
-        <button class="context-menu-item" data-action="archive" data-id="${noteId}">📦 Archivieren</button>
-        <button class="context-menu-item context-menu-item danger" data-action="delete" data-id="${noteId}">🗑 Löschen</button>`;
+        <button class="context-menu-item" data-action="archive" data-id="${noteId}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+          Archivieren
+        </button>
+        <button class="context-menu-item danger" data-action="delete" data-id="${noteId}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Löschen
+        </button>`;
 
       contextMenu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
       contextMenu.style.top = Math.min(y, window.innerHeight - 200) + 'px';

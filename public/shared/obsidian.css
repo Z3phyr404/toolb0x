@@ -1,0 +1,267 @@
+/* ============================================================
+   OBSIDIAN DESIGN SYSTEM — Toolb0x
+   Gemeinsame Tokens, Reset, Basis-Komponenten
+   ============================================================ */
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ===== TOKENS ===== */
+:root {
+  --bg: #12161d;
+  --panel: #1b212b;
+  --panel-2: #161b23;
+  --panel-inset: #12161d;
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.12);
+  --text: #eef1f6;
+  --text-2: rgba(238,241,246,0.55);
+  --text-3: rgba(238,241,246,0.4);
+  --text-mono: rgba(238,241,246,0.42);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error-text: #ff6b60;
+  --error-btn: #ff3b30;
+  --radius-card: 20px;
+  --radius-btn: 11px;
+  --radius-icon: 14px;
+  --radius-pill: 99px;
+}
+
+/* ===== RESET ===== */
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a { text-decoration:none; color:inherit; }
+
+/* ===== ANIMATIONS ===== */
+@keyframes jitter {
+  0%,100% { transform:translate(0,0); }
+  33% { transform:translate(-0.5px,0.5px); }
+  66% { transform:translate(0.5px,-0.5px); }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.35; }
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.jitter:hover { animation: jitter .4s ease; cursor:default; }
+
+/* ===== TYPOGRAPHY ===== */
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+.label-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mono);
+}
+.label-mono-sm {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238,241,246,0.5);
+}
+h1, .h1 {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+h2, .h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ===== PANELS / CARDS ===== */
+.ob-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  transition: border-color .25s, box-shadow .25s, transform .25s;
+}
+.ob-card-hover:hover {
+  transform: translateY(-3px);
+}
+
+/* ===== BUTTONS ===== */
+.ob-btn-ghost {
+  font-family: inherit;
+  font-size: 13px;
+  color: rgba(238,241,246,0.65);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.ob-btn-ghost:hover {
+  background: rgba(255,255,255,0.1);
+}
+.ob-btn-logout {
+  font-family: inherit;
+  font-size: 13px;
+  color: rgba(238,241,246,0.65);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.ob-btn-logout:hover {
+  background: rgba(255,99,71,0.12);
+  color: #ff8a70;
+  border-color: rgba(255,99,71,0.25);
+}
+.ob-btn-danger {
+  padding: 11px 18px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--error-btn);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.ob-btn-danger:hover { opacity: 0.88; }
+
+/* ===== INPUTS ===== */
+.ob-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-btn);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color .2s, background .2s;
+}
+.ob-input::placeholder {
+  color: var(--text-3);
+}
+
+/* ===== STATUS PILLS ===== */
+.ob-pill {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+/* ===== ICON TILE ===== */
+.ob-icon-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-icon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ===== TOAST ===== */
+.ob-toast-box {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ob-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-btn);
+  font-size: 13px;
+  font-weight: 600;
+  animation: obToastIn .3s, obToastOut .3s 2.8s forwards;
+  backdrop-filter: blur(30px) saturate(1.5);
+}
+.ob-toast.success {
+  background: rgba(52,211,153,0.15);
+  border: 1px solid rgba(52,211,153,0.25);
+  color: var(--success);
+}
+.ob-toast.error {
+  background: rgba(255,59,48,0.15);
+  border: 1px solid rgba(255,59,48,0.25);
+  color: var(--error-text);
+}
+@keyframes obToastIn { from { transform:translateX(40px); opacity:0; } }
+@keyframes obToastOut { to { transform:translateX(40px); opacity:0; } }
+
+/* ===== LOADING ===== */
+.ob-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18,22,29,0.6);
+  backdrop-filter: blur(8px);
+  transition: opacity .3s;
+}
+.ob-loading.hidden { opacity:0; pointer-events:none; }
+.ob-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+/* ===== MODAL ===== */
+.ob-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.ob-modal-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+.ob-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 28px;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 16px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:600px) {
+  h1, .h1 { font-size: 28px; }
+}

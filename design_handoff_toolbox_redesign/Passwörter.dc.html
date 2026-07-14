@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { background:#12161d; }
+  body { font-family:'Space Grotesk',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { text-decoration:none; color:inherit; }
+  @keyframes jitter { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-0.5px,0.5px);} 66%{transform:translate(0.5px,-0.5px);} }
+  input[type=range] { accent-color:#fbbf24; }
+</style>
+</helmet>
+
+<div id="scrPass" style="position:relative;min-height:100vh;background:#12161d;color:#eef1f6;font-family:'Space Grotesk',system-ui,sans-serif;overflow:hidden;padding:0 0 72px;">
+  <div data-glow data-glow-primary data-depth="55" style="position:absolute;top:-160px;right:-120px;width:600px;height:600px;background:radial-gradient(circle,rgba(251,191,36,0.2),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;"></div>
+  <div data-glow data-depth="30" style="position:absolute;bottom:-200px;left:-140px;width:520px;height:520px;background:radial-gradient(circle,rgba(255,146,32,0.07),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
+
+  <header style="position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;padding:20px 34px;border-bottom:1px solid rgba(255,255,255,0.06);background:rgba(18,22,29,0.6);">
+    <div style="display:flex;align-items:center;gap:20px;">
+      <a href="#" style="display:inline-flex;align-items:center;gap:7px;font-size:13px;color:rgba(238,241,246,0.5);transition:color 0.2s;" style-hover="color:#eef1f6;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Zur Übersicht
+      </a>
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#fcd34d,#f59e0b);display:flex;align-items:center;justify-content:center;box-shadow:0 5px 16px rgba(245,158,11,0.35);"><div style="width:12px;height:12px;border:2px solid #2a1c02;border-radius:3px;"></div></div>
+        <span style="font-size:17px;font-weight:700;letter-spacing:-0.02em;cursor:default;" style-hover="animation:jitter 0.4s ease;">Passwort-Manager</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span style="font-size:14px;font-weight:500;">Michael</span>
+      <button style="font-family:inherit;font-size:13px;color:rgba(238,241,246,0.65);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);padding:8px 14px;border-radius:10px;cursor:pointer;transition:background 0.2s,color 0.2s,border-color 0.2s;" style-hover="background:rgba(255,99,71,0.12);color:#ff8a70;border-color:rgba(255,99,71,0.25);">Abmelden</button>
+    </div>
+  </header>
+
+  <main style="position:relative;z-index:1;max-width:840px;margin:0 auto;padding:34px;">
+    <div data-reveal data-reveal-index="0" style="background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:26px;margin-bottom:28px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.14em;color:rgba(251,191,36,0.9);margin-bottom:14px;">// GENERATOR</div>
+      <div style="display:flex;align-items:center;gap:10px;background:#12161d;border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+        <div style="flex:1;font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:500;letter-spacing:0.02em;color:#fcd34d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">K7#mP2@vX9!qL4wZ</div>
+        <button title="Kopieren" style="width:36px;height:36px;border:none;border-radius:9px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.7);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button title="Neu generieren" style="width:36px;height:36px;border:none;border-radius:9px;background:rgba(251,191,36,0.12);color:#fbbf24;cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(251,191,36,0.2);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+        <div style="flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;"><div style="height:100%;width:92%;border-radius:3px;background:linear-gradient(90deg,#34d399,#10b981);"></div></div>
+        <span style="font-size:12px;font-weight:700;color:#34d399;font-family:'JetBrains Mono',monospace;">Sehr stark</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:rgba(238,241,246,0.7);">Länge: <strong style="color:#eef1f6;">16</strong></span>
+      </div>
+      <input type="range" min="8" max="128" value="16" style="width:100%;margin-bottom:18px;cursor:pointer;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(238,241,246,0.75);padding:10px 12px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.08);border-radius:10px;cursor:pointer;"><input type="checkbox" checked style="accent-color:#fbbf24;width:16px;height:16px;">Großbuchstaben (A-Z)</label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(238,241,246,0.75);padding:10px 12px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.08);border-radius:10px;cursor:pointer;"><input type="checkbox" checked style="accent-color:#fbbf24;width:16px;height:16px;">Kleinbuchstaben (a-z)</label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(238,241,246,0.75);padding:10px 12px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.08);border-radius:10px;cursor:pointer;"><input type="checkbox" checked style="accent-color:#fbbf24;width:16px;height:16px;">Zahlen (0-9)</label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(238,241,246,0.75);padding:10px 12px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.08);border-radius:10px;cursor:pointer;"><input type="checkbox" checked style="accent-color:#fbbf24;width:16px;height:16px;">Sonderzeichen (!@#$)</label>
+        <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:rgba(238,241,246,0.6);padding:10px 12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);border-radius:10px;cursor:pointer;grid-column:span 2;"><input type="checkbox" style="accent-color:#fbbf24;width:16px;height:16px;">Merkbar (Passphrase)</label>
+      </div>
+      <button style="margin-top:18px;display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border:none;border-radius:11px;background:linear-gradient(135deg,#fcd34d,#f59e0b);color:#2a1c02;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(245,158,11,0.3);transition:transform 0.2s,box-shadow 0.2s;" style-hover="transform:translateY(-1px);box-shadow:0 8px 26px rgba(245,158,11,0.42);">Speichern</button>
+    </div>
+
+    <div data-reveal data-reveal-index="1" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+      <h2 style="font-size:18px;font-weight:700;cursor:default;" style-hover="animation:jitter 0.4s ease;">Gespeicherte Passwörter</h2>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 12px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input placeholder="Suchen..." style="border:none;background:transparent;color:#eef1f6;font-family:inherit;font-size:13px;outline:none;width:130px;">
+        </div>
+        <button style="font-family:inherit;font-size:13px;font-weight:600;padding:9px 15px;border:1px solid rgba(251,191,36,0.25);background:rgba(251,191,36,0.1);color:#fbbf24;border-radius:10px;cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(251,191,36,0.18);">+ Manuell</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div data-card data-reveal data-reveal-index="2" data-glow-color="rgba(251,113,133,0.2)" style="display:flex;align-items:center;gap:16px;background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px 20px;transition:border-color 0.25s,transform 0.2s;" style-hover="border-color:rgba(251,191,36,0.25);transform:translateY(-1px);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(251,113,133,0.14);color:#fb7185;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;">N</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:700;">Netflix</div>
+          <div style="font-size:12px;color:rgba(238,241,246,0.45);margin-top:2px;">michael@test.de</div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;color:rgba(238,241,246,0.5);letter-spacing:2px;">••••••••••</div>
+        <div style="display:flex;gap:6px;">
+          <button title="Anzeigen" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button title="Kopieren" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+
+      <div data-card data-reveal data-reveal-index="3" data-glow-color="rgba(129,140,248,0.2)" style="display:flex;align-items:center;gap:16px;background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px 20px;transition:border-color 0.25s,transform 0.2s;" style-hover="border-color:rgba(251,191,36,0.25);transform:translateY(-1px);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(129,140,248,0.14);color:#818cf8;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;">G</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:700;">GitHub</div>
+          <div style="font-size:12px;color:rgba(238,241,246,0.45);margin-top:2px;">z3phyr404</div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;color:rgba(238,241,246,0.5);letter-spacing:2px;">••••••••••</div>
+        <div style="display:flex;gap:6px;">
+          <button title="Anzeigen" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button title="Kopieren" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+
+      <div data-card data-reveal data-reveal-index="4" data-glow-color="rgba(251,146,60,0.2)" style="display:flex;align-items:center;gap:16px;background:#1b212b;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:16px 20px;transition:border-color 0.25s,transform 0.2s;" style-hover="border-color:rgba(251,191,36,0.25);transform:translateY(-1px);">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(251,146,60,0.14);color:#fb923c;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0;">A</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:700;">Amazon</div>
+          <div style="font-size:12px;color:rgba(238,241,246,0.45);margin-top:2px;">michael@test.de</div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:16px;color:rgba(238,241,246,0.5);letter-spacing:2px;">••••••••••</div>
+        <div style="display:flex;gap:6px;">
+          <button title="Anzeigen" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button title="Kopieren" style="width:32px;height:32px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);cursor:pointer;transition:background 0.2s;" style-hover="background:rgba(255,255,255,0.12);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount(){ this._init(); this._reveal(); }
+  _init(){
+    const scope = document.getElementById('scrPass');
+    if(!scope){ requestAnimationFrame(()=>this._init()); return; }
+    if(scope.dataset.glowReady) return;
+    scope.dataset.glowReady = '1';
+    const glows = scope.querySelectorAll('[data-glow]');
+    const primary = scope.querySelector('[data-glow-primary]');
+    const baseBg = primary ? primary.style.background : '';
+    scope.addEventListener('mousemove', (e) => {
+      const r = scope.getBoundingClientRect();
+      const rx = (e.clientX - r.left) / Math.max(r.width,1) - 0.5;
+      const ry = (e.clientY - r.top) / Math.max(r.height,1) - 0.5;
+      glows.forEach(g => { const d = parseFloat(g.dataset.depth||'40'); g.style.transform = 'translate(' + (rx*d).toFixed(1) + 'px,' + (ry*d).toFixed(1) + 'px)'; });
+    });
+    scope.addEventListener('mouseleave', () => { glows.forEach(g => { g.style.transform = 'translate(0,0)'; }); });
+    scope.querySelectorAll('[data-card]').forEach(card => {
+      const c = card.getAttribute('data-glow-color');
+      card.addEventListener('mouseenter', () => { if (primary) primary.style.background = 'radial-gradient(circle,' + c + ',transparent 70%)'; });
+      card.addEventListener('mouseleave', () => { if (primary) primary.style.background = baseBg; });
+    });
+  }
+  _reveal(){
+    const scope = document.getElementById('scrPass');
+    if(!scope){ requestAnimationFrame(()=>this._reveal()); return; }
+    if(scope.dataset.revealReady) return;
+    scope.dataset.revealReady = '1';
+    const els = scope.querySelectorAll('[data-reveal]');
+    els.forEach(el => { el.style.opacity='0'; el.style.transform='translateY(22px)'; el.style.transition='opacity 0.7s cubic-bezier(0.2,0.8,0.2,1), transform 0.7s cubic-bezier(0.2,0.8,0.2,1)'; });
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          const el = en.target;
+          const delay = (parseInt(el.dataset.revealIndex)||0) * 60;
+          setTimeout(() => { el.style.opacity='1'; el.style.transform='translateY(0)'; }, delay);
+          io.unobserve(el);
+        }
+      });
+    }, { threshold: 0.1 });
+    els.forEach(el => io.observe(el));
+  }
+}
+</script>
+</body>
+</html>

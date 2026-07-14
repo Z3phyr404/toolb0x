@@ -18,10 +18,16 @@ function setupSecurity(app) {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
-          styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
-          fontSrc: ["'self'"],
+          styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
           imgSrc: ["'self'", "data:"],
           connectSrc: ["'self'"],
+          // Explizit gesetzt (Helmet-Defaults, hier sichtbar gemacht):
+          // verhindert <base>-Hijacking, Form-Exfiltration, Plugins, Framing
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'self'"],
         },
       },
     })(req, res, next);
