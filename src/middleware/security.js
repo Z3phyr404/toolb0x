@@ -19,6 +19,10 @@ function setupSecurity(app) {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`],
           styleSrc: ["'self'", `'nonce-${res.locals.cspNonce}'`, "https://fonts.googleapis.com"],
+          // Inline style="..."-Attribute erlauben (Glow-Blobs, Layout, Akzentfarben).
+          // Muss ein eigenes style-src-attr sein: In styleSrc würde 'unsafe-inline'
+          // wegen des Nonce vom Browser ignoriert. script-src bleibt strikt nonce-basiert.
+          styleSrcAttr: ["'unsafe-inline'"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
           imgSrc: ["'self'", "data:"],
           connectSrc: ["'self'"],
