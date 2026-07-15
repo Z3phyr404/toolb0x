@@ -41,7 +41,8 @@ toolb0x/
 │       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
 │       ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
 │       ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
-│       └── passwords.js                 # /api/passwords CRUD (Passwort-Manager)
+│       ├── passwords.js                 # /api/passwords CRUD (Passwort-Manager)
+│       └── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -52,9 +53,12 @@ toolb0x/
     │   ├── admin/
     │   │   └── index.html               # Admin-Bereich (Nutzerübersicht, nur für Admins)
     │   └── passwords/
-    │       └── index.html               # Passwort-Manager (Generator + verschlüsselter Tresor)
+    │       └── index.html               # Passwort-Manager (Generator + verschlüsselter Tresor + Teilen)
+    ├── share/
+    │   └── index.html                   # ÖFFENTLICHE View-Seite für geteilte Links (/s, kein Login)
     └── shared/
-        └── session-timeout.js           # Inaktivitäts-Timeout (20min), Browser-Restart-Erkennung
+        ├── session-timeout.js           # Inaktivitäts-Timeout (20min), Browser-Restart-Erkennung
+        └── share-crypto.js              # Clientseitige Web-Crypto (Zero-Knowledge Share, beide Seiten)
 ```
 
 ---
@@ -70,12 +74,14 @@ toolb0x/
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
 | `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
+| `/s` | **Öffentliche** View-Seite für geteilte Links (KEIN Login, KEIN Portal-Redirect) — Schlüssel steht im URL-Fragment `#<token>~<key>` |
 | `/api/auth/*` | Auth-API |
 | `/api/categories/*` | Kategorien-API |
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
 | `/api/reminders/*` | Erinnerungs-API |
 | `/api/passwords/*` | Passwort-Manager-API (CRUD) |
+| `/api/share/*` | Secret-Sharing-API (öffentliches Reveal + Owner-CRUD) |
 | `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
@@ -202,6 +208,20 @@ Index: [userId]
 Zweck: Verschlüsselter Passwort-Tresor (Passwort-Manager)
 ```
 
+### Share
+```
+id (UUID), token (unique, URL-sicherer Zufalls-Token für Lookup)
+blob (Text, CLIENTSEITIG verschlüsselt — Server blind, KEIN Server-Key im Spiel)
+hasPin (Boolean, steuert nur die PIN-Abfrage im View)
+maxViews (Int, 0 = unbegrenzt bis Ablauf), viewCount (Int)
+expiresAt (DateTime, nicht enc), userId → User (Cascade Delete)
+Index: [userId]
+Zweck: Sicheres Teilen von Geheimnissen per Link (Zero-Knowledge)
+WICHTIG: Der Entschlüsselungs-Schlüssel steht im URL-Fragment und erreicht
+den Server NIE. blob wird im Browser des Absenders mit Web Crypto (AES-256-GCM)
+ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key noch PIN.
+```
+
 ---
 
 ## API-Routen
@@ -257,6 +277,17 @@ Zweck: Verschlüsselter Passwort-Tresor (Passwort-Manager)
 | POST | `/` | Neues Passwort speichern |
 | PUT | `/:id` | Passwort bearbeiten |
 | DELETE | `/:id` | Passwort löschen |
+
+### Share (`/api/share/`)
+| Methode | Route | Auth | Beschreibung |
+|---------|-------|------|-------------|
+| GET | `/:token` | öffentlich | Metadaten (hasPin, remainingViews, expiresAt) — **kein Burn**, kein Blob (schützt vor Link-Vorschau-Bots) |
+| POST | `/:token/reveal` | öffentlich | Gibt `blob` heraus + zählt Ansicht hoch; löscht bei erreichtem View-Limit (burn-after-read). Eigener Rate-Limiter (30/15min) |
+| POST | `/` | `requireAuth` | Share anlegen (`blob`, `hasPin`, `maxViews`, `expiresIn` ∈ 1h/1d/7d) → gibt `token` zurück |
+| GET | `/` | `requireAuth` | Eigene aktive Shares auflisten (ohne Blob/Key) |
+| DELETE | `/:token` | `requireAuth` | Eigenen Share widerrufen (userId-gefiltert) |
+
+**Wichtig:** Öffentliche Routen sind in `share.js` VOR `router.use(requireAuth)` definiert (Express matcht in Reihenfolge → umgehen die Auth-Middleware).
 
 ### Admin (`/api/admin/`)
 | Methode | Route | Beschreibung |
@@ -423,3 +454,7 @@ pm2 restart all            # Prozess neu starten — lädt neuen Client + Code i
 - Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)
 - **Admin-Bereich** (`/app/admin`): Nur für User mit `role: 'admin'` sichtbar. Admin-Karte im Portal wird per JS bedingt angezeigt. Backend geschützt durch `requireAdmin` Middleware. Admin sieht nur unverschlüsselte Felder (Zero-Knowledge gewahrt). Admin-Rolle nur per DB-Zugriff setzbar.
 - **Nutzersperre** (`suspended`-Feld): Gesperrte Nutzer können sich nicht einloggen (403 beim Login). Beim Sperren werden alle aktiven Sessions sofort beendet (`sessionStore.deleteAllForUser`). Admins können nicht gesperrt werden. Admin kann sich nicht selbst sperren.
+- **Secret-Sharing** (`/app/passwords` → Teilen-Button/Ad-hoc-Box, View unter `/s`): Anders als der Rest der App nutzt Sharing **NICHT** den User-Encryption-Key aus `encryption.js`. Stattdessen erzeugt der Browser des Absenders einen frischen Zufalls-Schlüssel (`public/shared/share-crypto.js`, Web Crypto), verschlüsselt clientseitig (AES-256-GCM) und legt nur den opaken `blob` auf dem Server ab. Der Schlüssel wandert im **URL-Fragment** (`/s#<token>~<key>`) — Fragmente werden vom Browser nicht an den Server gesendet → echter Zero-Knowledge, auch der Betreiber kann geteilte Geheimnisse nicht lesen.
+- **PIN beim Share** ist kein Server-Check: die PIN wird via `PBKDF2(keyMaterial ‖ PIN, salt)` kryptografisch in den AES-Key eingemischt. Falsche/fehlende PIN → GCM-Auth-Tag schlägt fehl → Entschlüsselung wirft. `hasPin` (DB) steuert nur die PIN-Abfrage im View.
+- **Reveal vs. Meta getrennt:** `GET /api/share/:token` liefert nur Metadaten (kein Burn), erst `POST …/reveal` gibt den Blob heraus und zählt hoch. So verbrennen Link-Vorschau-Bots (Signal/WhatsApp/Slack) keine burn-after-read-Ansicht.
+- **Neue Prisma-Migration** `20260715_add_share` (Modell `Share`) — bei Deploy `migrate deploy` + `generate` + Restart nicht vergessen (siehe Deployment).

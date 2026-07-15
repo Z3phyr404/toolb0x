@@ -83,6 +83,12 @@ app.use('/app/servers', express.static(path.join(__dirname, 'public', 'apps', 's
   index: false,
 }));
 
+// Statische Dateien: Öffentliche Share-Seite (nur Assets, HTML via Nonce)
+app.use('/s', express.static(path.join(__dirname, 'public', 'share'), {
+  etag: true,
+  index: false,
+}));
+
 // Gemeinsame Assets (CSS, Fonts, etc.)
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), { etag: true }));
 
@@ -99,6 +105,7 @@ const adminRoutes = require('./src/routes/admin');
 const noteRoutes = require('./src/routes/notes');
 const passwordRoutes = require('./src/routes/passwords');
 const serverRoutes = require('./src/routes/servers');
+const shareRoutes = require('./src/routes/share');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -110,6 +117,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/passwords', passwordRoutes);
 app.use('/api/servers', serverRoutes);
+app.use('/api/share', shareRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -153,6 +161,11 @@ app.get('/app/servers', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'apps', 'servers', 'index.html')
 ));
 
+// Öffentliche Share-Seite (KEIN Login, KEIN Portal-Redirect)
+app.get('/s', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'share', 'index.html')
+));
+
 // 404 für API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API-Route nicht gefunden.' });
@@ -177,5 +190,6 @@ app.listen(PORT, () => {
   console.log(`📝 Notizen:      http://localhost:${PORT}/app/notizen`);
   console.log(`🔐 Passwörter:   http://localhost:${PORT}/app/passwords`);
   console.log(`🖥️  Server:       http://localhost:${PORT}/app/servers`);
+  console.log(`🔗 Share:        http://localhost:${PORT}/s`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });

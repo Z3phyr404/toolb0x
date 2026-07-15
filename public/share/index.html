@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Toolb0x — Sicher geteilt</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/obsidian.css">
+  <style nonce="__CSP_NONCE__">
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .s-wrap { width: 100%; max-width: 480px; }
+
+    .s-brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+    .s-logo {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg,#fcd34d,#f59e0b);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 5px 16px rgba(245,158,11,0.35);
+    }
+    .s-logo-inner { width: 12px; height: 12px; border: 2px solid #2a1c02; border-radius: 3px; }
+    .s-brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+
+    .s-card { padding: 30px 28px; text-align: center; }
+    .s-icon {
+      width: 60px; height: 60px; border-radius: 16px; margin: 0 auto 18px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(251,191,36,0.12); color: var(--warning);
+    }
+    .s-icon.err { background: rgba(255,59,48,0.12); color: var(--error-text); }
+    .s-icon.ok { background: rgba(52,211,153,0.12); color: var(--success); }
+    .s-title { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .s-sub { font-size: 14px; color: var(--text-2); line-height: 1.5; margin-bottom: 22px; }
+
+    .s-meta {
+      display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+      margin-bottom: 22px;
+    }
+    .s-meta .ob-pill { background: rgba(255,255,255,0.05); color: var(--text-2); border: 1px solid var(--border); }
+
+    .s-btn {
+      width: 100%; padding: 14px 18px; border: none; border-radius: var(--radius-btn);
+      background: linear-gradient(135deg,#fcd34d,#f59e0b); color: #2a1c02;
+      font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .s-btn:hover { opacity: 0.92; }
+    .s-btn:active { transform: scale(0.99); }
+    .s-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .s-pin { margin-bottom: 16px; text-align: left; }
+    .s-pin label { display: block; font-size: 12px; color: var(--text-2); margin-bottom: 7px; }
+
+    /* Aufgedeckte Felder */
+    .s-fields { text-align: left; display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+    .s-field-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-mono); margin-bottom: 6px;
+    }
+    .s-field-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--panel-inset); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px;
+    }
+    .s-field-val {
+      flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 15px;
+      color: var(--text); word-break: break-all; white-space: pre-wrap;
+    }
+    .s-field-val.secret.masked { letter-spacing: 2px; }
+    .s-icon-btn {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-2); cursor: pointer; transition: background .2s, color .2s;
+    }
+    .s-icon-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+
+    .s-note {
+      margin-top: 18px; font-size: 12px; color: var(--text-3); line-height: 1.5;
+    }
+    .hidden { display: none !important; }
+    .s-spin {
+      width: 34px; height: 34px; margin: 8px auto 0;
+      border: 3px solid rgba(255,255,255,0.1); border-top-color: var(--warning);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="s-wrap">
+    <div class="s-brand">
+      <div class="s-logo"><div class="s-logo-inner"></div></div>
+      <div class="s-brand-name">Toolb0x</div>
+    </div>
+
+    <div class="ob-card s-card">
+      <!-- LADEN -->
+      <div id="stateLoading">
+        <div class="s-spin"></div>
+        <div class="s-sub" style="margin-top:16px;margin-bottom:0;">Link wird geprüft…</div>
+      </div>
+
+      <!-- BEREIT (mit optionaler PIN) -->
+      <div id="statePrompt" class="hidden">
+        <div class="s-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div class="s-title">Ein Geheimnis wurde für dich geteilt</div>
+        <div class="s-sub">Der Inhalt ist Ende-zu-Ende verschlüsselt. Er wird erst nach dem Öffnen entschlüsselt.</div>
+        <div class="s-meta" id="metaBox"></div>
+        <div class="s-pin hidden" id="pinBox">
+          <label for="pinInput">PIN eingeben</label>
+          <input class="ob-input" id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="••••">
+        </div>
+        <button class="s-btn" id="revealBtn">Geheimnis anzeigen</button>
+        <div class="s-note">Achtung: Dieser Link kann nur begrenzt oft geöffnet werden.</div>
+      </div>
+
+      <!-- AUFGEDECKT -->
+      <div id="stateRevealed" class="hidden">
+        <div class="s-fields" id="fieldsBox"></div>
+        <div class="s-note" id="revealedNote"></div>
+      </div>
+
+      <!-- FEHLER -->
+      <div id="stateError" class="hidden">
+        <div class="s-icon err">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="s-title" id="errTitle">Link nicht verfügbar</div>
+        <div class="s-sub" id="errSub">Dieser Link ist abgelaufen, wurde bereits geöffnet oder existiert nicht.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ob-toast-box" id="toastBox"></div>
+
+  <script nonce="__CSP_NONCE__" src="/shared/share-crypto.js"></script>
+  <script nonce="__CSP_NONCE__">
+    (function () {
+      'use strict';
+
+      var API = '/api';
+
+      var ICONS = {
+        eye: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+        eyeOff: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+        copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+      };
+
+      function $(id) { return document.getElementById(id); }
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function getCsrfToken() {
+        var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+        return m ? m[1] : '';
+      }
+
+      function toast(msg, type) {
+        var box = $('toastBox');
+        var el = document.createElement('div');
+        el.className = 'ob-toast ' + (type || 'success');
+        el.textContent = msg;
+        box.appendChild(el);
+        setTimeout(function () { el.remove(); }, 3200);
+      }
+
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { toast('Kopiert'); },
+            function () { toast('Kopieren fehlgeschlagen', 'error'); });
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = text; document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); toast('Kopiert'); }
+          catch (e) { toast('Kopieren fehlgeschlagen', 'error'); }
+          ta.remove();
+        }
+      }
+
+      function show(stateId) {
+        ['stateLoading', 'statePrompt', 'stateRevealed', 'stateError'].forEach(function (id) {
+          $(id).classList.toggle('hidden', id !== stateId);
+        });
+      }
+
+      function showError(title, sub) {
+        if (title) $('errTitle').textContent = title;
+        if (sub) $('errSub').textContent = sub;
+        show('stateError');
+      }
+
+      // --- Fragment parsen: #<token>~<keyFragment> ---
+      function parseHash() {
+        var h = (window.location.hash || '').replace(/^#/, '');
+        var idx = h.indexOf('~');
+        if (idx < 0) return null;
+        var token = h.slice(0, idx);
+        var key = h.slice(idx + 1);
+        if (!token || !key) return null;
+        return { token: token, key: key };
+      }
+
+      var ctx = parseHash();
+      if (!ctx) {
+        showError('Ungültiger Link', 'Diesem Link fehlt der Entschlüsselungsschlüssel. Bitte prüfe, ob du den vollständigen Link geöffnet hast.');
+        return;
+      }
+
+      function metaLabel(data) {
+        var out = [];
+        if (typeof data.remainingViews === 'number') {
+          out.push(data.remainingViews === 1 ? 'Nur noch 1 Ansicht' : 'Noch ' + data.remainingViews + ' Ansichten');
+        } else if (data.remainingViews === null) {
+          out.push('Unbegrenzte Ansichten');
+        }
+        if (data.expiresAt) {
+          var d = new Date(data.expiresAt);
+          out.push('Gültig bis ' + d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
+        }
+        return out;
+      }
+
+      // --- Schritt 1: Metadaten laden (ohne Burn) ---
+      fetch(API + '/share/' + encodeURIComponent(ctx.token), { credentials: 'include' })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok) throw new Error(data.error || 'Nicht verfügbar');
+            return data;
+          });
+        })
+        .then(function (data) {
+          $('metaBox').innerHTML = metaLabel(data).map(function (t) {
+            return '<span class="ob-pill">' + esc(t) + '</span>';
+          }).join('');
+          if (data.hasPin) $('pinBox').classList.remove('hidden');
+          show('statePrompt');
+        })
+        .catch(function (err) {
+          showError('Link nicht verfügbar', err.message || 'Dieser Link ist abgelaufen, wurde bereits geöffnet oder existiert nicht.');
+        });
+
+      // --- Schritt 2: Aufdecken (Burn) + entschlüsseln ---
+      var revealing = false;
+      $('revealBtn').addEventListener('click', function () {
+        if (revealing) return;
+        revealing = true;
+        var btn = $('revealBtn');
+        btn.disabled = true;
+        btn.textContent = 'Wird entschlüsselt…';
+        var pin = $('pinInput') ? $('pinInput').value : '';
+
+        fetch(API + '/share/' + encodeURIComponent(ctx.token) + '/reveal', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+          body: '{}'
+        })
+          .then(function (res) {
+            return res.json().then(function (data) {
+              if (!res.ok) throw new Error(data.error || 'Nicht verfügbar');
+              return data;
+            });
+          })
+          .then(function (data) {
+            return ShareCrypto.decryptSecret(data.blob, ctx.key, pin).then(function (plaintext) {
+              renderSecret(plaintext, data);
+            });
+          })
+          .catch(function (err) {
+            revealing = false;
+            btn.disabled = false;
+            btn.textContent = 'Geheimnis anzeigen';
+            if (err && (err.name === 'OperationError' || /decrypt/i.test(err.message || '') || err instanceof DOMException)) {
+              toast('PIN falsch oder Link beschädigt', 'error');
+            } else {
+              showError('Link nicht verfügbar', err.message || 'Der Link konnte nicht geöffnet werden.');
+            }
+          });
+      });
+
+      $('pinInput') && $('pinInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') $('revealBtn').click();
+      });
+
+      // --- Geheimnis rendern ---
+      function renderSecret(plaintext, meta) {
+        var payload;
+        try { payload = JSON.parse(plaintext); }
+        catch (e) { payload = { kind: 'text', value: plaintext }; }
+
+        var fields = [];
+        if (payload.kind === 'entry') {
+          if (payload.title) fields.push({ label: 'Bezeichnung', value: payload.title, secret: false });
+          if (payload.username) fields.push({ label: 'Benutzername', value: payload.username, secret: false });
+          if (payload.password) fields.push({ label: 'Passwort', value: payload.password, secret: true });
+          if (payload.website) fields.push({ label: 'Website', value: payload.website, secret: false });
+          if (payload.notes) fields.push({ label: 'Notizen', value: payload.notes, secret: false });
+        } else {
+          fields.push({ label: 'Geteilter Inhalt', value: payload.value != null ? payload.value : plaintext, secret: true });
+        }
+
+        var html = fields.map(function (f, i) {
+          var masked = f.secret;
+          return '<div>' +
+            '<div class="s-field-label">' + esc(f.label) + '</div>' +
+            '<div class="s-field-row">' +
+              '<div class="s-field-val' + (f.secret ? ' secret' + (masked ? ' masked' : '') : '') + '" data-val-idx="' + i + '">' +
+                (masked ? '•'.repeat(Math.min(f.value.length, 24)) : esc(f.value)) +
+              '</div>' +
+              (f.secret ? '<button class="s-icon-btn" data-toggle="' + i + '" title="Anzeigen">' + ICONS.eye + '</button>' : '') +
+              '<button class="s-icon-btn" data-copy="' + i + '" title="Kopieren">' + ICONS.copy + '</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+        $('fieldsBox').innerHTML = html;
+
+        var left = (typeof meta.remainingViews === 'number')
+          ? (meta.remainingViews <= 0 ? 'Dies war die letzte Ansicht — der Link ist jetzt verbraucht.'
+              : 'Danach noch ' + meta.remainingViews + ' Ansicht(en) übrig.')
+          : 'Der Inhalt wurde lokal in deinem Browser entschlüsselt.';
+        $('revealedNote').textContent = left;
+
+        // Event-Delegation für Toggle/Copy
+        $('fieldsBox').addEventListener('click', function (e) {
+          var t = e.target.closest('[data-toggle]');
+          if (t) {
+            var i = t.dataset.toggle;
+            var val = fields[i].value;
+            var el = $('fieldsBox').querySelector('[data-val-idx="' + i + '"]');
+            var isMasked = el.classList.contains('masked');
+            if (isMasked) { el.classList.remove('masked'); el.textContent = val; t.innerHTML = ICONS.eyeOff; }
+            else { el.classList.add('masked'); el.textContent = '•'.repeat(Math.min(val.length, 24)); t.innerHTML = ICONS.eye; }
+            return;
+          }
+          var c = e.target.closest('[data-copy]');
+          if (c) { copyText(fields[c.dataset.copy].value); }
+        });
+
+        show('stateRevealed');
+      }
+    })();
+  </script>
+</body>
+
+</html>

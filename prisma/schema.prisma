@@ -35,6 +35,7 @@ model User {
   notes           Note[]
   storedPasswords StoredPassword[]
   servers         Server[]
+  shares          Share[]
 
   @@map("users")
 }
@@ -222,4 +223,37 @@ model Server {
 
   @@index([userId])
   @@map("servers")
+}
+
+// ============================================================
+// SHARE — Sicheres Teilen von Geheimnissen per Link (Zero-Knowledge)
+// ============================================================
+// Der Browser des Absenders verschlüsselt clientseitig (Web Crypto,
+// AES-256-GCM). Der Schlüssel wandert im URL-Fragment (#...) und
+// erreicht den Server NIE. Der Server speichert nur den opaken Blob
+// + Metadaten. hasPin steuert lediglich die PIN-Abfrage im View —
+// die PIN selbst wird kryptografisch in den Schlüssel eingemischt
+// und ist dem Server unbekannt.
+//
+// blob:      base64(salt):base64(iv):base64(ciphertext) — Server blind
+// token:     URL-sicherer Zufalls-Token für Lookup (nicht die id)
+// maxViews:  0 = unbegrenzt bis Zeitablauf, sonst burn-after-N-views
+// expiresAt: NICHT verschlüsselt (für Cleanup/Query)
+// ============================================================
+model Share {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  blob      String   @db.Text
+  hasPin    Boolean  @default(false)
+  maxViews  Int      @default(1)
+  viewCount Int      @default(0)
+  expiresAt DateTime
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("shares")
 }

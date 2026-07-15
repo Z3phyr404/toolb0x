@@ -571,6 +571,43 @@
       line-height: 1.5;
     }
 
+    /* ===== SELECT ===== */
+    select.form-input {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 38px;
+      cursor: pointer;
+    }
+    select.form-input option { background: var(--panel); color: var(--text); }
+
+    /* ===== MANAGE SHARES LIST ===== */
+    .share-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .share-row:last-child { border-bottom: none; }
+    .share-row-info { flex: 1; min-width: 0; }
+    .share-row-meta {
+      font-size: 12px;
+      color: var(--text-2);
+      margin-top: 3px;
+    }
+    .share-row-token {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .share-empty { font-size: 13px; color: var(--text-2); padding: 8px 0 4px; }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 600px) {
       .pw-header { padding: 16px 16px; gap: 10px; }
@@ -676,6 +713,8 @@
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" id="searchInput" placeholder="Suchen..." class="search-input">
             </div>
+            <button class="manual-btn" id="shareAdhocBtn">Sicher teilen</button>
+            <button class="manual-btn" id="manageSharesBtn">Geteilte Links</button>
             <button class="manual-btn" id="addManualBtn">+ Manuell</button>
           </div>
         </div>
@@ -740,11 +779,91 @@
     </div>
   </div>
 
+  <!-- ===== SHARE MODAL ===== -->
+  <div class="pw-modal-overlay" id="shareModal">
+    <div class="pw-modal">
+      <h3 id="shareTitle">Sicher teilen</h3>
+
+      <!-- Konfiguration -->
+      <div id="shareForm">
+        <p class="confirm-text">Der Inhalt wird in deinem Browser Ende-zu-Ende verschlüsselt. Der Server sieht ihn nie im Klartext.</p>
+
+        <div class="form-group" id="shareContentGroup">
+          <label class="form-label">Inhalt</label>
+          <textarea class="form-input form-textarea" id="shareContent" rows="3" maxlength="4000" placeholder="Passwort oder geheimen Text einfügen..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ansichten</label>
+          <select class="form-input" id="shareViews">
+            <option value="1">1× ansehbar (danach gelöscht)</option>
+            <option value="2">2× ansehbar</option>
+            <option value="5">5× ansehbar</option>
+            <option value="0">Unbegrenzt (bis Ablauf)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Gültig für</label>
+          <select class="form-input" id="shareExpiry">
+            <option value="1h">1 Stunde</option>
+            <option value="1d" selected>1 Tag</option>
+            <option value="7d">7 Tage</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">PIN (optional)</label>
+          <input class="form-input" id="sharePin" type="text" inputmode="numeric" maxlength="12" autocomplete="off" placeholder="z.B. 4-stellige PIN — getrennt übermitteln">
+        </div>
+
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" id="shareCancel">Abbrechen</button>
+          <button class="modal-btn modal-btn-save" id="shareCreate">Link erstellen</button>
+        </div>
+      </div>
+
+      <!-- Ergebnis -->
+      <div id="shareResult" style="display:none;">
+        <p class="confirm-text">Link erstellt. Teile ihn über einen sicheren Kanal.</p>
+        <div class="form-group">
+          <label class="form-label">Link</label>
+          <div class="pw-input-wrap">
+            <input class="form-input" id="shareLink" type="text" readonly>
+            <button class="pw-toggle-vis" id="shareLinkCopy" type="button" title="Kopieren">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-group" id="sharePinReminder" style="display:none;">
+          <label class="form-label">PIN (separat übermitteln!)</label>
+          <input class="form-input" id="sharePinOut" type="text" readonly>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" id="shareDone">Fertig</button>
+          <button class="modal-btn modal-btn-save" id="shareCopyDone">Link kopieren</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MANAGE SHARES MODAL ===== -->
+  <div class="pw-modal-overlay" id="manageModal">
+    <div class="pw-modal">
+      <h3>Geteilte Links</h3>
+      <div id="manageList"></div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="manageClose">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="ob-toast-box" id="toastBox"></div>
 
   <script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
   <script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
+  <script nonce="__CSP_NONCE__" src="/shared/share-crypto.js"></script>
   <script nonce="__CSP_NONCE__">
     /* ============================================================
        PASSWORT-MANAGER — JavaScript (Obsidian)
@@ -984,7 +1103,8 @@
         eyeOff: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
         copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
         edit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
-        trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
+        trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        share: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>'
       };
 
       // --------------------------------------------------------
@@ -1077,6 +1197,7 @@
             '<div class="pw-card-actions">' +
               '<button class="pw-action-btn" data-reveal-pw="' + p.id + '" title="Anzeigen">' + ICONS.eye + '</button>' +
               '<button class="pw-action-btn" data-copy="' + p.id + '" title="Kopieren">' + ICONS.copy + '</button>' +
+              '<button class="pw-action-btn" data-share="' + p.id + '" title="Sicher teilen">' + ICONS.share + '</button>' +
               '<button class="pw-action-btn" data-edit="' + p.id + '" title="Bearbeiten">' + ICONS.edit + '</button>' +
               '<button class="pw-action-btn danger" data-del="' + p.id + '" title="Löschen">' + ICONS.trash + '</button>' +
             '</div>' +
@@ -1113,6 +1234,14 @@
         if (btn) {
           var pw = allPasswords.find(function (p) { return p.id === btn.dataset.copy; });
           if (pw) copyToClipboard(pw.password);
+          return;
+        }
+
+        // Share
+        btn = e.target.closest('[data-share]');
+        if (btn) {
+          var pwShare = allPasswords.find(function (p) { return p.id === btn.dataset.share; });
+          if (pwShare) openShareModal('entry', pwShare);
           return;
         }
 
@@ -1166,8 +1295,9 @@
       }
 
       function closeModals() {
-        $('saveModal').classList.remove('open');
-        $('confirmModal').classList.remove('open');
+        document.querySelectorAll('.pw-modal-overlay').forEach(function (o) {
+          o.classList.remove('open');
+        });
       }
 
       // Modal: Save
@@ -1224,6 +1354,157 @@
       // Close modals on Escape
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeModals();
+      });
+
+      // --------------------------------------------------------
+      // Sicher teilen (Zero-Knowledge Share)
+      // --------------------------------------------------------
+      var shareMode = 'text';   // 'text' | 'entry'
+      var shareEntry = null;
+      var lastShareToken = null;
+
+      function openShareModal(mode, entry) {
+        shareMode = mode;
+        shareEntry = entry || null;
+        lastShareToken = null;
+
+        $('shareForm').style.display = '';
+        $('shareResult').style.display = 'none';
+        $('shareViews').value = '1';
+        $('shareExpiry').value = '1d';
+        $('sharePin').value = '';
+
+        if (mode === 'entry' && entry) {
+          $('shareTitle').textContent = 'Teilen: ' + (entry.name || 'Eintrag');
+          $('shareContentGroup').style.display = 'none';
+        } else {
+          $('shareTitle').textContent = 'Sicher teilen';
+          $('shareContentGroup').style.display = '';
+          $('shareContent').value = '';
+        }
+
+        $('shareModal').classList.add('open');
+        if (mode !== 'entry') $('shareContent').focus();
+      }
+
+      function buildSharePlaintext() {
+        if (shareMode === 'entry' && shareEntry) {
+          return JSON.stringify({
+            kind: 'entry',
+            title: shareEntry.name || '',
+            username: shareEntry.username || '',
+            password: shareEntry.password || '',
+            website: shareEntry.website || '',
+            notes: shareEntry.notes || ''
+          });
+        }
+        return JSON.stringify({ kind: 'text', value: $('shareContent').value });
+      }
+
+      $('shareCreate').addEventListener('click', function () {
+        if (shareMode !== 'entry' && !$('shareContent').value.trim()) {
+          toast('Bitte einen Inhalt eingeben', 'error');
+          return;
+        }
+
+        var pin = $('sharePin').value.trim();
+        var maxViews = parseInt($('shareViews').value, 10);
+        var expiresIn = $('shareExpiry').value;
+        var plaintext = buildSharePlaintext();
+
+        var btn = $('shareCreate');
+        btn.disabled = true;
+
+        ShareCrypto.encryptSecret(plaintext, pin).then(function (result) {
+          return api('/share', {
+            method: 'POST',
+            body: JSON.stringify({
+              blob: result.blob,
+              hasPin: result.hasPin,
+              maxViews: maxViews,
+              expiresIn: expiresIn
+            })
+          }).then(function (data) {
+            lastShareToken = data.token;
+            var link = window.location.origin + '/s#' + data.token + '~' + result.keyFragment;
+            $('shareLink').value = link;
+
+            if (pin) {
+              $('sharePinReminder').style.display = '';
+              $('sharePinOut').value = pin;
+            } else {
+              $('sharePinReminder').style.display = 'none';
+            }
+
+            $('shareForm').style.display = 'none';
+            $('shareResult').style.display = '';
+            toast('Link erstellt');
+          });
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast(err.message || 'Link konnte nicht erstellt werden', 'error');
+        }).then(function () {
+          btn.disabled = false;
+        });
+      });
+
+      $('shareCancel').addEventListener('click', closeModals);
+      $('shareDone').addEventListener('click', closeModals);
+      $('shareLinkCopy').addEventListener('click', function () { copyToClipboard($('shareLink').value); });
+      $('shareCopyDone').addEventListener('click', function () { copyToClipboard($('shareLink').value); });
+
+      $('shareAdhocBtn').addEventListener('click', function () { openShareModal('text', null); });
+
+      // --- Verwaltung geteilter Links ---
+      function fmtExpiry(iso) {
+        var d = new Date(iso);
+        return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      }
+
+      function renderManageList(shares) {
+        if (!shares || shares.length === 0) {
+          $('manageList').innerHTML = '<div class="share-empty">Keine aktiven Links.</div>';
+          return;
+        }
+        $('manageList').innerHTML = shares.map(function (s) {
+          var views = (s.remainingViews === null) ? 'unbegrenzt' : (s.remainingViews + '× übrig');
+          var status = s.expired ? 'abgelaufen' : (views + ' · bis ' + fmtExpiry(s.expiresAt));
+          if (s.hasPin) status += ' · PIN';
+          return '<div class="share-row">' +
+            '<div class="share-row-info">' +
+              '<div class="share-row-token">…' + esc(s.token.slice(-10)) + '</div>' +
+              '<div class="share-row-meta">' + esc(status) + '</div>' +
+            '</div>' +
+            '<button class="pw-action-btn danger" data-revoke="' + esc(s.token) + '" title="Widerrufen">' + ICONS.trash + '</button>' +
+          '</div>';
+        }).join('');
+      }
+
+      function loadShares() {
+        return api('/share').then(function (data) {
+          renderManageList(data.shares || []);
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast('Links konnten nicht geladen werden', 'error');
+        });
+      }
+
+      $('manageSharesBtn').addEventListener('click', function () {
+        $('manageList').innerHTML = '<div class="share-empty">Wird geladen…</div>';
+        $('manageModal').classList.add('open');
+        loadShares();
+      });
+
+      $('manageClose').addEventListener('click', closeModals);
+
+      $('manageList').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-revoke]');
+        if (!btn) return;
+        var token = btn.dataset.revoke;
+        api('/share/' + encodeURIComponent(token), { method: 'DELETE' }).then(function () {
+          toast('Link widerrufen');
+          loadShares();
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast(err.message || 'Widerrufen fehlgeschlagen', 'error');
+        });
       });
 
       // --------------------------------------------------------
