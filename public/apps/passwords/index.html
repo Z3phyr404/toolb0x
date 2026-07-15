@@ -314,6 +314,68 @@
     }
     .manual-btn:hover { background: rgba(251,191,36,0.18); }
 
+    /* Primäre Aktion: Passwort hinzufügen */
+    .add-pw-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 9px 16px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg,#fcd34d,#f59e0b);
+      color: #2a1c02;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(245,158,11,0.28);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .add-pw-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(245,158,11,0.4);
+    }
+    .add-pw-btn:active { transform: scale(0.98); }
+
+    /* ===== SUCHE (eigene Zeile, volle Breite) ===== */
+    .search-row { margin-bottom: 14px; }
+    .search-row .search-wrap { width: 100%; padding: 11px 14px; }
+    .search-row .search-input { width: 100%; font-size: 14px; }
+
+    /* ===== FILTER-CHIPS (Privat / Tresore) ===== */
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-2);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .filter-chip:hover { background: rgba(255,255,255,0.07); }
+    .filter-chip.active {
+      background: rgba(251,191,36,0.14);
+      border-color: rgba(251,191,36,0.4);
+      color: #fbbf24;
+      font-weight: 600;
+    }
+    .filter-chip .chip-count {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      opacity: 0.65;
+    }
+
     /* Password Cards */
     .pw-list {
       display: flex;
@@ -787,16 +849,22 @@
         <div class="saved-header">
           <h2 class="saved-title jitter">Gespeicherte Passwörter</h2>
           <div class="saved-actions">
-            <div class="search-wrap">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="searchInput" placeholder="Suchen..." class="search-input">
-            </div>
             <button class="manual-btn" id="shareAdhocBtn">Sicher teilen</button>
             <button class="manual-btn" id="manageSharesBtn">Geteilte Links</button>
             <button class="manual-btn" id="vaultsBtn">Tresore</button>
-            <button class="manual-btn" id="addManualBtn">+ Manuell</button>
+            <button class="add-pw-btn" id="addManualBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Passwort hinzufügen
+            </button>
           </div>
         </div>
+        <div class="search-row">
+          <div class="search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(238,241,246,0.4)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Suchen in Name, Benutzername, Website, Tresor..." class="search-input">
+          </div>
+        </div>
+        <div class="filter-chips" id="filterChips"></div>
       </div>
 
       <div class="pw-list" id="passwordList"></div>
@@ -989,6 +1057,7 @@
       var editingId = null;
       var deleteId = null;
       var currentGenerated = '';
+      var activeFilter = 'all';   // 'all' | 'private' | <vaultId>
 
       // --------------------------------------------------------
       // DOM refs
@@ -1249,6 +1318,7 @@
       function loadPasswords() {
         return api('/passwords').then(function (data) {
           allPasswords = data.passwords || [];
+          renderFilterChips();
           renderList();
         }).catch(function (err) {
           if (err.message !== 'auth') toast('Laden fehlgeschlagen', 'error');
@@ -1272,10 +1342,59 @@
         return api('/vaults').then(function (data) {
           allVaults = data.vaults || [];
           populateVaultSelect();
+          renderFilterChips();
         }).catch(function (err) {
           if (err.message !== 'auth') toast('Tresore konnten nicht geladen werden', 'error');
         });
       }
+
+      // --------------------------------------------------------
+      // Filter-Chips (Alle / Privat / je Tresor)
+      // --------------------------------------------------------
+      function renderFilterChips() {
+        var box = $('filterChips');
+
+        // Ohne Tresore gibt es nichts zu filtern → Chips ausblenden
+        if (allVaults.length === 0) {
+          box.innerHTML = '';
+          box.style.display = 'none';
+          activeFilter = 'all';
+          return;
+        }
+        box.style.display = '';
+
+        // Gewählter Tresor wurde gelöscht/verlassen → zurück auf "Alle"
+        var vaultExists = allVaults.some(function (v) { return v.id === activeFilter; });
+        if (activeFilter !== 'all' && activeFilter !== 'private' && !vaultExists) {
+          activeFilter = 'all';
+        }
+
+        var chips = [
+          { id: 'all', label: 'Alle', count: allPasswords.length },
+          { id: 'private', label: 'Privat', count: allPasswords.filter(function (p) { return !p.vaultId; }).length },
+        ];
+        allVaults.forEach(function (v) {
+          chips.push({
+            id: v.id,
+            label: '\u{1F465} ' + v.name,
+            count: allPasswords.filter(function (p) { return p.vaultId === v.id; }).length,
+          });
+        });
+
+        box.innerHTML = chips.map(function (c) {
+          return '<button class="filter-chip' + (activeFilter === c.id ? ' active' : '') + '" data-filter="' + esc(c.id) + '">' +
+            esc(c.label) + '<span class="chip-count">' + c.count + '</span>' +
+          '</button>';
+        }).join('');
+      }
+
+      $('filterChips').addEventListener('click', function (e) {
+        var chip = e.target.closest('[data-filter]');
+        if (!chip) return;
+        activeFilter = chip.dataset.filter;
+        renderFilterChips();
+        renderList();
+      });
 
       function populateVaultSelect() {
         var sel = $('modalVault');
@@ -1334,8 +1453,17 @@
       function renderList() {
         var query = searchInput.value.toLowerCase().trim();
         var filtered = allPasswords;
+
+        // 1. Bereichs-Filter (Chips): Alle / Privat / bestimmter Tresor
+        if (activeFilter === 'private') {
+          filtered = filtered.filter(function (p) { return !p.vaultId; });
+        } else if (activeFilter !== 'all') {
+          filtered = filtered.filter(function (p) { return p.vaultId === activeFilter; });
+        }
+
+        // 2. Suche
         if (query) {
-          filtered = allPasswords.filter(function (p) {
+          filtered = filtered.filter(function (p) {
             return p.name.toLowerCase().indexOf(query) !== -1 ||
                    p.username.toLowerCase().indexOf(query) !== -1 ||
                    p.website.toLowerCase().indexOf(query) !== -1 ||
