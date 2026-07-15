@@ -1473,6 +1473,14 @@
 
         if (filtered.length === 0) {
           passwordList.innerHTML = '';
+          // Bei aktiver Suche/Filter "Keine Treffer" statt "Noch keine Passwörter"
+          var hasFilter = Boolean(query) || activeFilter !== 'all';
+          emptyState.querySelector('.empty-title').textContent = hasFilter
+            ? 'Keine Treffer'
+            : 'Noch keine Passwörter gespeichert';
+          emptyState.querySelector('.empty-text').textContent = hasFilter
+            ? 'Versuche eine andere Suche oder wähle einen anderen Filter.'
+            : 'Generiere ein Passwort oben und speichere es, oder füge eines manuell hinzu.';
           emptyState.style.display = '';
           return;
         }
@@ -1525,9 +1533,11 @@
           var dots = document.querySelector('[data-dots="' + id + '"]');
           var plain = document.querySelector('[data-plain="' + id + '"]');
           if (dots && plain) {
-            var showing = plain.style.display !== 'none';
+            // 'inline' überschreibt das display:none der CSS-Klasse —
+            // '' würde zurück auf die Klasse fallen und nie anzeigen.
+            var showing = plain.style.display === 'inline';
             dots.style.display = showing ? '' : 'none';
-            plain.style.display = showing ? 'none' : '';
+            plain.style.display = showing ? '' : 'inline';
             btn.innerHTML = showing ? ICONS.eye : ICONS.eyeOff;
           }
           return;
