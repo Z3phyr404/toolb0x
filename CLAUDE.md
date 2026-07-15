@@ -370,6 +370,32 @@ RATE_LIMIT_LOGIN=10
 
 ---
 
+## Deployment (Produktion)
+
+**Server:** `ubuntu-4gb-nbg1-1` (Hetzner) · **Pfad:** `/var/www/toolbox/finanz-app` · **Domain:** `toolb0x.eu`
+
+### Deploy-Ablauf — nach JEDEM Deploy vollständig ausführen
+```bash
+cd /var/www/toolbox/finanz-app
+git pull                   # neuen Code holen (inkl. neuer Prisma-Migrationen)
+npm install                # bei geänderten Dependencies — sonst 502
+npx prisma migrate deploy  # wendet ausstehende Migrationen auf die Prod-DB an
+npx prisma generate        # regeneriert den Prisma-Client aus dem aktuellen Schema
+pm2 restart all            # Prozess neu starten — lädt neuen Client + Code in den RAM
+```
+
+**Warum jeder Schritt zählt:**
+- `prisma migrate deploy` **vergessen** → DB-Spalte fehlt → Laufzeit-Fehler bei Queries auf das neue Feld.
+- `prisma generate` **vergessen** → veralteter Client lehnt neue Felder ab: `Unknown argument \`feldname\`. Available options are marked with ?` (Client-Validierung, KEIN DB-Fehler).
+- **Restart vergessen** → der Node-Prozess läuft mit dem alten, im RAM geladenen Client/Code weiter — `git pull` allein reicht nie.
+- `npm install` vergessen → fehlende Dependencies → 502.
+
+> **Symptom-Beispiel:** Serverüberwachung zeigte alle Server als „offline", weil `prisma.server.update({ data: { hostKeyFingerprint } })` (Trust-on-first-use beim ersten Connect) fehlschlug — Schema/Migration waren im Repo vorhanden, auf Prod fehlten aber `migrate deploy` + `generate` + Restart.
+
+**Wichtig:** Schema-Änderungen (`schema.prisma`) IMMER als committete Migration deployen — nie nur das Schema pushen. `prisma migrate dev` erzeugt lokal die Migration, `prisma migrate deploy` wendet sie auf Prod an.
+
+---
+
 ## Wichtige Designentscheidungen
 
 - **Kein Frontend-Framework** — reines Vanilla JS, alles in einer HTML-Datei pro Tool
