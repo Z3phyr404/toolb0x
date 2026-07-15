@@ -97,8 +97,14 @@ function setupSecurity(app) {
   app.use(hpp());
 
   // 5. Body-Parser Limits
+  // /api/notes ist ausgenommen: Notizen (WYSIWYG-HTML) brauchen mehr Platz,
+  // der Notes-Router hat seinen eigenen Parser mit 500kb-Limit.
   const express = require('express');
-  app.use(express.json({ limit: '10kb' }));
+  const jsonParser = express.json({ limit: '10kb' });
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/notes')) return next();
+    jsonParser(req, res, next);
+  });
   app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
   // 6. CSRF-Schutz (Double-Submit-Cookie-Pattern)

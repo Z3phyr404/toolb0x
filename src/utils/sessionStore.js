@@ -36,7 +36,9 @@ class SessionStore {
     // Abgelaufene Sessions alle 5 Minuten aufräumen
     this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
 
-    // Session-Lebensdauer: 30 Minuten (passend zum JWT expiresIn von 20min + Puffer)
+    // Inaktivitäts-Fenster: 30 Minuten (passend zum JWT expiresIn von 20min + Puffer).
+    // Sliding: jeder Zugriff über get() setzt die Uhr zurück — passend zum
+    // JWT, das bei jeder Anfrage erneuert wird.
     this.maxAge = 30 * 60 * 1000;
   }
 
@@ -49,7 +51,7 @@ class SessionStore {
     this.sessions.set(sessionId, {
       userId,
       encryptionKey,  // Buffer — bleibt im RAM
-      createdAt: Date.now(),
+      lastActivity: Date.now(),
     });
     return sessionId;
   }
@@ -62,12 +64,14 @@ class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
 
-    // Abgelaufen?
-    if (Date.now() - session.createdAt > this.maxAge) {
+    // Abgelaufen? (Inaktivität, nicht absolute Lebensdauer)
+    if (Date.now() - session.lastActivity > this.maxAge) {
       this.sessions.delete(sessionId);
       return null;
     }
 
+    // Sliding: Aktivität verlängert die Session
+    session.lastActivity = Date.now();
     return session;
   }
 
@@ -96,7 +100,7 @@ class SessionStore {
     const now = Date.now();
     let removed = 0;
     for (const [sid, session] of this.sessions) {
-      if (now - session.createdAt > this.maxAge) {
+      if (now - session.lastActivity > this.maxAge) {
         this.sessions.delete(sid);
         removed++;
       }

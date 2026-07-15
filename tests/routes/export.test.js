@@ -89,7 +89,7 @@ function seedIncome({ name, amount, month, isRecurring = true }) {
 describe('GET /api/export/pdf — Monats-Export', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 
@@ -142,7 +142,7 @@ describe('GET /api/export/pdf — Monats-Export', () => {
 describe('GET /api/export/pdf-all — Gesamt-Export', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 

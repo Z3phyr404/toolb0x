@@ -106,6 +106,7 @@ const noteRoutes = require('./src/routes/notes');
 const passwordRoutes = require('./src/routes/passwords');
 const serverRoutes = require('./src/routes/servers');
 const shareRoutes = require('./src/routes/share');
+const vaultRoutes = require('./src/routes/vaults');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -118,6 +119,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/passwords', passwordRoutes);
 app.use('/api/servers', serverRoutes);
 app.use('/api/share', shareRoutes);
+app.use('/api/vaults', vaultRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING

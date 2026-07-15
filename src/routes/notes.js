@@ -310,7 +310,13 @@ router.put('/:id/move', async (req, res) => {
 
     const data = {};
     if (parentId !== undefined) data.parentId = parentId || null;
-    if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+    if (sortOrder !== undefined) {
+      const parsed = parseInt(sortOrder);
+      if (isNaN(parsed)) {
+        return res.status(400).json({ error: 'Ungültige Sortierposition.' });
+      }
+      data.sortOrder = parsed;
+    }
 
     const note = await prisma.note.update({
       where: { id: req.params.id },

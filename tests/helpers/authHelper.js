@@ -16,9 +16,15 @@ process.env.JWT_SECRET = TEST_JWT_SECRET;
 
 /**
  * Erstellt einen Test-User mit gültigem Auth-Token.
+ *
+ * Wenn ein mockPrisma übergeben wird, landet der User auch im Mock-Store —
+ * nötig, weil requireAuth den User für den Suspended-Check aus der DB lädt
+ * (sonst 403 "Konto gesperrt" bei jedem Request).
+ *
+ * @param {object} [mockPrisma] - Mock aus createMockPrisma()
  * @returns {{ userId, encryptionKey, token, cookie }}
  */
-function createTestAuth() {
+function createTestAuth(mockPrisma) {
   const userId = crypto.randomUUID();
   const encryptionKey = generateEncryptionKey();
   const sessionId = sessionStore.create(userId, encryptionKey);
@@ -27,6 +33,18 @@ function createTestAuth() {
     TEST_JWT_SECRET,
     { expiresIn: '20m' },
   );
+
+  if (mockPrisma && mockPrisma._store && mockPrisma._store.users) {
+    mockPrisma._store.users.push({
+      id: userId,
+      email: `test-${userId.slice(0, 8)}@test.de`,
+      name: 'Test-User',
+      role: 'user',
+      suspended: false,
+      createdAt: new Date(),
+    });
+  }
+
   return {
     userId,
     encryptionKey,

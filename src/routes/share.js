@@ -105,21 +105,34 @@ router.post('/:token/reveal', revealLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Dieser Link ist abgelaufen.' });
     }
 
-    // Ansicht atomar hochzählen (verhindert Race bei parallelen Aufrufen)
-    const updated = await prisma.share.update({
-      where: { id: share.id },
+    // Ansicht atomar UND bedingt reservieren: Das WHERE prüft das View-Limit
+    // im selben Statement wie das Increment. Zwei parallele Reveals können
+    // so bei maxViews=1 nicht beide den Blob bekommen (Check-then-Act-Race).
+    const claimed = await prisma.share.updateMany({
+      where: {
+        id: share.id,
+        OR: [
+          { maxViews: 0 },
+          { viewCount: { lt: share.maxViews } },
+        ],
+      },
       data: { viewCount: { increment: 1 } },
     });
+    if (claimed.count === 0) {
+      return res.status(404).json({ error: 'Dieser Link ist abgelaufen.' });
+    }
+
+    const updated = await prisma.share.findUnique({ where: { id: share.id } });
 
     // Wenn diese Ansicht die letzte war → Share löschen (burn-after-read)
-    if (updated.maxViews > 0 && updated.viewCount >= updated.maxViews) {
+    if (updated && updated.maxViews > 0 && updated.viewCount >= updated.maxViews) {
       await prisma.share.delete({ where: { id: updated.id } }).catch(() => {});
     }
 
     res.json({
       blob: share.blob,
       hasPin: share.hasPin,
-      remainingViews: remainingViews(updated),
+      remainingViews: updated ? remainingViews(updated) : 0,
     });
   } catch (error) {
     console.error('Share aufdecken fehlgeschlagen:', error.message);

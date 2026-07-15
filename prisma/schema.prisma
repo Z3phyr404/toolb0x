@@ -24,6 +24,14 @@ model User {
   suspended    Boolean  @default(false)   // Gesperrte Nutzer können sich nicht einloggen
   encryptedKey String   // Encryption Key, verschlüsselt mit dem User-Passwort
 
+  // Schlüsselpaar für geteilte Tresore (RSA-OAEP).
+  // publicKey ist öffentlich (Klartext-PEM) — damit können andere Nutzer
+  // Tresor-Schlüssel für diesen User verschlüsseln, ohne dass er online ist.
+  // encryptedPrivateKey ist mit dem User-Encryption-Key verschlüsselt
+  // (Zero-Knowledge bleibt gewahrt). Wird beim Login provisioniert.
+  publicKey           String @default("")
+  encryptedPrivateKey String @default("") @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -36,6 +44,8 @@ model User {
   storedPasswords StoredPassword[]
   servers         Server[]
   shares          Share[]
+  ownedVaults      Vault[]       @relation("VaultOwner")
+  vaultMemberships VaultMember[]
 
   @@map("users")
 }
@@ -186,11 +196,65 @@ model StoredPassword {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Optional: Eintrag liegt in einem geteilten Tresor.
+  // Dann sind die Felder mit dem TRESOR-Schlüssel verschlüsselt (nicht mit
+  // dem User-Key) und alle Tresor-Mitglieder können lesen/schreiben.
+  // userId bleibt der Ersteller (für Anzeige "von wem").
+  vaultId String?
+  vault   Vault?  @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([vaultId])
   @@map("stored_passwords")
+}
+
+// ============================================================
+// GETEILTE TRESORE — Gemeinsame Passwörter zwischen Nutzern
+// ============================================================
+// Jeder Tresor hat einen eigenen zufälligen AES-256-Schlüssel.
+// Dieser wird pro Mitglied mit dessen RSA-Public-Key verschlüsselt
+// (VaultMember.wrappedKey) — der Server kann ihn nie im Klartext
+// aus der DB lesen (Zero-Knowledge at rest, wie beim User-Key).
+// name ist mit dem Tresor-Schlüssel verschlüsselt.
+// ============================================================
+model Vault {
+  id   String @id @default(uuid())
+  name String // VERSCHLÜSSELT (mit dem Tresor-Schlüssel)
+
+  ownerId String
+  owner   User   @relation("VaultOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members   VaultMember[]
+  passwords StoredPassword[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@map("vaults")
+}
+
+model VaultMember {
+  id String @id @default(uuid())
+
+  vaultId String
+  vault   Vault  @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Tresor-Schlüssel, RSA-OAEP-verschlüsselt mit dem Public Key des Mitglieds
+  wrappedKey String @db.Text
+  role       String @default("member") // "owner" | "member"
+
+  createdAt DateTime @default(now())
+
+  @@unique([vaultId, userId])
+  @@index([userId])
+  @@map("vault_members")
 }
 
 // ============================================================

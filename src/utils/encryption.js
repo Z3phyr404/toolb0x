@@ -245,6 +245,66 @@ function decryptFields(obj, key, fields) {
   return result;
 }
 
+// ============================================================
+// SCHLÜSSELPAARE — für geteilte Tresore
+// ============================================================
+// Problem: Um einen Tresor-Schlüssel für ein anderes Mitglied zu
+// verschlüsseln, bräuchte der Server dessen User-Key — den gibt es
+// aber nur, während das Mitglied eingeloggt ist.
+//
+// Lösung (wie bei 1Password/Bitwarden): Jeder User bekommt ein
+// RSA-Schlüsselpaar. Der Public Key liegt im Klartext in der DB,
+// der Private Key mit dem User-Encryption-Key verschlüsselt.
+// Tresor-Schlüssel werden pro Mitglied mit dessen Public Key
+// "gewrappt" — das geht jederzeit, auch wenn das Mitglied offline ist.
+// ============================================================
+
+/**
+ * Erzeugt ein RSA-2048-Schlüsselpaar (PEM).
+ * Wird einmalig pro User beim Login/Register provisioniert.
+ */
+function generateUserKeypair() {
+  return crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+}
+
+/**
+ * Verschlüsselt einen (Tresor-)Schlüssel mit einem Public Key (RSA-OAEP).
+ * @returns {string} Base64
+ */
+function wrapKeyWithPublicKey(publicKeyPem, keyBuffer) {
+  return crypto.publicEncrypt(
+    {
+      key: publicKeyPem,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256',
+    },
+    keyBuffer
+  ).toString('base64');
+}
+
+/**
+ * Entschlüsselt einen gewrappten Schlüssel mit dem Private Key (PEM).
+ * @returns {Buffer|null} — null bei ungültigen Daten
+ */
+function unwrapKeyWithPrivateKey(privateKeyPem, wrappedBase64) {
+  try {
+    return crypto.privateDecrypt(
+      {
+        key: privateKeyPem,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256',
+      },
+      Buffer.from(wrappedBase64, 'base64')
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   generateEncryptionKey,
   wrapEncryptionKey,
@@ -253,4 +313,7 @@ module.exports = {
   decrypt,
   encryptFields,
   decryptFields,
+  generateUserKeypair,
+  wrapKeyWithPublicKey,
+  unwrapKeyWithPrivateKey,
 };

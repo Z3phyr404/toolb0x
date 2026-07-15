@@ -14,15 +14,15 @@ const {
   wrapEncryptionKey,
   unwrapEncryptionKey,
   encrypt,
+  generateUserKeypair,
 } = require('../utils/encryption');
 
 const router = express.Router();
 
-// Fix #2: Gültiger Dummy-Hash — wird beim Server-Start generiert
-let dummyHash = null;
-(async () => {
-  dummyHash = await bcrypt.hash('dummy-password-for-timing-protection', 12);
-})();
+// Fix #2: Gültiger Dummy-Hash für Timing-Attack-Schutz.
+// Synchron beim Modul-Load: ein Login in den ersten Millisekunden nach
+// Serverstart darf nie auf einen noch fehlenden Hash treffen (→ 500).
+const dummyHash = bcrypt.hashSync('dummy-password-for-timing-protection', 12);
 
 const DEFAULT_CATEGORIES = [
   { name: 'Wohnen & Grund', color: '#FF9500' },
@@ -82,6 +82,9 @@ router.post('/register', async (req, res) => {
     const encKey = generateEncryptionKey();
     const wrappedKey = wrapEncryptionKey(encKey, password);
 
+    // Schlüsselpaar für geteilte Tresore (Private Key mit User-Key verschlüsselt)
+    const keypair = generateUserKeypair();
+
     const encryptedCategories = DEFAULT_CATEGORIES.map(cat => ({
       name: encrypt(cat.name, encKey),
       color: encrypt(cat.color, encKey),
@@ -93,6 +96,8 @@ router.post('/register', async (req, res) => {
         password: hashedPassword,
         name,
         encryptedKey: wrappedKey,
+        publicKey: keypair.publicKey,
+        encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
         categories: {
           create: encryptedCategories,
         },
@@ -162,6 +167,19 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Bestandsnutzer ohne Schlüsselpaar: jetzt provisionieren (für geteilte
+    // Tresore). Nur beim Login möglich, weil nur hier der User-Key vorliegt.
+    if (!user.publicKey || !user.encryptedPrivateKey) {
+      const keypair = generateUserKeypair();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          publicKey: keypair.publicKey,
+          encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
+        },
+      });
+    }
+
     // Alte Sessions invalidieren (verhindert Session-Akkumulation)
     sessionStore.deleteAllForUser(user.id);
 
@@ -195,7 +213,7 @@ router.post('/logout', (req, res) => {
   try {
     const token = req.cookies?.auth_token;
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
       sessionStore.delete(decoded.sid);
     }
   } catch {

@@ -65,7 +65,7 @@ function seedMonthInit(month) {
 describe('GET /api/income — Auto-Copy', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
   });
 
   after(() => cleanupAuth());
@@ -137,7 +137,7 @@ describe('GET /api/income — Auto-Copy', () => {
 describe('POST /api/income — Vorwärts-Propagation', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
   });
 
   after(() => cleanupAuth());
@@ -178,7 +178,7 @@ describe('POST /api/income — Vorwärts-Propagation', () => {
 describe('PUT /api/income — Edit-Propagation', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
   });
 
   after(() => cleanupAuth());
@@ -255,7 +255,7 @@ describe('PUT /api/income — Edit-Propagation', () => {
 describe('DELETE /api/income — Löschschutz', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
   });
 
   after(() => cleanupAuth());

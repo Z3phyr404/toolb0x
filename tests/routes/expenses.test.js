@@ -84,7 +84,7 @@ function seedMonthInit(month) {
 describe('GET /api/expenses — Auto-Copy', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 
@@ -199,7 +199,7 @@ describe('GET /api/expenses — Auto-Copy', () => {
 describe('POST /api/expenses — Vorwärts-Propagation', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 
@@ -258,7 +258,7 @@ describe('POST /api/expenses — Vorwärts-Propagation', () => {
 describe('PUT /api/expenses — Edit-Propagation', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 
@@ -363,7 +363,7 @@ describe('PUT /api/expenses — Edit-Propagation', () => {
 describe('DELETE /api/expenses — Löschschutz', () => {
   beforeEach(() => {
     resetStore();
-    auth = createTestAuth();
+    auth = createTestAuth(mockPrisma);
     seedCategory();
   });
 

@@ -26,8 +26,9 @@ toolb0x/
 │   └── seed.js                          # Testdaten mit verschlüsselten Einträgen
 ├── src/
 │   ├── utils/
-│   │   ├── encryption.js                # AES-256-GCM + PBKDF2 Key Wrapping
-│   │   ├── sessionStore.js              # RAM-basierter Session-Store (Singleton)
+│   │   ├── encryption.js                # AES-256-GCM + PBKDF2 Key Wrapping + RSA-Keypairs (Tresore)
+│   │   ├── sessionStore.js              # RAM-basierter Session-Store (Singleton, sliding)
+│   │   ├── vaultKeys.js                 # Tresor-Schlüssel entpacken (geteilte Tresore)
 │   │   ├── prisma.js                    # Zentrale Prisma-Instanz (ein Pool)
 │   │   └── validation.js               # Eingabe-Validierung & Sanitization
 │   ├── middleware/
@@ -41,7 +42,8 @@ toolb0x/
 │       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
 │       ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
 │       ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
-│       ├── passwords.js                 # /api/passwords CRUD (Passwort-Manager)
+│       ├── passwords.js                 # /api/passwords CRUD (privat + Tresor-Einträge)
+│       ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
 │       └── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
 └── public/
     ├── portal/
@@ -80,7 +82,8 @@ toolb0x/
 | `/api/expenses/*` | Ausgaben-API |
 | `/api/income/*` | Einnahmen-API |
 | `/api/reminders/*` | Erinnerungs-API |
-| `/api/passwords/*` | Passwort-Manager-API (CRUD) |
+| `/api/passwords/*` | Passwort-Manager-API (CRUD, privat + Tresor) |
+| `/api/vaults/*` | Geteilte Tresore (anlegen, Mitglieder, löschen) |
 | `/api/share/*` | Secret-Sharing-API (öffentliches Reveal + Owner-CRUD) |
 | `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
@@ -203,9 +206,28 @@ Zweck: Verhindert dass gelöschte Einträge nach Monatswechsel wieder auftauchen
 ### StoredPassword
 ```
 id (UUID), name (enc), username (enc), password (enc), website (enc), notes (enc)
-userId → User (Cascade Delete)
-Index: [userId]
+userId → User (Cascade Delete), vaultId → Vault (optional, Cascade Delete)
+Index: [userId], [vaultId]
 Zweck: Verschlüsselter Passwort-Tresor (Passwort-Manager)
+WICHTIG: vaultId gesetzt → Felder sind mit dem TRESOR-Schlüssel verschlüsselt
+(nicht mit dem User-Key). userId ist dann nur noch der Ersteller.
+```
+
+### Vault / VaultMember (Geteilte Tresore)
+```
+Vault:       id, name (enc mit Tresor-Schlüssel), ownerId → User (Cascade)
+VaultMember: id, vaultId → Vault (Cascade), userId → User (Cascade),
+             wrappedKey (Tresor-Schlüssel, RSA-OAEP-verschlüsselt mit dem
+             Public Key des Mitglieds), role ("owner"|"member")
+             Unique: [vaultId, userId]
+Zweck: Gemeinsame Passwörter zwischen Nutzern (z.B. Team-Zugänge).
+Krypto: Jeder User hat ein RSA-2048-Keypair (User.publicKey klartext,
+User.encryptedPrivateKey mit User-Key verschlüsselt — wird beim Login
+provisioniert, Bestandsnutzer brauchen also EINEN Login nach Deploy).
+Tresor-Schlüssel = 32 Zufallsbytes, pro Mitglied per Public Key gewrappt
+→ Zero-Knowledge at rest bleibt erhalten, Einladen geht auch wenn das
+Mitglied offline ist. Beim Entfernen eines Mitglieds wird der Schlüssel
+NICHT rotiert (dokumentiert, Hinweis in der UI).
 ```
 
 ### Share
@@ -273,10 +295,19 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 ### Passwords (`/api/passwords/`)
 | Methode | Route | Beschreibung |
 |---------|-------|-------------|
-| GET | `/` | Alle gespeicherten Passwörter (entschlüsselt) |
-| POST | `/` | Neues Passwort speichern |
-| PUT | `/:id` | Passwort bearbeiten |
-| DELETE | `/:id` | Passwort löschen |
+| GET | `/` | Eigene private + alle Tresor-Einträge (entschlüsselt, mit `vaultId`/`vaultName`/`createdBy`) |
+| POST | `/` | Neues Passwort (optional `vaultId` → landet im Tresor) |
+| PUT | `/:id` | Bearbeiten; `vaultId` im Body verschiebt privat ↔ Tresor (Re-Encrypt) |
+| DELETE | `/:id` | Löschen (eigene private ODER Tresor-Einträge als Mitglied) |
+
+### Vaults (`/api/vaults/`) — Geteilte Tresore
+| Methode | Route | Beschreibung |
+|---------|-------|-------------|
+| POST | `/` | Tresor anlegen (erzeugt Tresor-Schlüssel, wrappt für Owner) |
+| GET | `/` | Eigene Tresore inkl. Mitgliederliste |
+| POST | `/:id/members` | Mitglied per E-Mail einladen (nur Owner; Invitee braucht Keypair) |
+| DELETE | `/:id/members/:userId` | Mitglied entfernen (Owner) oder selbst verlassen |
+| DELETE | `/:id` | Tresor + alle Einträge löschen (nur Owner) |
 
 ### Share (`/api/share/`)
 | Methode | Route | Auth | Beschreibung |
@@ -458,3 +489,7 @@ pm2 restart all            # Prozess neu starten — lädt neuen Client + Code i
 - **PIN beim Share** ist kein Server-Check: die PIN wird via `PBKDF2(keyMaterial ‖ PIN, salt)` kryptografisch in den AES-Key eingemischt. Falsche/fehlende PIN → GCM-Auth-Tag schlägt fehl → Entschlüsselung wirft. `hasPin` (DB) steuert nur die PIN-Abfrage im View.
 - **Reveal vs. Meta getrennt:** `GET /api/share/:token` liefert nur Metadaten (kein Burn), erst `POST …/reveal` gibt den Blob heraus und zählt hoch. So verbrennen Link-Vorschau-Bots (Signal/WhatsApp/Slack) keine burn-after-read-Ansicht.
 - **Neue Prisma-Migration** `20260715_add_share` (Modell `Share`) — bei Deploy `migrate deploy` + `generate` + Restart nicht vergessen (siehe Deployment).
+- **Geteilte Tresore** (`/app/passwords` → „Tresore"-Button): Gemeinsame Passwörter zwischen Nutzern. Pro User RSA-2048-Keypair (Provisionierung beim Login → Bestandsnutzer müssen sich nach Deploy EINMAL einloggen, bevor sie eingeladen werden können). Tresor-Einträge sind mit dem Tresor-Schlüssel verschlüsselt, `StoredPassword.vaultId` unterscheidet privat/geteilt. Details: Schema-Abschnitt „Vault / VaultMember".
+- **Body-Limit-Ausnahme**: Der globale 10kb-JSON-Parser (security.js) überspringt `/api/notes` — der Notes-Router hat einen eigenen 500kb-Parser. Sonst könnten Notizen > 10kb nie gespeichert werden.
+- **Session-Store ist sliding**: `get()` frischt `lastActivity` auf; 30-Min-Fenster gilt für INAKTIVITÄT, nicht absolut (passend zum JWT-Sliding).
+- **Share-Reveal ist race-sicher**: View wird per bedingtem `updateMany` (WHERE viewCount < maxViews) atomar reserviert — parallele Reveals können das Limit nicht überschreiten.

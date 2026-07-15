@@ -608,6 +608,84 @@
     }
     .share-empty { font-size: 13px; color: var(--text-2); padding: 8px 0 4px; }
 
+    /* ===== TRESORE (geteilte Passwörter) ===== */
+    .vault-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: #60a5fa;
+      background: rgba(96,165,250,0.12);
+      border: 1px solid rgba(96,165,250,0.25);
+      border-radius: 6px;
+      padding: 2px 7px;
+      margin-left: 8px;
+      vertical-align: 1px;
+      white-space: nowrap;
+    }
+    .vault-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.02);
+    }
+    .vault-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .vault-card-name { font-size: 15px; font-weight: 700; }
+    .vault-card-actions { display: flex; gap: 6px; }
+    .vault-member-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      font-size: 13px;
+      color: var(--text-2);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .vault-member-row:last-child { border-bottom: none; }
+    .vault-members { margin-top: 10px; }
+    .vault-invite-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .vault-invite-row .form-input { flex: 1; padding: 9px 12px; font-size: 13px; }
+    .vault-invite-btn {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 0 14px;
+      border: 1px solid rgba(96,165,250,0.3);
+      background: rgba(96,165,250,0.12);
+      color: #60a5fa;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .vault-invite-btn:hover { background: rgba(96,165,250,0.2); }
+    .vault-create-row { display: flex; gap: 8px; margin-bottom: 18px; }
+    .vault-create-row .form-input { flex: 1; }
+    .vault-role-tag {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-3);
+    }
+    .vault-hint {
+      font-size: 12px;
+      color: var(--text-3);
+      margin-top: 14px;
+      line-height: 1.5;
+    }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 600px) {
       .pw-header { padding: 16px 16px; gap: 10px; }
@@ -715,6 +793,7 @@
             </div>
             <button class="manual-btn" id="shareAdhocBtn">Sicher teilen</button>
             <button class="manual-btn" id="manageSharesBtn">Geteilte Links</button>
+            <button class="manual-btn" id="vaultsBtn">Tresore</button>
             <button class="manual-btn" id="addManualBtn">+ Manuell</button>
           </div>
         </div>
@@ -759,6 +838,12 @@
       <div class="form-group">
         <label class="form-label">Notizen</label>
         <textarea class="form-input form-textarea" id="modalNotes" rows="3" maxlength="2000" placeholder="Optionale Notizen..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Speicherort</label>
+        <select class="form-input" id="modalVault">
+          <option value="">Privat (nur ich)</option>
+        </select>
       </div>
       <div class="modal-actions">
         <button class="modal-btn modal-btn-cancel" id="modalCancel">Abbrechen</button>
@@ -858,6 +943,27 @@
     </div>
   </div>
 
+  <!-- ===== VAULTS MODAL (geteilte Tresore) ===== -->
+  <div class="pw-modal-overlay" id="vaultModal">
+    <div class="pw-modal">
+      <h3>Gemeinsame Tresore</h3>
+      <p class="confirm-text">Passwörter in einem Tresor sind für alle Mitglieder sichtbar und bearbeitbar. Mitglieder lädst du per E-Mail-Adresse ihres Kontos ein.</p>
+
+      <div class="vault-create-row">
+        <input class="form-input" id="vaultNewName" type="text" maxlength="50" placeholder="Neuer Tresor, z.B. Team-Zugänge">
+        <button class="vault-invite-btn" id="vaultCreateBtn">Anlegen</button>
+      </div>
+
+      <div id="vaultList"></div>
+
+      <p class="vault-hint">Hinweis: Beim Entfernen eines Mitglieds wird der Tresor-Schlüssel nicht rotiert — ändere danach sensible Passwörter, falls nötig.</p>
+
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-cancel" id="vaultClose">Schließen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="ob-toast-box" id="toastBox"></div>
 
@@ -878,6 +984,8 @@
       // State
       // --------------------------------------------------------
       var allPasswords = [];
+      var allVaults = [];
+      var currentUserId = null;
       var editingId = null;
       var deleteId = null;
       var currentGenerated = '';
@@ -1158,6 +1266,69 @@
       }
 
       // --------------------------------------------------------
+      // Tresore (geteilte Passwörter)
+      // --------------------------------------------------------
+      function loadVaults() {
+        return api('/vaults').then(function (data) {
+          allVaults = data.vaults || [];
+          populateVaultSelect();
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast('Tresore konnten nicht geladen werden', 'error');
+        });
+      }
+
+      function populateVaultSelect() {
+        var sel = $('modalVault');
+        sel.innerHTML = '<option value="">Privat (nur ich)</option>' +
+          allVaults.map(function (v) {
+            return '<option value="' + esc(v.id) + '">Tresor: ' + esc(v.name) + '</option>';
+          }).join('');
+      }
+
+      function vaultName(vaultId) {
+        var v = allVaults.find(function (x) { return x.id === vaultId; });
+        return v ? v.name : null;
+      }
+
+      function renderVaultList() {
+        if (allVaults.length === 0) {
+          $('vaultList').innerHTML = '<div class="share-empty">Noch keine Tresore. Lege oben einen an und lade dann Mitglieder ein.</div>';
+          return;
+        }
+        $('vaultList').innerHTML = allVaults.map(function (v) {
+          var members = v.members.map(function (m) {
+            var canRemove = v.isOwner && m.userId !== currentUserId;
+            return '<div class="vault-member-row">' +
+              '<span>' + esc(m.name) + ' <span class="vault-role-tag">' + esc(m.email) + (m.role === 'owner' ? ' · Besitzer' : '') + '</span></span>' +
+              (canRemove
+                ? '<button class="pw-action-btn danger" data-vault-remove="' + esc(v.id) + '" data-member="' + esc(m.userId) + '" title="Entfernen">' + ICONS.trash + '</button>'
+                : '') +
+            '</div>';
+          }).join('');
+
+          var actions = v.isOwner
+            ? '<button class="pw-action-btn danger" data-vault-delete="' + esc(v.id) + '" title="Tresor löschen">' + ICONS.trash + '</button>'
+            : '<button class="pw-action-btn danger" data-vault-leave="' + esc(v.id) + '" title="Tresor verlassen">' + ICONS.trash + '</button>';
+
+          var invite = v.isOwner
+            ? '<div class="vault-invite-row">' +
+                '<input class="form-input" type="email" data-invite-input="' + esc(v.id) + '" placeholder="E-Mail des Kontos, z.B. kollegin@mail.de">' +
+                '<button class="vault-invite-btn" data-vault-invite="' + esc(v.id) + '">Einladen</button>' +
+              '</div>'
+            : '';
+
+          return '<div class="vault-card">' +
+            '<div class="vault-card-head">' +
+              '<span class="vault-card-name">' + esc(v.name) + '</span>' +
+              '<div class="vault-card-actions">' + actions + '</div>' +
+            '</div>' +
+            '<div class="vault-members">' + members + '</div>' +
+            invite +
+          '</div>';
+        }).join('');
+      }
+
+      // --------------------------------------------------------
       // Render Passwort-Liste
       // --------------------------------------------------------
       function renderList() {
@@ -1167,7 +1338,8 @@
           filtered = allPasswords.filter(function (p) {
             return p.name.toLowerCase().indexOf(query) !== -1 ||
                    p.username.toLowerCase().indexOf(query) !== -1 ||
-                   p.website.toLowerCase().indexOf(query) !== -1;
+                   p.website.toLowerCase().indexOf(query) !== -1 ||
+                   (p.vaultName || '').toLowerCase().indexOf(query) !== -1;
           });
         }
 
@@ -1183,13 +1355,17 @@
           var meta = [];
           if (p.username) meta.push(esc(p.username));
           if (p.website) meta.push(esc(p.website));
+          if (p.vaultId && p.createdBy) meta.push('von ' + esc(p.createdBy));
+          var badge = p.vaultId
+            ? '<span class="vault-badge" title="Geteilter Tresor">&#128101; ' + esc(p.vaultName || 'Tresor') + '</span>'
+            : '';
           var letter = (p.name || '?')[0].toUpperCase();
           var tc = tileColor(p.name || '');
           var idx = revealIdx++;
           return '<div class="pw-card" data-reveal data-reveal-index="' + idx + '" data-glow-color="' + tc.bg.replace('0.14', '0.2') + '" data-id="' + p.id + '">' +
             '<div class="pw-tile" style="background:' + tc.bg + ';color:' + tc.fg + ';">' + letter + '</div>' +
             '<div class="pw-card-info">' +
-              '<div class="pw-card-name">' + esc(p.name) + '</div>' +
+              '<div class="pw-card-name">' + esc(p.name) + badge + '</div>' +
               (meta.length ? '<div class="pw-card-meta">' + meta.join(' &middot; ') + '</div>' : '') +
             '</div>' +
             '<span class="pw-card-dots" data-dots="' + p.id + '">' + '\u2022'.repeat(10) + '</span>' +
@@ -1275,6 +1451,7 @@
         $('modalPassword').type = 'password';
         $('modalWebsite').value = '';
         $('modalNotes').value = '';
+        $('modalVault').value = '';
         $('saveModal').classList.add('open');
         $('modalName').focus();
       }
@@ -1290,6 +1467,7 @@
         $('modalPassword').type = 'password';
         $('modalWebsite').value = entry.website || '';
         $('modalNotes').value = entry.notes || '';
+        $('modalVault').value = entry.vaultId || '';
         $('saveModal').classList.add('open');
         $('modalName').focus();
       }
@@ -1312,7 +1490,8 @@
           password: password,
           username: $('modalUsername').value.trim(),
           website: $('modalWebsite').value.trim(),
-          notes: $('modalNotes').value.trim()
+          notes: $('modalNotes').value.trim(),
+          vaultId: $('modalVault').value || null
         };
 
         savePassword(payload).then(function () {
@@ -1454,6 +1633,92 @@
 
       $('shareAdhocBtn').addEventListener('click', function () { openShareModal('text', null); });
 
+      // --------------------------------------------------------
+      // Tresor-Verwaltung
+      // --------------------------------------------------------
+      $('vaultsBtn').addEventListener('click', function () {
+        renderVaultList();
+        $('vaultModal').classList.add('open');
+        loadVaults().then(renderVaultList);
+      });
+
+      $('vaultClose').addEventListener('click', closeModals);
+
+      $('vaultCreateBtn').addEventListener('click', function () {
+        var name = $('vaultNewName').value.trim();
+        if (!name) { toast('Bitte einen Tresor-Namen eingeben', 'error'); return; }
+        api('/vaults', { method: 'POST', body: JSON.stringify({ name: name }) }).then(function () {
+          $('vaultNewName').value = '';
+          toast('Tresor angelegt');
+          return loadVaults().then(renderVaultList);
+        }).catch(function (err) {
+          if (err.message !== 'auth') toast(err.message || 'Anlegen fehlgeschlagen', 'error');
+        });
+      });
+
+      $('vaultList').addEventListener('click', function (e) {
+        var btn;
+
+        // Mitglied einladen
+        btn = e.target.closest('[data-vault-invite]');
+        if (btn) {
+          var vid = btn.dataset.vaultInvite;
+          var input = document.querySelector('[data-invite-input="' + vid + '"]');
+          var email = input ? input.value.trim() : '';
+          if (!email) { toast('Bitte E-Mail-Adresse eingeben', 'error'); return; }
+          api('/vaults/' + vid + '/members', { method: 'POST', body: JSON.stringify({ email: email }) }).then(function (data) {
+            toast(data.message || 'Mitglied hinzugefügt');
+            return loadVaults().then(function () { renderVaultList(); loadPasswords(); });
+          }).catch(function (err) {
+            if (err.message !== 'auth') toast(err.message || 'Einladen fehlgeschlagen', 'error');
+          });
+          return;
+        }
+
+        // Mitglied entfernen
+        btn = e.target.closest('[data-vault-remove]');
+        if (btn) {
+          api('/vaults/' + btn.dataset.vaultRemove + '/members/' + btn.dataset.member, { method: 'DELETE' }).then(function () {
+            toast('Mitglied entfernt');
+            return loadVaults().then(renderVaultList);
+          }).catch(function (err) {
+            if (err.message !== 'auth') toast(err.message || 'Entfernen fehlgeschlagen', 'error');
+          });
+          return;
+        }
+
+        // Tresor verlassen (als Mitglied)
+        btn = e.target.closest('[data-vault-leave]');
+        if (btn) {
+          api('/vaults/' + btn.dataset.vaultLeave + '/members/' + currentUserId, { method: 'DELETE' }).then(function () {
+            toast('Tresor verlassen');
+            return loadVaults().then(function () { renderVaultList(); loadPasswords(); });
+          }).catch(function (err) {
+            if (err.message !== 'auth') toast(err.message || 'Verlassen fehlgeschlagen', 'error');
+          });
+          return;
+        }
+
+        // Tresor löschen (als Besitzer) — mit Bestätigung
+        btn = e.target.closest('[data-vault-delete]');
+        if (btn) {
+          var v = allVaults.find(function (x) { return x.id === btn.dataset.vaultDelete; });
+          if (!confirm('Tresor "' + (v ? v.name : '') + '" und ALLE Einträge darin unwiderruflich löschen?')) return;
+          api('/vaults/' + btn.dataset.vaultDelete, { method: 'DELETE' }).then(function () {
+            toast('Tresor gelöscht');
+            return loadVaults().then(function () { renderVaultList(); loadPasswords(); });
+          }).catch(function (err) {
+            if (err.message !== 'auth') toast(err.message || 'Löschen fehlgeschlagen', 'error');
+          });
+          return;
+        }
+      });
+
+      // Enter im Einladen-/Anlegen-Feld
+      $('vaultNewName').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') $('vaultCreateBtn').click();
+      });
+
       // --- Verwaltung geteilter Links ---
       function fmtExpiry(iso) {
         var d = new Date(iso);
@@ -1564,7 +1829,8 @@
 
         api('/auth/me').then(function (data) {
           $('userName').textContent = data.user.name;
-          return loadPasswords();
+          currentUserId = data.user.id;
+          return Promise.all([loadVaults(), loadPasswords()]);
         }).then(function () {
           var appEl = $('app');
           appEl.classList.add('active');
