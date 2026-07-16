@@ -252,9 +252,12 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | Methode | Route | Beschreibung |
 |---------|-------|-------------|
 | POST | `/login` | Login, gibt Cookie zurück |
-| POST | `/register` | Registrierung + Default-Kategorien anlegen |
+| POST | `/register` | Registrierung + Default-Kategorien; liefert einmalig `recoveryCode` |
+| POST | `/reset-password` | **Öffentlich.** Passwort-Reset per Recovery-Code (OHNE Datenverlust) |
+| POST | `/reset-with-token` | **Öffentlich.** Reset per Admin-Token (LÖSCHT alle Daten, neuer Key + Code) |
+| POST | `/recovery-code` | Recovery-Code (neu) erzeugen — braucht aktuelles Passwort, Code nur einmal sichtbar |
 | POST | `/logout` | Session löschen, Cookie leeren |
-| GET | `/me` | Aktueller User (`requireAuth`) |
+| GET | `/me` | Aktueller User inkl. `hasRecoveryCode` (`requireAuth`) |
 | PUT | `/password` | Passwort ändern (alle Sessions invalidieren) |
 | PUT | `/profile` | Name/E-Mail ändern (Passwort zur Bestätigung) |
 | DELETE | `/account` | Konto + alle Daten löschen |
@@ -326,6 +329,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | GET | `/stats` | Nutzeranzahl + neuester Nutzer (`requireAuth` + `requireAdmin`) |
 | GET | `/users` | Nutzerliste mit E-Mail, Rolle, Datenstatistiken |
 | PATCH | `/users/:id/suspend` | Nutzer sperren/entsperren (body: `{ suspended: bool }`) |
+| POST | `/users/:id/reset-link` | Passwort-Reset-Token erzeugen (60 Min, nur Hash in DB; nicht für Admins/sich selbst) |
 | DELETE | `/users/:id` | Nutzer endgültig löschen (Kaskade löscht alle Daten; nicht für Admins/sich selbst) |
 
 ---
@@ -405,7 +409,19 @@ Konsistentes CSS-System, das in allen HTML-Dateien gleich ist:
 
 5. **Portal-Karte** in `public/portal/index.html` hinzufügen (`.tool-card.glass`)
 
-6. **Sidebar-Back-Link** im Tool: `<a href="/portal" class="nav-btn back-portal-btn">← Zur Übersicht</a>`
+6. **Sidebar-Layout verwenden** (Pflicht, UX-Konsistenz): Jedes Tool hat eine LINKE Sidebar
+   mit den geteilten Klassen aus `obsidian.css` (`.ob-layout`, `.ob-sidebar`, `.ob-main-col`):
+   - Ganz oben: `<a href="/portal" class="ob-sidebar-back">← Zur Übersicht</a>`
+   - Darunter: `.ob-sidebar-logo` (App-Icon-Tile + Name)
+   - Navigation: `.ob-nav-btn` (Akzentfarbe pro App via `--sb-accent`, `--sb-accent-border`, `--sb-accent-bg` auf dem Layout-Container)
+   - Ganz unten: `.ob-sidebar-user` (Avatar, Name, `.ob-sidebar-logout`)
+   - Mobil (≤768px) versteckt sich die Sidebar automatisch → am Anfang des `<main>` einen
+     `.ob-mobile-header` einbauen (`.ob-mobile-back`-Kreis + `<h1>` + `.ob-btn-logout`)
+   - Scrollen: Container `height:100vh; overflow:hidden`, das `<main>` bekommt `overflow-y:auto`
+     (so bleibt der Nutzer-Block in der Sidebar immer sichtbar)
+   - Referenz-Umsetzungen: `passwords`, `servers`, `profil.html`
+   - **Layout lokal prüfen:** `node tests/helpers/layout-stub-server.js` (Port 3999) serviert
+     die Frontends ohne DB mit gefakter API (vorher im Tab `sessionStorage.setItem('toolbox_active','1')`)
 
 ---
 
@@ -485,6 +501,17 @@ pm2 restart all            # Prozess neu starten — lädt neuen Client + Code i
 - Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)
 - Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)
 - **Admin-Bereich** (`/app/admin`): Nur für User mit `role: 'admin'` sichtbar. Admin-Karte im Portal wird per JS bedingt angezeigt. Backend geschützt durch `requireAdmin` Middleware. Admin sieht nur unverschlüsselte Felder (Zero-Knowledge gewahrt). Admin-Rolle nur per DB-Zugriff setzbar.
+- **Passwort-Reset** (Zero-Knowledge-kompatibel, Migration `20260716_add_password_reset`):
+  Zwei Wege. (1) **Recovery-Code** (`User.recoveryKey` = Encryption Key gewrappt mit dem Code,
+  Format `XXXX-XXXX-…`, 6×4 Zeichen ohne 0/O/1/I/L): Reset OHNE Datenverlust über
+  `/portal` → „Passwort vergessen?". Code entsteht bei Registrierung (einmalige Anzeige)
+  und kann im Profil rotiert werden (`POST /api/auth/recovery-code`). Falscher Code →
+  GCM-Auth-Tag schlägt fehl, Server speichert den Code NIE. (2) **Admin-Reset-Link**
+  (Admin-Bereich → „Reset-Link", 60 Min gültig, nur SHA-256-Hash in DB, Link-Format
+  `/portal?reset=<token>`): setzt neues Passwort, LÖSCHT aber alle verschlüsselten Daten
+  (inkl. eigener Tresore + Tresor-Mitgliedschaften; Shares bleiben) und provisioniert
+  frischen Key/Keypair/Recovery-Code + Standard-Kategorien. Beide öffentlichen Routen
+  haben einen eigenen Rate-Limiter (10/15min). Es gibt bewusst KEINEN E-Mail-Reset (kein SMTP).
 - **Registrierungs-UX**: Doppelte E-Mail liefert `400 + code: 'EMAIL_EXISTS'` — das Portal wechselt dann automatisch in den Anmelde-Modus (E-Mail bleibt stehen). Nach Browser-Neustart-Logout zeigt das Portal einen Info-Hinweis „Zur Sicherheit abgemeldet" — aber nur, wenn `localStorage.toolbox_known` gesetzt ist (wird bei erfolgreichem Login/Register gesetzt; verhindert die Meldung bei Erstbesuchern). Grund: Nutzer hielten die Registrierung für fehlgeschlagen, weil sie nach Browser-Neustart wieder das Login-Formular sahen, und versuchten sich erneut zu registrieren.
 - **Nutzer löschen (Admin)**: `DELETE /api/admin/users/:id` — Kaskade löscht alle Daten inkl. eigener Tresore (auch für Tresor-Mitglieder weg!). Sessions werden sofort beendet. Admins und sich selbst kann man nicht löschen.
 - **Nutzersperre** (`suspended`-Feld): Gesperrte Nutzer können sich nicht einloggen (403 beim Login). Beim Sperren werden alle aktiven Sessions sofort beendet (`sessionStore.deleteAllForUser`). Admins können nicht gesperrt werden. Admin kann sich nicht selbst sperren.

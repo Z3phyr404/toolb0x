@@ -9,12 +9,15 @@ const prisma = require('../utils/prisma');
 const { validateRegistration, validateLogin, sanitize } = require('../utils/validation');
 const { requireAuth } = require('../middleware/auth');
 const sessionStore = require('../utils/sessionStore');
+const crypto = require('crypto');
 const {
   generateEncryptionKey,
   wrapEncryptionKey,
   unwrapEncryptionKey,
   encrypt,
   generateUserKeypair,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
 } = require('../utils/encryption');
 
 const router = express.Router();
@@ -35,6 +38,21 @@ const DEFAULT_CATEGORIES = [
   { name: 'Persönliches', color: '#FF6B6B' },
   { name: 'Sonstiges', color: '#8E8E93' },
 ];
+
+// Passwort-Regeln (Registrierung, Passwort ändern, Reset)
+function validatePasswordRules(password) {
+  const errors = [];
+  if (!password || password.length < 8) {
+    errors.push('Das neue Passwort muss mindestens 8 Zeichen lang sein.');
+  }
+  if (password && !/[A-Z]/.test(password)) {
+    errors.push('Das neue Passwort braucht mindestens einen Großbuchstaben.');
+  }
+  if (password && !/[0-9]/.test(password)) {
+    errors.push('Das neue Passwort braucht mindestens eine Zahl.');
+  }
+  return errors;
+}
 
 function getCookieOptions() {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -88,6 +106,12 @@ router.post('/register', async (req, res) => {
     // Schlüsselpaar für geteilte Tresore (Private Key mit User-Key verschlüsselt)
     const keypair = generateUserKeypair();
 
+    // Recovery-Code: wrappt den Encryption Key ein zweites Mal —
+    // damit ist ein Passwort-Reset OHNE Datenverlust möglich.
+    // Wird nur EINMAL im Klartext zurückgegeben (Frontend zeigt ihn an).
+    const recoveryCode = generateRecoveryCode();
+    const recoveryKey = wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode));
+
     const encryptedCategories = DEFAULT_CATEGORIES.map(cat => ({
       name: encrypt(cat.name, encKey),
       color: encrypt(cat.color, encKey),
@@ -101,6 +125,7 @@ router.post('/register', async (req, res) => {
         encryptedKey: wrappedKey,
         publicKey: keypair.publicKey,
         encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
+        recoveryKey,
         categories: {
           create: encryptedCategories,
         },
@@ -121,6 +146,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Konto erfolgreich erstellt!',
       user,
+      recoveryCode,
     });
 
   } catch (error) {
@@ -209,6 +235,161 @@ router.post('/login', async (req, res) => {
 });
 
 // ============================================================
+// POST /api/auth/reset-password — Reset per Recovery-Code (ÖFFENTLICH)
+// ============================================================
+// KEIN Datenverlust: Der Recovery-Code entschlüsselt den Encryption
+// Key (User.recoveryKey), der dann mit dem neuen Passwort neu
+// gewrappt wird. Falscher Code → GCM-Auth-Tag schlägt fehl.
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, recoveryCode, newPassword } = req.body;
+
+    if (!email || !recoveryCode || !newPassword) {
+      return res.status(400).json({
+        errors: ['E-Mail, Recovery-Code und neues Passwort sind erforderlich.'],
+      });
+    }
+
+    const pwErrors = validatePasswordRules(newPassword);
+    if (pwErrors.length > 0) {
+      return res.status(400).json({ errors: pwErrors });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: String(email).toLowerCase().trim() },
+    });
+
+    // Einheitliche Fehlermeldung (kein User-Enumeration über diesen Weg,
+    // ob die E-Mail existiert oder der Code falsch ist)
+    const genericError = () => res.status(401).json({
+      errors: ['E-Mail oder Recovery-Code ist falsch.'],
+    });
+
+    if (!user || !user.recoveryKey || user.suspended) {
+      return genericError();
+    }
+
+    const encKey = unwrapEncryptionKey(user.recoveryKey, normalizeRecoveryCode(recoveryCode));
+    if (!encKey) {
+      return genericError();
+    }
+
+    // Neues Passwort setzen, Key neu wrappen — Daten bleiben erhalten
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        encryptedKey: wrapEncryptionKey(encKey, newPassword),
+      },
+    });
+
+    // Alle Sessions beenden — Login mit dem neuen Passwort
+    sessionStore.deleteAllForUser(user.id);
+
+    res.json({
+      message: 'Passwort zurückgesetzt. Melde dich mit dem neuen Passwort an.',
+    });
+
+  } catch (error) {
+    console.error('Passwort-Reset fehlgeschlagen:', error.message);
+    res.status(500).json({
+      errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
+    });
+  }
+});
+
+// ============================================================
+// POST /api/auth/reset-with-token — Admin-Reset-Link (ÖFFENTLICH)
+// ============================================================
+// MIT Datenverlust: Ohne Passwort/Recovery-Code ist der Encryption
+// Key unwiederbringlich. Alle verschlüsselten Daten werden gelöscht,
+// das Konto (E-Mail, Name, Rolle) bleibt bestehen und bekommt einen
+// frischen Key + Keypair + Recovery-Code + Standard-Kategorien.
+router.post('/reset-with-token', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        errors: ['Token und neues Passwort sind erforderlich.'],
+      });
+    }
+
+    const pwErrors = validatePasswordRules(newPassword);
+    if (pwErrors.length > 0) {
+      return res.status(400).json({ errors: pwErrors });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const user = await prisma.user.findUnique({ where: { resetToken: tokenHash } });
+
+    if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
+      return res.status(401).json({
+        errors: ['Der Reset-Link ist ungültig oder abgelaufen.'],
+      });
+    }
+
+    // Alle mit dem alten Key verschlüsselten Daten löschen.
+    // Reihenfolge beachtet FK-Beziehungen (Expenses vor Categories).
+    // Eigene Tresore kaskadieren (Mitglieder + Einträge). Tresor-Einträge
+    // ANDERER Tresore bleiben (mit Tresor-Schlüssel verschlüsselt), nur
+    // die eigene Mitgliedschaft fällt weg (gewrappter Schlüssel ist verloren).
+    await prisma.reminder.deleteMany({ where: { userId: user.id } });
+    await prisma.expense.deleteMany({ where: { userId: user.id } });
+    await prisma.income.deleteMany({ where: { userId: user.id } });
+    await prisma.monthInit.deleteMany({ where: { userId: user.id } });
+    await prisma.category.deleteMany({ where: { userId: user.id } });
+    await prisma.note.deleteMany({ where: { userId: user.id } });
+    await prisma.storedPassword.deleteMany({ where: { userId: user.id, vaultId: null } });
+    await prisma.vault.deleteMany({ where: { ownerId: user.id } });
+    await prisma.vaultMember.deleteMany({ where: { userId: user.id } });
+    await prisma.server.deleteMany({ where: { userId: user.id } });
+
+    // Frischer Key, frisches Keypair, frischer Recovery-Code
+    const encKey = generateEncryptionKey();
+    const keypair = generateUserKeypair();
+    const recoveryCode = generateRecoveryCode();
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        encryptedKey: wrapEncryptionKey(encKey, newPassword),
+        publicKey: keypair.publicKey,
+        encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
+        recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
+        resetToken: null,
+        resetTokenExpires: null,
+      },
+    });
+
+    // Standard-Kategorien mit dem neuen Key anlegen
+    await prisma.category.createMany({
+      data: DEFAULT_CATEGORIES.map(cat => ({
+        name: encrypt(cat.name, encKey),
+        color: encrypt(cat.color, encKey),
+        userId: user.id,
+      })),
+    });
+
+    sessionStore.deleteAllForUser(user.id);
+
+    res.json({
+      message: 'Passwort zurückgesetzt. Melde dich mit dem neuen Passwort an.',
+      recoveryCode,
+    });
+
+  } catch (error) {
+    console.error('Token-Reset fehlgeschlagen:', error.message);
+    res.status(500).json({
+      errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
+    });
+  }
+});
+
+// ============================================================
 // POST /api/auth/logout
 // ============================================================
 router.post('/logout', (req, res) => {
@@ -246,6 +427,7 @@ router.get('/me', requireAuth, async (req, res) => {
         name: true,
         role: true,
         createdAt: true,
+        recoveryKey: true,
       },
     });
 
@@ -253,7 +435,16 @@ router.get('/me', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
     }
 
-    res.json({ user });
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        createdAt: user.createdAt,
+        hasRecoveryCode: !!user.recoveryKey,
+      },
+    });
 
   } catch (error) {
     console.error('Nutzerabfrage fehlgeschlagen:', error.message);
@@ -344,6 +535,60 @@ router.put('/password', requireAuth, async (req, res) => {
 
   } catch (error) {
     console.error('Passwort-Änderung fehlgeschlagen:', error.message);
+    res.status(500).json({
+      errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
+    });
+  }
+});
+
+// ============================================================
+// POST /api/auth/recovery-code — Recovery-Code (neu) erzeugen
+// ============================================================
+// Für Bestandsnutzer ohne Code und zum Rotieren (z.B. Code verloren
+// oder kompromittiert). Braucht das aktuelle Passwort, weil nur damit
+// der Encryption Key entschlüsselt werden kann. Der Code wird nur
+// EINMAL im Klartext zurückgegeben.
+router.post('/recovery-code', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+
+    if (!currentPassword) {
+      return res.status(400).json({
+        errors: ['Bitte gib dein aktuelles Passwort zur Bestätigung ein.'],
+      });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(401).json({
+        errors: ['Das aktuelle Passwort ist falsch.'],
+      });
+    }
+
+    const encKey = unwrapEncryptionKey(user.encryptedKey, currentPassword);
+    if (!encKey) {
+      return res.status(500).json({
+        errors: ['Verschlüsselungs-Fehler. Bitte kontaktiere den Support.'],
+      });
+    }
+
+    const recoveryCode = generateRecoveryCode();
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
+      },
+    });
+
+    res.json({
+      message: 'Neuer Recovery-Code erstellt. Der alte Code ist ab sofort ungültig.',
+      recoveryCode,
+    });
+
+  } catch (error) {
+    console.error('Recovery-Code-Erstellung fehlgeschlagen:', error.message);
     res.status(500).json({
       errors: ['Ein unerwarteter Fehler ist aufgetreten.'],
     });

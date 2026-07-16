@@ -7,6 +7,7 @@
 // ============================================================
 
 const express = require('express');
+const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const sessionStore = require('../utils/sessionStore');
@@ -125,6 +126,56 @@ router.patch('/users/:id/suspend', async (req, res) => {
     });
   } catch (error) {
     console.error('Nutzer-Sperrung fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// ============================================================
+// POST /api/admin/users/:id/reset-link — Passwort-Reset-Link erzeugen
+// ============================================================
+// Notfall-Fallback, wenn ein Nutzer Passwort UND Recovery-Code
+// verloren hat. Der Link setzt ein neues Passwort, LÖSCHT aber alle
+// verschlüsselten Daten (Zero-Knowledge: ohne Key kein Zugriff).
+// Der Admin gibt den Link selbst weiter (kein E-Mail-Versand nötig).
+// In der DB liegt nur der SHA-256-Hash des Tokens (60 Min gültig).
+router.post('/users/:id/reset-link', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (id === req.userId) {
+      return res.status(400).json({ error: 'Nutze für dein eigenes Konto den Recovery-Code.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
+    }
+
+    // Reset-Link für einen Admin = Kontoübernahme → nicht erlaubt
+    if (user.role === 'admin') {
+      return res.status(400).json({ error: 'Für Admins können keine Reset-Links erzeugt werden.' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 Minuten
+
+    await prisma.user.update({
+      where: { id },
+      data: { resetToken: tokenHash, resetTokenExpires: expiresAt },
+    });
+
+    res.json({
+      message: `Reset-Link für ${user.name} erstellt (60 Minuten gültig).`,
+      token,
+      expiresAt,
+    });
+  } catch (error) {
+    console.error('Reset-Link-Erstellung fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
   }
 });

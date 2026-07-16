@@ -93,6 +93,25 @@ function createCollection(store, tableName) {
         updatedAt: new Date(),
         ...data,
       };
+
+      // Prisma nested create: z.B. user.create({ data: { categories: { create: [...] } } })
+      // → Einträge landen in der passenden Tabelle mit gesetztem Fremdschlüssel
+      for (const [key, val] of Object.entries(data)) {
+        if (val && typeof val === 'object' && Array.isArray(val.create) && store[key]) {
+          delete record[key];
+          const fk = tableName === 'users' ? 'userId' : tableName.slice(0, -1) + 'Id';
+          for (const child of val.create) {
+            store[key].push({
+              id: crypto.randomUUID(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              [fk]: record.id,
+              ...child,
+            });
+          }
+        }
+      }
+
       store[tableName].push(record);
       if (include) return applyInclude(record, include, store);
       return record;
@@ -135,6 +154,14 @@ function createCollection(store, tableName) {
       return store[tableName].splice(idx, 1)[0];
     },
 
+    deleteMany: async ({ where = {} } = {}) => {
+      const keep = store[tableName].filter(r => !matchesWhere(r, where));
+      const count = store[tableName].length - keep.length;
+      store[tableName].length = 0;
+      store[tableName].push(...keep);
+      return { count };
+    },
+
     upsert: async ({ where, create, update }) => {
       // Composite key support
       const compositeKey = Object.keys(where).find(k => k.includes('_'));
@@ -173,6 +200,13 @@ function createMockPrisma() {
     monthInits: [],
     categories: [],
     users: [],
+    reminders: [],
+    notes: [],
+    storedPasswords: [],
+    vaults: [],
+    vaultMembers: [],
+    servers: [],
+    shares: [],
   };
 
   return {
@@ -182,6 +216,13 @@ function createMockPrisma() {
     monthInit: createCollection(store, 'monthInits'),
     category: createCollection(store, 'categories'),
     user: createCollection(store, 'users'),
+    reminder: createCollection(store, 'reminders'),
+    note: createCollection(store, 'notes'),
+    storedPassword: createCollection(store, 'storedPasswords'),
+    vault: createCollection(store, 'vaults'),
+    vaultMember: createCollection(store, 'vaultMembers'),
+    server: createCollection(store, 'servers'),
+    share: createCollection(store, 'shares'),
   };
 }
 

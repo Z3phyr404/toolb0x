@@ -31,6 +31,7 @@
 .auth-error.show { display:block; }
 .auth-error.info { background:rgba(255,150,40,0.08); border-color:rgba(255,150,40,0.25); color:#ffb662; }
 .auth-name-hidden { display:none !important; }
+.recovery-code { font-family:'JetBrains Mono',monospace; font-size:17px; letter-spacing:0.06em; font-weight:600; color:#ffb662; background:rgba(255,150,40,0.08); border:1px dashed rgba(255,150,40,0.35); border-radius:12px; padding:16px 12px; margin-bottom:14px; user-select:all; word-break:break-all; }
 
 /* ===== PORTAL ===== */
 .portal { position:relative; z-index:1; min-height:100vh; overflow:hidden; padding:40px 0 80px; opacity:0; pointer-events:none; transition:opacity 0.4s; }
@@ -134,16 +135,35 @@
     </div>
     <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
     <div class="auth-error" id="authError"></div>
-    <form class="auth-form" id="authForm">
+    <form class="auth-form" id="authForm" novalidate>
       <input class="auth-input auth-name-hidden" id="authName" type="text" placeholder="Name" autocomplete="name">
-      <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
-      <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
+      <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email">
+      <input class="auth-input auth-name-hidden" id="authRecovery" type="text" placeholder="Recovery-Code" autocomplete="off" spellcheck="false">
+      <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password">
       <button class="auth-btn" type="submit" id="authBtn">Anmelden</button>
     </form>
     <div class="auth-switch">
       <span id="authSwitchText">Noch kein Konto?</span>
       <a id="authSwitchLink">Registrieren</a>
     </div>
+    <div class="auth-switch" id="forgotRow">
+      <a id="forgotLink">Passwort vergessen?</a>
+    </div>
+  </div>
+</div>
+
+<!-- RECOVERY-CODE ANZEIGE (einmalig nach Registrierung/Reset) -->
+<div class="ob-modal-overlay" id="recoveryModal">
+  <div class="ob-modal" style="text-align:center;">
+    <h2 style="font-size:20px;margin-bottom:10px;">Dein Recovery-Code</h2>
+    <p style="font-size:13px;color:var(--text-2);line-height:1.55;margin-bottom:18px;">
+      Mit diesem Code kannst du dein Passwort zurücksetzen, <strong>ohne deine
+      Daten zu verlieren</strong>. Speichere ihn an einem sicheren Ort (z.&nbsp;B.
+      ausgedruckt) — er wird nur <strong>einmal</strong> angezeigt.
+    </p>
+    <div class="recovery-code" id="recoveryCodeText">—</div>
+    <button class="auth-btn" id="copyRecoveryBtn" style="margin-bottom:10px;background:rgba(255,255,255,0.08);color:var(--text);box-shadow:none;">Code kopieren</button>
+    <button class="auth-btn" id="recoveryDoneBtn">Ich habe den Code gespeichert</button>
   </div>
 </div>
 
@@ -280,12 +300,69 @@
 <script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
 <script nonce="__CSP_NONCE__">
 const API = '/api';
+// Admin-Reset-Link: /portal?reset=<token> → Modus "token" (neues Passwort setzen)
+const resetToken = new URLSearchParams(window.location.search).get('reset');
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('authForm').addEventListener('submit', handleAuth);
-  document.getElementById('authSwitchLink').addEventListener('click', toggleAuthMode);
+  document.getElementById('authSwitchLink').addEventListener('click', function () {
+    setAuthMode(authMode === 'login' ? 'register' : 'login');
+  });
+  document.getElementById('forgotLink').addEventListener('click', function () {
+    setAuthMode('forgot');
+  });
   document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('copyRecoveryBtn').addEventListener('click', function () {
+    navigator.clipboard.writeText(document.getElementById('recoveryCodeText').textContent)
+      .then(function () { toast('Code kopiert'); })
+      .catch(function () { toast('Kopieren fehlgeschlagen — bitte manuell abschreiben.', 'error'); });
+  });
+  document.getElementById('recoveryDoneBtn').addEventListener('click', function () {
+    document.getElementById('recoveryModal').classList.remove('active');
+    if (afterRecoveryModal) { var fn = afterRecoveryModal; afterRecoveryModal = null; fn(); }
+  });
 });
-let isLoginMode = true;
+
+// 'login' | 'register' | 'forgot' | 'token'
+let authMode = 'login';
+let afterRecoveryModal = null;
+
+const AUTH_MODES = {
+  login:    { name: false, email: true,  recovery: false, pw: 'Passwort',       pwAc: 'current-password', btn: 'Anmelden',               subtitle: 'Melde dich an, um fortzufahren',
+              switchText: 'Noch kein Konto?', switchLink: 'Registrieren', forgot: true },
+  register: { name: true,  email: true,  recovery: false, pw: 'Passwort',       pwAc: 'new-password',     btn: 'Registrieren',           subtitle: 'Erstelle ein neues Konto',
+              switchText: 'Bereits registriert?', switchLink: 'Anmelden', forgot: false },
+  forgot:   { name: false, email: true,  recovery: true,  pw: 'Neues Passwort', pwAc: 'new-password',     btn: 'Passwort zurücksetzen',  subtitle: 'Reset mit deinem Recovery-Code — ohne Datenverlust',
+              switchText: 'Doch wieder eingefallen?', switchLink: 'Anmelden', forgot: false },
+  token:    { name: false, email: false, recovery: false, pw: 'Neues Passwort', pwAc: 'new-password',     btn: 'Neues Passwort setzen',  subtitle: 'Admin-Reset: Neues Passwort setzen',
+              switchText: '', switchLink: 'Zur Anmeldung', forgot: false },
+};
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const m = AUTH_MODES[mode];
+  document.getElementById('authName').classList.toggle('auth-name-hidden', !m.name);
+  document.getElementById('authEmail').classList.toggle('auth-name-hidden', !m.email);
+  document.getElementById('authRecovery').classList.toggle('auth-name-hidden', !m.recovery);
+  const pwEl = document.getElementById('authPassword');
+  pwEl.placeholder = m.pw;
+  pwEl.setAttribute('autocomplete', m.pwAc);
+  document.getElementById('authSubtitle').textContent = m.subtitle;
+  document.getElementById('authBtn').textContent = m.btn;
+  document.getElementById('authSwitchText').textContent = m.switchText;
+  document.getElementById('authSwitchLink').textContent = m.switchLink;
+  document.getElementById('forgotRow').style.display = m.forgot ? '' : 'none';
+  document.getElementById('authError').classList.remove('show', 'info');
+  if (mode === 'token') {
+    showAuthMessage('Achtung: Dieser Reset löscht alle bisherigen verschlüsselten Daten deines Kontos unwiderruflich.', false);
+  }
+}
+
+function showRecoveryCode(code, onDone) {
+  document.getElementById('recoveryCodeText').textContent = code;
+  afterRecoveryModal = onDone || null;
+  document.getElementById('recoveryModal').classList.add('active');
+}
 
 function escapeHtml(str) {
   const d = document.createElement('div');
@@ -309,16 +386,6 @@ function toast(msg, type='success') {
 function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
 function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
-function toggleAuthMode() {
-  isLoginMode = !isLoginMode;
-  document.getElementById('authName').classList.toggle('auth-name-hidden', isLoginMode);
-  document.getElementById('authSubtitle').textContent = isLoginMode ? 'Melde dich an, um fortzufahren' : 'Erstelle ein neues Konto';
-  document.getElementById('authBtn').textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
-  document.getElementById('authSwitchText').textContent = isLoginMode ? 'Noch kein Konto?' : 'Bereits registriert?';
-  document.getElementById('authSwitchLink').textContent = isLoginMode ? 'Registrieren' : 'Anmelden';
-  document.getElementById('authError').classList.remove('show', 'info');
-}
-
 function showAuthMessage(msg, isInfo) {
   const errEl = document.getElementById('authError');
   errEl.textContent = msg;
@@ -326,40 +393,69 @@ function showAuthMessage(msg, isInfo) {
   errEl.classList.add('show');
 }
 
+async function postJson(endpoint, body) {
+  const res = await fetch(API + endpoint, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw data;
+  return data;
+}
+
 async function handleAuth(e) {
   e.preventDefault();
-  const errEl = document.getElementById('authError');
-  errEl.classList.remove('show', 'info');
+  const mode = authMode;
+  document.getElementById('authError').classList.remove('show', 'info');
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const name = document.getElementById('authName').value.trim();
+  const recoveryCode = document.getElementById('authRecovery').value.trim();
   const btn = document.getElementById('authBtn');
   btn.disabled = true; btn.textContent = 'Laden...';
 
   try {
-    const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
-    const body = isLoginMode ? { email, password } : { email, password, name };
-    const wasRegister = !isLoginMode;
-    if (!isLoginMode && !name) throw { errors: ['Bitte gib deinen Namen ein.'] };
+    if (mode === 'login' || mode === 'register') {
+      if (mode === 'register' && !name) throw { errors: ['Bitte gib deinen Namen ein.'] };
+      const body = mode === 'login' ? { email, password } : { email, password, name };
+      const data = await postJson(mode === 'login' ? '/auth/login' : '/auth/register', body);
 
-    const res = await fetch(API + endpoint, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw data;
+      SessionTimeout.markActive();
+      // Merker: Auf diesem Gerät existiert ein Konto (für den Neustart-Hinweis)
+      try { localStorage.setItem('toolbox_known', '1'); } catch {}
 
-    SessionTimeout.markActive();
-    // Merker: Auf diesem Gerät existiert ein Konto (für den Neustart-Hinweis)
-    try { localStorage.setItem('toolbox_known', '1'); } catch {}
-    if (wasRegister) toast('Konto erstellt — willkommen!');
-    await checkAuth();
+      if (mode === 'register' && data.recoveryCode) {
+        // Recovery-Code EINMALIG zeigen, erst danach ins Portal
+        toast('Konto erstellt — willkommen!');
+        showRecoveryCode(data.recoveryCode, function () { checkAuth(); });
+      } else {
+        await checkAuth();
+      }
+
+    } else if (mode === 'forgot') {
+      if (!recoveryCode) throw { errors: ['Bitte gib deinen Recovery-Code ein.'] };
+      await postJson('/auth/reset-password', { email, recoveryCode, newPassword: password });
+      setAuthMode('login');
+      showAuthMessage('Passwort zurückgesetzt — melde dich jetzt mit dem neuen Passwort an. Dein Recovery-Code bleibt gültig.', true);
+      document.getElementById('authPassword').value = '';
+      document.getElementById('authRecovery').value = '';
+
+    } else if (mode === 'token') {
+      const data = await postJson('/auth/reset-with-token', { token: resetToken, newPassword: password });
+      // Frisches Konto → neuen Recovery-Code einmalig zeigen
+      showRecoveryCode(data.recoveryCode, function () {
+        window.history.replaceState(null, '', '/portal');
+        setAuthMode('login');
+        showAuthMessage('Passwort gesetzt — melde dich jetzt an.', true);
+        document.getElementById('authPassword').value = '';
+      });
+    }
   } catch (err) {
     // E-Mail existiert schon → direkt in den Anmelde-Modus wechseln
     // (E-Mail bleibt im Feld stehen, nur das Passwort ist noch einzugeben)
-    if (err.code === 'EMAIL_EXISTS' && !isLoginMode) {
-      toggleAuthMode();
+    if (err.code === 'EMAIL_EXISTS' && mode === 'register') {
+      setAuthMode('login');
       showAuthMessage('Diese E-Mail-Adresse ist bereits registriert — melde dich hier mit deinem Passwort an.', true);
       document.getElementById('authPassword').focus();
     } else {
@@ -367,7 +463,7 @@ async function handleAuth(e) {
     }
   } finally {
     btn.disabled = false;
-    btn.textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
+    btn.textContent = AUTH_MODES[authMode].btn;
   }
 }
 
@@ -512,7 +608,14 @@ document.getElementById('reminderCard').addEventListener('click', async function
   }
 });
 
-checkAuth();
+if (resetToken) {
+  // Admin-Reset-Link (?reset=<token>): kein Auto-Login,
+  // direkt das "Neues Passwort setzen"-Formular zeigen
+  document.addEventListener('DOMContentLoaded', function () { setAuthMode('token'); });
+  hideLoading();
+} else {
+  checkAuth();
+}
 </script>
 </body>
 </html>

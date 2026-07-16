@@ -305,6 +305,41 @@ function unwrapKeyWithPrivateKey(privateKeyPem, wrappedBase64) {
   }
 }
 
+// ============================================================
+// RECOVERY-CODE — Passwort-Reset ohne Datenverlust
+// ============================================================
+// Der Recovery-Code ist ein zweites "Passwort": Der Encryption Key
+// wird zusätzlich mit dem Code gewrappt (User.recoveryKey). Wer den
+// Code hat, kann den Key entschlüsseln und ein neues Passwort setzen,
+// ohne dass Daten verloren gehen. Der Server speichert den Code NIE
+// im Klartext — ein falscher Code lässt das GCM-Auth-Tag fehlschlagen.
+// ============================================================
+
+// Ohne leicht verwechselbare Zeichen (0/O, 1/I/L)
+const RECOVERY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/**
+ * Erzeugt einen Recovery-Code im Format XXXX-XXXX-XXXX-XXXX-XXXX-XXXX
+ * (24 Zeichen à ~4,95 Bit ≈ 119 Bit Entropie).
+ */
+function generateRecoveryCode() {
+  const bytes = crypto.randomBytes(24);
+  let code = '';
+  for (let i = 0; i < 24; i++) {
+    code += RECOVERY_ALPHABET[bytes[i] % RECOVERY_ALPHABET.length];
+    if ((i + 1) % 4 === 0 && i < 23) code += '-';
+  }
+  return code;
+}
+
+/**
+ * Normalisiert Nutzereingaben (Bindestriche/Leerzeichen egal,
+ * Groß-/Kleinschreibung egal, 0→O-Verwechslungen bleiben Fehler).
+ */
+function normalizeRecoveryCode(input) {
+  return String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 module.exports = {
   generateEncryptionKey,
   wrapEncryptionKey,
@@ -316,4 +351,6 @@ module.exports = {
   generateUserKeypair,
   wrapKeyWithPublicKey,
   unwrapKeyWithPrivateKey,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
 };

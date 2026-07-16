@@ -32,6 +32,15 @@ model User {
   publicKey           String @default("")
   encryptedPrivateKey String @default("") @db.Text
 
+  // Passwort-Reset:
+  // recoveryKey = Encryption Key, gewrappt mit dem Recovery-Code des Nutzers
+  // (gleiches Format wie encryptedKey). Reset OHNE Datenverlust möglich.
+  // resetToken = SHA-256-Hash eines Admin-generierten One-Time-Tokens
+  // (Reset MIT Datenverlust — alle verschlüsselten Daten werden gelöscht).
+  recoveryKey       String?   @db.Text
+  resetToken        String?   @unique
+  resetTokenExpires DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -83,6 +83,16 @@ function setupSecurity(app) {
   });
   app.use('/api/auth/register', registerLimiter);
 
+  // Passwort-Reset (öffentlich): streng limitieren gegen
+  // Brute-Force auf Recovery-Codes und Reset-Tokens
+  const resetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { errors: ['Zu viele Versuche. Bitte warte 15 Minuten.'] },
+  });
+  app.use('/api/auth/reset-password', resetLimiter);
+  app.use('/api/auth/reset-with-token', resetLimiter);
+
   // Sensitive Endpunkte: strengeres Rate-Limit
   const sensitiveLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,

@@ -353,6 +353,16 @@
       background: rgba(52,211,153,0.16);
     }
 
+    .suspend-btn.reset {
+      border: 1px solid rgba(56,189,248,0.25);
+      background: rgba(56,189,248,0.08);
+      color: #38bdf8;
+    }
+
+    .suspend-btn.reset:hover {
+      background: rgba(56,189,248,0.16);
+    }
+
     .suspend-btn.delete {
       border: 1px solid rgba(255,59,48,0.35);
       background: rgba(255,59,48,0.16);
@@ -626,6 +636,7 @@
             } else {
               actionBtn = '<button class="suspend-btn suspend" data-id="' + u.id + '" data-action="suspend">Sperren</button>';
             }
+            actionBtn += ' <button class="suspend-btn reset" data-id="' + u.id + '" data-action="reset">Reset-Link</button>';
             actionBtn += ' <button class="suspend-btn delete" data-id="' + u.id + '" data-action="delete">Löschen</button>';
           }
 
@@ -659,6 +670,37 @@
 
         var userId = btn.getAttribute('data-id');
         var action = btn.getAttribute('data-action');
+
+        // Reset-Link: erzeugt Link, kopiert ihn — Tabelle bleibt unverändert
+        if (action === 'reset') {
+          var rNameEl = btn.closest('tr') && btn.closest('tr').querySelector('.user-name');
+          var rName = rNameEl ? rNameEl.textContent : 'Nutzer';
+          if (!confirm('Passwort-Reset-Link für „' + rName + '“ erzeugen?\n\nACHTUNG: Beim Einlösen werden ALLE verschlüsselten Daten des Nutzers gelöscht (Zero-Knowledge). Nur verwenden, wenn Passwort UND Recovery-Code verloren sind.\n\nDer Link ist 60 Minuten gültig.')) return;
+
+          btn.disabled = true;
+          try {
+            var rRes = await fetch('/api/admin/users/' + userId + '/reset-link', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'X-CSRF-Token': getCsrfToken() },
+            });
+            var rData = await rRes.json();
+            if (!rRes.ok) { showToast(rData.error || 'Fehler', true); return; }
+
+            var url = window.location.origin + '/portal?reset=' + rData.token;
+            try {
+              await navigator.clipboard.writeText(url);
+              showToast('Reset-Link kopiert — 60 Minuten gültig. Jetzt an ' + rName + ' weitergeben.');
+            } catch (clipErr) {
+              window.prompt('Reset-Link (60 Min gültig) — kopieren und an ' + rName + ' weitergeben:', url);
+            }
+          } catch (err) {
+            showToast('Netzwerkfehler', true);
+          } finally {
+            btn.disabled = false;
+          }
+          return;
+        }
 
         var request;
         if (action === 'delete') {
