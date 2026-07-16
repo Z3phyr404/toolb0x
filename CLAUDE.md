@@ -340,7 +340,9 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 
 - **Helmet** mit CSP (script-src nur nonce-basiert, keine unsafe-inline)
 - **CORS** whitelist via `CORS_ORIGIN` env var
-- **Rate-Limiting:** Allgemein 100/15min, Login 10/15min, Register 5/h
+- **Rate-Limiting:** Allgemein 600/15min (`RATE_LIMIT_GENERAL`), Login 10/15min, Register 5/h, Reset 10/15min, Profil 15/15min, Passwort & Konto je 5/15min
+  - Das allgemeine Limit gilt PRO IP und deckt ALLE `/api/`-Routen ab — hinter einer NAT teilen sich alle Nutzer das Budget. Normale Nutzung ist API-intensiv (Seitenaufruf ~5 Calls), 100 war zu eng (429 ab ~20 Ausgaben in 15 Min).
+  - **Jeder sensible Endpunkt braucht eine EIGENE Limiter-Instanz.** Eine geteilte Instanz über mehrere `app.use()` zählt alle Pfade auf denselben Zähler (Profil-Speichern sperrte so die Konto-Löschung).
 - **HPP** — HTTP Parameter Pollution Schutz
 - **Body-Parser** — Max 10kb
 - **Timing-Attack-Schutz** — Dummy-Hash beim Login für nicht existierende Users
@@ -429,6 +431,13 @@ auf Verlaufs-Buttons), `--brand-link`. Neue Brand-Flächen IMMER über diese Tok
    - Scrollen: Container `height:100vh; overflow:hidden`, das `<main>` bekommt `overflow-y:auto`
      (so bleibt der Nutzer-Block in der Sidebar immer sichtbar)
    - Referenz-Umsetzungen: `passwords`, `servers`, `profil.html`
+   - **Scroll-Falle:** In der Sidebar NIE `scrollIntoView()` verwenden — das scrollt jeden
+     scrollbaren Vorfahren mit, auch den `overflow:hidden`-Container. Der lässt sich
+     programmatisch verschieben, aber der Nutzer kann ihn NICHT zurückscrollen (Symptom:
+     „komme durch Scrollen nicht mehr nach oben"). Stattdessen gezielt den Scroll-Container
+     bewegen: `mainEl.scrollTo({ top: ziel.offsetTop - 24, behavior: 'smooth' })`.
+     Ebenso KEIN `scroll-behavior: smooth` im CSS des Containers — das animiert auch jedes
+     `scrollTop = x` und macht die Position für Code unlesbar (liest sich als alter Wert).
    - **Layout lokal prüfen:** `node tests/helpers/layout-stub-server.js` (Port 3999) serviert
      die Frontends ohne DB mit gefakter API (vorher im Tab `sessionStorage.setItem('toolbox_active','1')`)
 

@@ -871,17 +871,20 @@ async function initApp() {
   } finally { hideLoading(); }
 }
 
-async function loadAllData() {
-  var results = await Promise.all([
-    api('/categories'),
-    api('/expenses?month=' + currentMonth),
-    api('/income?month=' + currentMonth),
-    api('/reminders?status=pending'),
-  ]);
-  categories = results[0].categories;
-  expenses = results[1].expenses;
-  incomes = results[2].incomes;
-  reminders = results[3].reminders;
+// Lädt nur die angegebenen Bereiche neu (ohne Argument: alles).
+// Wichtig fürs Rate-Limit: Das API-Budget zählt pro IP, und stumpf alles
+// nach jedem Speichern neu zu laden kostete 4 Calls pro Aktion.
+// Beispiel: eine Einnahme speichern ändert weder Kategorien noch Erinnerungen.
+var LADER = {
+  categories: function () { return api('/categories').then(function (r) { categories = r.categories; }); },
+  expenses:   function () { return api('/expenses?month=' + currentMonth).then(function (r) { expenses = r.expenses; }); },
+  income:     function () { return api('/income?month=' + currentMonth).then(function (r) { incomes = r.incomes; }); },
+  reminders:  function () { return api('/reminders?status=pending').then(function (r) { reminders = r.reminders; }); },
+};
+
+async function loadAllData(bereiche) {
+  var was = bereiche || Object.keys(LADER);
+  await Promise.all(was.map(function (b) { return LADER[b](); }));
 }
 
 // ============================================================
@@ -1245,7 +1248,8 @@ async function saveExpense() {
     }
     closeM('mExpense');
     document.getElementById('saveExpenseBtn').textContent = 'Speichern';
-    await loadAllData();
+    // Ausgabe + evtl. Erinnerung geändert — Kategorien/Einnahmen nicht
+    await loadAllData(['expenses', 'reminders']);
     renderCurrentPage();
   } catch(err) {
     toast((err.errors ? err.errors.join(', ') : null) || 'Fehler beim Speichern', 'error');
@@ -1311,7 +1315,7 @@ async function saveIncome() {
     }
     closeM('mIncome');
     document.getElementById('saveIncomeBtn').textContent = 'Speichern';
-    await loadAllData();
+    await loadAllData(['income']);
     renderCurrentPage();
   } catch(err) {
     toast((err.errors ? err.errors.join(', ') : null) || 'Fehler beim Speichern', 'error');
@@ -1373,7 +1377,8 @@ async function saveCat() {
     }
     closeM('mCat');
     document.getElementById('saveCatBtn').textContent = 'Speichern';
-    await loadAllData();
+    // Ausgaben tragen den Kategorienamen/-farbe eingebettet → mitladen
+    await loadAllData(['categories', 'expenses']);
     renderCurrentPage();
   } catch(err) {
     toast((err.errors ? err.errors.join(', ') : null) || 'Fehler beim Speichern', 'error');
@@ -1384,7 +1389,8 @@ async function delCat(id) {
   try {
     var res = await api('/categories/' + id, { method: 'DELETE' });
     toast('Kategorie gelöscht' + (res.movedExpenses > 0 ? ' (' + res.movedExpenses + ' Ausgaben verschoben)' : ''));
-    await loadAllData();
+    // Löschen verschiebt Ausgaben auf "Sonstiges" → beides neu laden
+    await loadAllData(['categories', 'expenses']);
     renderCurrentPage();
   } catch(err) { toast(err.error || 'Fehler beim Löschen', 'error'); }
 }

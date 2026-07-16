@@ -59,9 +59,14 @@ function setupSecurity(app) {
   app.use(cors(corsOptions));
 
   // 3. RATE LIMITING
+  // Das generelle Limit gilt PRO IP — hinter einer NAT (Familie, Büro) teilen
+  // sich alle Nutzer dasselbe Budget. Normale Nutzung ist API-intensiv
+  // (Seitenaufruf ~5 Calls, jedes Speichern ~5), deshalb großzügig: 100 wären
+  // schon bei ~20 Ausgaben in 15 Min erschöpft. Die wirklich sensiblen
+  // Endpunkte (Login, Register, Reset, Konto) haben eigene, enge Limits.
   const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: parseInt(process.env.RATE_LIMIT_GENERAL) || 600,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Zu viele Anfragen. Bitte warte einen Moment.' },
@@ -93,15 +98,22 @@ function setupSecurity(app) {
   app.use('/api/auth/reset-password', resetLimiter);
   app.use('/api/auth/reset-with-token', resetLimiter);
 
-  // Sensitive Endpunkte: strengeres Rate-Limit
-  const sensitiveLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: { error: 'Zu viele Anfragen. Bitte warte einen Moment.' },
-  });
-  app.use('/api/auth/password', sensitiveLimiter);
-  app.use('/api/auth/profile', sensitiveLimiter);
-  app.use('/api/auth/account', sensitiveLimiter);
+  // Sensitive Endpunkte: strengeres Rate-Limit.
+  // WICHTIG: Jeder Endpunkt braucht eine EIGENE Limiter-Instanz. Teilt man
+  // eine Instanz über mehrere app.use(), zählen alle Pfade auf denselben
+  // Zähler — dann sperrt z.B. mehrmaliges Profil-Speichern die Konto-Löschung.
+  function sensitiveLimiter(max) {
+    return rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max,
+      message: { errors: ['Zu viele Versuche. Bitte warte einen Moment.'] },
+    });
+  }
+  // Profil darf man öfter speichern (Tippfehler, mehrere Anläufe) …
+  app.use('/api/auth/profile', sensitiveLimiter(15));
+  // … Passwort ändern und Konto löschen bleiben eng.
+  app.use('/api/auth/password', sensitiveLimiter(5));
+  app.use('/api/auth/account', sensitiveLimiter(5));
 
   // 4. HPP
   app.use(hpp());
