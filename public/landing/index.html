@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Toolb0x — Deine Tools. Deine Daten. Verschlüsselt.</title>
 <meta name="description" content="Toolb0x ist dein privates, verschlüsseltes Tool-Portal: Finanzen, Notizen und Passwörter — Zero-Knowledge-verschlüsselt, ohne Werbung, ohne Tracking.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/fonts.css">
 <link rel="stylesheet" href="/shared/obsidian.css">
 <style nonce="__CSP_NONCE__">
 /* ===== LAYOUT ===== */
@@ -76,6 +74,9 @@
 
 /* ===== FOOTER ===== */
 .footer { margin-top:64px; padding-top:28px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; color:var(--text-3); }
+.footer-links { display:flex; gap:8px; }
+.footer-links a { color:var(--text-2); }
+.footer-links a:hover { color:var(--brand-link); text-decoration:underline; }
 
 /* ===== MOBILE ===== */
 @media (max-width:640px) {
@@ -260,6 +261,11 @@
     <!-- FOOTER -->
     <footer class="footer">
       <span>© 2026 Toolb0x — privates Projekt</span>
+      <span class="footer-links">
+        <a href="/impressum">Impressum</a>
+        <span>·</span>
+        <a href="/datenschutz">Datenschutz</a>
+      </span>
       <span class="mono" style="font-family:'JetBrains Mono',monospace;">AES-256-GCM · Zero-Knowledge · toolb0x.eu</span>
     </footer>
 

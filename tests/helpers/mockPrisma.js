@@ -12,6 +12,20 @@ function matchesWhere(record, where) {
   for (const [key, val] of Object.entries(where)) {
     if (val === undefined) continue;
 
+    // Logische Operatoren (Prisma: OR/AND/NOT)
+    if (key === 'OR') {
+      if (!val.some(bedingung => matchesWhere(record, bedingung))) return false;
+      continue;
+    }
+    if (key === 'AND') {
+      if (!val.every(bedingung => matchesWhere(record, bedingung))) return false;
+      continue;
+    }
+    if (key === 'NOT') {
+      if (matchesWhere(record, val)) return false;
+      continue;
+    }
+
     // Prisma-Composite-Key (z.B. userId_month_type)
     if (key.includes('_') && typeof val === 'object' && !val.gt && !val.lt) {
       // Composite key: jedes Feld im Objekt muss matchen
@@ -37,19 +51,33 @@ function matchesWhere(record, where) {
   return true;
 }
 
+// Relationsname → Tabelle im Store (Prisma pluralisiert nicht schematisch)
+const RELATION_TABELLE = {
+  category: 'categories',
+  vault: 'vaults',
+  user: 'users',
+  expense: 'expenses',
+};
+
+// Generisches include: { vault: {...} } lädt store.vaults über record.vaultId.
+// Bewusst generisch, damit neue Relationen nicht jedes Mal den Mock brechen.
 function applyInclude(record, include, store) {
   if (!include) return record;
   const result = { ...record };
-  if (include.category && record.categoryId) {
-    const cat = store.categories.find(c => c.id === record.categoryId);
-    if (cat && include.category.select) {
-      const selected = {};
-      for (const field of Object.keys(include.category.select)) {
-        selected[field] = cat[field];
-      }
-      result.category = selected;
+
+  for (const [relation, optionen] of Object.entries(include)) {
+    if (!optionen) continue;
+    const tabelle = RELATION_TABELLE[relation] || relation + 's';
+    const fk = relation + 'Id';
+    if (!store[tabelle] || record[fk] === undefined || record[fk] === null) continue;
+
+    const treffer = store[tabelle].find(r => r.id === record[fk]);
+    if (treffer && optionen.select) {
+      const gewaehlt = {};
+      for (const feld of Object.keys(optionen.select)) gewaehlt[feld] = treffer[feld];
+      result[relation] = gewaehlt;
     } else {
-      result.category = cat || null;
+      result[relation] = treffer || null;
     }
   }
   return result;

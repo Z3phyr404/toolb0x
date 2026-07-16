@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Profil — Toolb0x</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/fonts.css">
 <link rel="stylesheet" href="/shared/obsidian.css">
 <style nonce="__CSP_NONCE__">
 /* ===== PAGE LAYOUT ===== */
@@ -340,13 +338,23 @@
     <div class="ob-card export-card" data-reveal data-reveal-index="5">
       <h2>Datenexport</h2>
       <p class="export-desc">
-        Exportiere alle deine Finanzdaten (Einnahmen und Ausgaben aller Monate)
-        als PDF-Datei.
+        Deine Finanzdaten als PDF zum Lesen und Archivieren — oder <strong>alle</strong>
+        Daten als JSON, wenn du sie weiterverarbeiten oder mitnehmen möchtest
+        (Datenübertragbarkeit nach Art. 20 DSGVO).
       </p>
-      <button class="btn-export" id="exportAllBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Alle Finanzdaten exportieren (PDF)
-      </button>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-export" id="exportAllBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Finanzdaten als PDF
+        </button>
+        <button class="btn-export" id="exportJsonBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Alle Daten als JSON
+        </button>
+      </div>
+      <p class="export-desc" style="margin:12px 0 0;font-size:12px;color:var(--text-3);">
+        Achtung: Die JSON-Datei enthält auch deine Passwörter im Klartext.
+      </p>
     </div>
 
     <!-- Gefahrenzone -->
@@ -629,14 +637,15 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
   }
 });
 
-// ---- Gesamt-Export ----
-document.getElementById('exportAllBtn').addEventListener('click', async function() {
-  var btn = document.getElementById('exportAllBtn');
+// ---- Datenexport (PDF + JSON) ----
+var DOWNLOAD_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> ';
+
+async function ladeExport(btnId, pfad, dateiname, beschriftung) {
+  var btn = document.getElementById(btnId);
   btn.disabled = true;
   btn.textContent = 'Export wird erstellt\u2026';
-
   try {
-    var res = await fetch(API + '/export/pdf-all', { credentials: 'include' });
+    var res = await fetch(API + pfad, { credentials: 'include' });
     if (!res.ok) {
       if (res.status === 401) return window.location.href = '/portal';
       throw new Error();
@@ -645,18 +654,28 @@ document.getElementById('exportAllBtn').addEventListener('click', async function
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'Gesamtexport_Finanzen_' + new Date().toISOString().slice(0, 10) + '.pdf';
+    a.download = dateiname;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast('Gesamtexport wurde erstellt!');
+    toast('Export wurde erstellt!');
   } catch(err) {
     toast('Export fehlgeschlagen.', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Alle Finanzdaten exportieren (PDF)';
+    btn.innerHTML = DOWNLOAD_ICON + beschriftung;
   }
+}
+
+document.getElementById('exportAllBtn').addEventListener('click', function() {
+  var datum = new Date().toISOString().slice(0, 10);
+  ladeExport('exportAllBtn', '/export/pdf-all', 'Gesamtexport_Finanzen_' + datum + '.pdf', 'Finanzdaten als PDF');
+});
+
+document.getElementById('exportJsonBtn').addEventListener('click', function() {
+  var datum = new Date().toISOString().slice(0, 10);
+  ladeExport('exportJsonBtn', '/export/json', 'toolb0x-export-' + datum + '.json', 'Alle Daten als JSON');
 });
 
 // ---- Logout-Button ----

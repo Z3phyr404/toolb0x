@@ -90,6 +90,12 @@ app.use('/s', express.static(path.join(__dirname, 'public', 'share'), {
 }));
 
 // Gemeinsame Assets (CSS, Fonts, etc.)
+// Schriften ändern sich praktisch nie → lange cachen (muss VOR /shared stehen)
+app.use('/shared/fonts', express.static(path.join(__dirname, 'public', 'shared', 'fonts'), {
+  etag: true,
+  immutable: true,
+  maxAge: '1y',
+}));
 app.use('/shared', express.static(path.join(__dirname, 'public', 'shared'), { etag: true }));
 
 // ============================================================
@@ -168,6 +174,14 @@ app.get('/app/servers', serveHtmlWithNonce(
 // Öffentliche Share-Seite (KEIN Login, KEIN Portal-Redirect)
 app.get('/s', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'share', 'index.html')
+));
+
+// Rechtsseiten — öffentlich, müssen ohne Login erreichbar sein
+app.get('/impressum', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'legal', 'impressum.html')
+));
+app.get('/datenschutz', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'legal', 'datenschutz.html')
 ));
 
 // 404 für API

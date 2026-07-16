@@ -1,0 +1,134 @@
+/* ============================================================
+   RECHTSSEITEN — Impressum, Datenschutz
+   Öffentlich erreichbar, kein Login, bewusst schlicht und lesbar.
+   ============================================================ */
+
+.legal-page {
+  min-height: 100vh;
+  padding: 48px 24px 80px;
+}
+.legal-inner {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.legal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+.legal-mark { width: 34px; height: 34px; }
+.legal-brand-name { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+
+.legal-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--brand-link);
+  margin-bottom: 10px;
+}
+
+.legal-inner h1 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin-bottom: 32px;
+}
+.legal-inner h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 34px 0 12px;
+}
+.legal-inner p,
+.legal-inner li {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+.legal-inner p { margin-bottom: 12px; }
+.legal-inner strong { color: var(--text); }
+.legal-inner ul { margin: 0 0 12px; padding-left: 22px; }
+.legal-inner li { margin-bottom: 8px; }
+.legal-inner code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: var(--text);
+}
+.legal-inner a { color: var(--brand-link); }
+.legal-inner a:hover { text-decoration: underline; }
+
+/* Hinweis auf noch auszufüllende Stellen — soll auffallen */
+.legal-todo {
+  background: rgba(255,204,0,0.08);
+  border: 1px solid rgba(255,204,0,0.3);
+  border-radius: var(--radius-btn);
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #f0d264;
+  margin-bottom: 28px;
+}
+.legal-todo strong { color: #ffdd77; }
+.legal-todo code { background: rgba(0,0,0,0.25); color: #f0d264; }
+
+/* Absätze mit Platzhaltern dezent markieren */
+.legal-fill {
+  border-left: 2px solid rgba(255,204,0,0.35);
+  padding-left: 14px;
+}
+
+.legal-note {
+  background: rgba(52,211,153,0.06);
+  border: 1px solid rgba(52,211,153,0.2);
+  border-radius: var(--radius-btn);
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.legal-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.legal-table th {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mono);
+  font-weight: 500;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-strong);
+}
+.legal-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  line-height: 1.5;
+  vertical-align: top;
+}
+.legal-table tr:last-child td { border-bottom: none; }
+
+.legal-footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+@media (max-width: 600px) {
+  .legal-page { padding: 28px 16px 60px; }
+  .legal-inner h1 { font-size: 27px; }
+  /* Tabelle auf schmalen Schirmen scrollbar statt gequetscht */
+  .legal-table { display: block; overflow-x: auto; white-space: nowrap; }
+}

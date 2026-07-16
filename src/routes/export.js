@@ -1,5 +1,5 @@
 // ============================================================
-// EXPORT-ROUTEN — PDF-Export für Monatsübersicht
+// EXPORT-ROUTEN — PDF-Export + JSON-Datenexport (DSGVO Art. 20)
 // ============================================================
 
 const express = require('express');
@@ -7,6 +7,7 @@ const PDFDocument = require('pdfkit');
 const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
+const { unwrapMembershipKey } = require('../utils/vaultKeys');
 
 const router = express.Router();
 
@@ -749,6 +750,169 @@ router.get('/pdf-all', async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: 'PDF konnte nicht erstellt werden.' });
     }
+  }
+});
+
+// ============================================================
+// GET /api/export/json — Vollständiger Datenexport (DSGVO Art. 20)
+// ============================================================
+// Art. 20 verlangt ein "strukturiertes, gängiges, maschinenlesbares
+// Format" — das erfüllt der PDF-Export NICHT, deshalb dieser Endpunkt.
+// Alles wird mit dem User-Key (bzw. Tresor-Schlüssel) entschlüsselt und
+// im Klartext ausgeliefert.
+//
+// Grenze der Vollständigkeit: Der `blob` geteilter Links ist CLIENTSEITIG
+// verschlüsselt, der Schlüssel steht nur im URL-Fragment. Der Server kann
+// ihn prinzipbedingt nicht entschlüsseln — deshalb hier nur die Metadaten.
+router.get('/json', async (req, res) => {
+  try {
+    const key = req.encryptionKey;
+
+    // Tresor-Schlüssel der Mitgliedschaften einmal entpacken
+    const memberships = await prisma.vaultMember.findMany({
+      where: { userId: req.userId },
+      include: { vault: { select: { id: true, name: true, ownerId: true, createdAt: true } } },
+    });
+    const vaultKeys = {};
+    const vaults = [];
+    for (const m of memberships) {
+      const vk = await unwrapMembershipKey(m, req.userId, key);
+      if (!vk) continue;
+      vaultKeys[m.vaultId] = vk;
+      vaults.push({
+        id: m.vault.id,
+        name: decrypt(m.vault.name, vk),
+        rolle: m.role,
+        binIchEigentuemer: m.vault.ownerId === req.userId,
+        erstelltAm: m.vault.createdAt,
+      });
+    }
+
+    const [user, kategorien, ausgaben, einnahmen, erinnerungen, notizen, passwoerter, server, shares] =
+      await Promise.all([
+        prisma.user.findUnique({
+          where: { id: req.userId },
+          select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true },
+        }),
+        prisma.category.findMany({ where: { userId: req.userId } }),
+        prisma.expense.findMany({ where: { userId: req.userId }, include: { category: true } }),
+        prisma.income.findMany({ where: { userId: req.userId } }),
+        prisma.reminder.findMany({ where: { userId: req.userId } }),
+        prisma.note.findMany({ where: { userId: req.userId } }),
+        prisma.storedPassword.findMany({
+          where: {
+            OR: [
+              { userId: req.userId, vaultId: null },
+              ...(Object.keys(vaultKeys).length > 0 ? [{ vaultId: { in: Object.keys(vaultKeys) } }] : []),
+            ],
+          },
+        }),
+        prisma.server.findMany({ where: { userId: req.userId } }),
+        prisma.share.findMany({ where: { userId: req.userId } }),
+      ]);
+
+    const entschluesselt = {
+      hinweis: 'Vollständiger Export deiner Daten aus Toolb0x (DSGVO Art. 20). '
+        + 'Alle Inhalte sind hier im Klartext — bewahre die Datei sicher auf.',
+      exportiertAm: new Date().toISOString(),
+      konto: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        rolle: user.role,
+        registriertAm: user.createdAt,
+        zuletztGeaendert: user.updatedAt,
+      },
+      kategorien: kategorien.map(c => ({
+        id: c.id,
+        name: decrypt(c.name, key),
+        farbe: decrypt(c.color, key),
+        erstelltAm: c.createdAt,
+      })),
+      ausgaben: ausgaben.map(e => {
+        const d = decryptExpense(e, key);
+        return {
+          id: e.id,
+          name: d.name,
+          betrag: d.amount,
+          tags: d.tags,
+          monat: e.month,
+          wiederkehrend: e.isRecurring,
+          kategorie: d.category ? d.category.name : null,
+          erstelltAm: e.createdAt,
+        };
+      }),
+      einnahmen: einnahmen.map(i => ({
+        id: i.id,
+        name: decrypt(i.name, key),
+        betrag: decrypt(i.amount, key),
+        monat: i.month,
+        wiederkehrend: i.isRecurring,
+        erstelltAm: i.createdAt,
+      })),
+      erinnerungen: erinnerungen.map(r => ({
+        id: r.id,
+        notiz: r.note ? decrypt(r.note, key) : null,
+        datum: r.reminderDate,
+        tageVorher: r.daysBefore,
+        status: r.status,
+        ausgabeId: r.expenseId,
+      })),
+      notizen: notizen.map(n => ({
+        id: n.id,
+        titel: decrypt(n.title, key),
+        inhaltHtml: n.content ? decrypt(n.content, key) : '',
+        icon: n.icon,
+        uebergeordneteSeite: n.parentId,
+        angepinnt: n.isPinned,
+        archiviert: n.isArchived,
+        erstelltAm: n.createdAt,
+        geaendertAm: n.updatedAt,
+      })),
+      passwoerter: passwoerter.map(p => {
+        const pk = p.vaultId ? vaultKeys[p.vaultId] : key;
+        return {
+          id: p.id,
+          name: decrypt(p.name, pk),
+          benutzername: p.username ? decrypt(p.username, pk) : '',
+          passwort: decrypt(p.password, pk),
+          website: p.website ? decrypt(p.website, pk) : '',
+          notizen: p.notes ? decrypt(p.notes, pk) : '',
+          tresorId: p.vaultId,
+          erstelltAm: p.createdAt,
+        };
+      }),
+      tresore: vaults,
+      server: server.map(s => ({
+        id: s.id,
+        bezeichnung: decrypt(s.label, key),
+        host: decrypt(s.host, key),
+        port: s.port,
+        benutzername: decrypt(s.username, key),
+        authTyp: s.authType,
+        notizen: s.notes ? decrypt(s.notes, key) : '',
+        erstelltAm: s.createdAt,
+      })),
+      geteilteLinks: shares.map(s => ({
+        token: s.token,
+        pinGeschuetzt: s.hasPin,
+        maxAnsichten: s.maxViews,
+        ansichten: s.viewCount,
+        laeuftAbAm: s.expiresAt,
+        erstelltAm: s.createdAt,
+        hinweis: 'Inhalt clientseitig verschlüsselt — der Schlüssel steht nur im '
+          + 'Link-Fragment und liegt dem Server nicht vor, daher nicht exportierbar.',
+      })),
+    };
+
+    const datum = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="toolb0x-export-${datum}.json"`);
+    res.send(JSON.stringify(entschluesselt, null, 2));
+
+  } catch (error) {
+    console.error('JSON-Export fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Export fehlgeschlagen.' });
   }
 });
 

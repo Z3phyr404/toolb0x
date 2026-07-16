@@ -67,9 +67,11 @@ const PAGES = {
   '/app/finanzen': '/apps/finanzen/index.html',
   '/app/notizen': '/apps/notizen/index.html',
   '/s': '/share/index.html',
+  '/impressum': '/legal/impressum.html',
+  '/datenschutz': '/legal/datenschutz.html',
 };
 
-const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain' };
 
 http.createServer((req, res) => {
   const url = req.url.split('?')[0];

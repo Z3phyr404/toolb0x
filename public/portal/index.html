@@ -4,9 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Tool-Portal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/fonts.css">
 <link rel="stylesheet" href="/shared/obsidian.css">
 <style nonce="__CSP_NONCE__">
 /* ===== AUTH ===== */
@@ -25,6 +23,9 @@
 .auth-btn:active { transform:scale(0.98); }
 .auth-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 .auth-switch { margin-top:20px; font-size:13px; color:var(--text-2); }
+.auth-legal { margin-top:22px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:8px; justify-content:center; font-size:12px; color:var(--text-3); }
+.auth-legal a { color:var(--text-3); }
+.auth-legal a:hover { color:var(--text-2); text-decoration:underline; }
 .auth-switch a { color:var(--brand-link); cursor:pointer; text-decoration:none; font-weight:500; }
 .auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--error-text); font-size:13px; padding:10px 14px; border-radius:var(--radius-btn); display:none; }
 .auth-error.show { display:block; }
@@ -157,6 +158,11 @@
     </div>
     <div class="auth-switch" id="forgotRow">
       <a id="forgotLink">Passwort vergessen?</a>
+    </div>
+    <div class="auth-legal">
+      <a href="/impressum">Impressum</a>
+      <span>·</span>
+      <a href="/datenschutz">Datenschutz</a>
     </div>
   </div>
 </div>

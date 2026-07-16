@@ -78,6 +78,8 @@ toolb0x/
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
 | `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
+| `/impressum` | **Öffentlich.** Impressum (`public/legal/impressum.html`) — enthält noch Platzhalter |
+| `/datenschutz` | **Öffentlich.** Datenschutzerklärung (`public/legal/datenschutz.html`) — technische Angaben stimmen, juristische Prüfung offen |
 | `/s` | **Öffentliche** View-Seite für geteilte Links (KEIN Login, KEIN Portal-Redirect) — Schlüssel steht im URL-Fragment `#<token>~<key>` |
 | `/api/auth/*` | Auth-API |
 | `/api/categories/*` | Kategorien-API |
@@ -296,6 +298,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
 - GET `/pdf-all` — Gesamt-PDF-Export aller Einnahmen & Ausgaben (Monatsübersicht + Details pro Monat)
+- GET `/json` — **Vollständiger Datenexport (DSGVO Art. 20)**, maschinenlesbar. Entschlüsselt auch Tresor-Einträge (via `unwrapMembershipKey`). Share-`blob`s sind clientseitig verschlüsselt → nur Metadaten. PDF erfüllt Art. 20 NICHT (nicht maschinenlesbar), daher dieser Endpunkt.
 
 ### Passwords (`/api/passwords/`)
 | Methode | Route | Beschreibung |
@@ -383,7 +386,11 @@ Konsistentes CSS-System, das in allen HTML-Dateien gleich ist:
 **Hintergrund:** Animiertes Gradient in allen Seiten gleich:
 `linear-gradient(135deg, #a8c8f0 0%, #d4b8e8 25%, #f0c8c8 50%, #b8d8f0 75%, #c8e8d0 100%)`
 
-**Font:** SF Pro (System-Font via `local()`), kein externer Font-Download
+**Font:** Space Grotesk + JetBrains Mono, **lokal gehostet** (`public/shared/fonts/`,
+eingebunden über `/shared/fonts.css`). NIEMALS wieder von fonts.googleapis.com laden:
+dabei geht die IP jedes Besuchers an Google (LG München I, 3 O 17493/20 — Abmahnrisiko).
+Beide Familien stehen unter der SIL OFL 1.1, die Lizenztexte liegen bei. Nur `latin` +
+`latin-ext`; die CSP erlaubt deshalb keine externen `style-src`/`font-src`-Quellen mehr.
 
 **Marke (seit Juli 2026):** Wortmarke ist einheitlich **„Toolb0x"** (mit Null, wie die Domain).
 Logo-Mark = Werkzeugkasten-Glyph als Kontur-SVG mit Verlaufs-Stroke auf dezenter Kachel

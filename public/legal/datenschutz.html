@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Datenschutzerklärung — Toolb0x</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/shared/fonts.css">
+<link rel="stylesheet" href="/shared/obsidian.css">
+<link rel="stylesheet" href="/shared/legal.css">
+</head>
+<body>
+<div class="legal-page">
+  <div class="legal-inner">
+    <a href="/" class="legal-brand ob-logo-link" title="Zur Startseite">
+      <div class="legal-mark brand-tile">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="brandGradLegal" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
+          <g stroke="url(#brandGradLegal)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="8.5" width="18" height="11" rx="2.5"/>
+            <path d="M9 8.5V7.5a3 3 0 0 1 6 0v1"/>
+            <path d="M3 13.5h7M14 13.5h7"/>
+            <path d="M10 12h4v3h-4z"/>
+          </g>
+        </svg>
+      </div>
+      <span class="legal-brand-name">Toolb0x</span>
+    </a>
+
+    <div class="legal-label">// RECHTLICHES</div>
+    <h1>Datenschutzerklärung</h1>
+
+    <div class="legal-todo">
+      <strong>Entwurf — bitte prüfen lassen.</strong> Die technischen Angaben
+      unten entsprechen dem tatsächlichen Stand der Anwendung. Die mit
+      <code>[…]</code> markierten Stellen musst du ausfüllen, und die
+      rechtliche Bewertung solltest du fachkundig prüfen lassen, bevor du
+      diesen Hinweis entfernst (<code>public/legal/datenschutz.html</code>).
+    </div>
+
+    <h2>1. Verantwortlicher</h2>
+    <p class="legal-fill">
+      [VORNAME NACHNAME]<br>
+      [STRASSE HAUSNUMMER], [PLZ ORT], Deutschland<br>
+      E-Mail: [DEINE-EMAIL@DOMAIN.DE]
+    </p>
+
+    <h2>2. Das Wichtigste vorweg: Zero-Knowledge</h2>
+    <p>
+      Deine Inhalte — Finanzdaten, Notizen, Passwörter, Servereinträge —
+      werden mit <strong>AES-256-GCM verschlüsselt, bevor sie gespeichert
+      werden</strong>. Der Schlüssel wird aus deinem Passwort abgeleitet und
+      existiert nur, solange du angemeldet bist, ausschließlich im
+      Arbeitsspeicher. In der Datenbank steht ausschließlich Chiffretext.
+    </p>
+    <p>
+      Das bedeutet: <strong>Der Betreiber kann deine Inhalte nicht lesen</strong>
+      — auch nicht bei vollem Serverzugriff, auf behördliche Anordnung oder
+      im Fall eines Datenlecks. Es bedeutet aber auch: Ohne dein Passwort und
+      ohne deinen Recovery-Code sind deine Daten unwiederbringlich verloren.
+      Wir können sie nicht wiederherstellen.
+    </p>
+
+    <h2>3. Welche Daten verarbeitet werden</h2>
+    <table class="legal-table">
+      <thead>
+        <tr><th>Daten</th><th>Zweck</th><th>Rechtsgrundlage</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>E-Mail-Adresse, Name</td>
+          <td>Kontoführung, Anmeldung, Einladungen in geteilte Tresore</td>
+          <td>Art. 6 Abs. 1 lit. b DSGVO (Vertrag)</td>
+        </tr>
+        <tr>
+          <td>Passwort (nur als bcrypt-Hash, Cost&nbsp;12)</td>
+          <td>Authentifizierung</td>
+          <td>Art. 6 Abs. 1 lit. b DSGVO</td>
+        </tr>
+        <tr>
+          <td>Inhalte (verschlüsselt, für uns unlesbar)</td>
+          <td>Bereitstellung der Werkzeuge</td>
+          <td>Art. 6 Abs. 1 lit. b DSGVO</td>
+        </tr>
+        <tr>
+          <td>Zeitstempel (Registrierung, Änderungen)</td>
+          <td>Technischer Betrieb</td>
+          <td>Art. 6 Abs. 1 lit. f DSGVO</td>
+        </tr>
+        <tr>
+          <td>Server-Logs des Webservers (IP-Adresse, Zeitpunkt, aufgerufene Adresse)</td>
+          <td>Betriebssicherheit, Missbrauchsabwehr</td>
+          <td>Art. 6 Abs. 1 lit. f DSGVO</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="legal-note">
+      Es findet <strong>kein Tracking</strong> statt: keine Analyse-Werkzeuge,
+      keine Werbe-Netzwerke, keine Weitergabe an Dritte zu Werbezwecken.
+    </p>
+
+    <h2>4. Cookies</h2>
+    <p>
+      Toolb0x setzt ausschließlich technisch erforderliche Cookies — deshalb
+      erscheint kein Cookie-Banner (§ 25 Abs. 2 Nr. 2 TDDDG):
+    </p>
+    <ul>
+      <li>
+        <code>auth_token</code> — hält dich angemeldet. HttpOnly (für Skripte
+        unlesbar), SameSite=Strict, im Betrieb nur über HTTPS. Läuft nach
+        20 Minuten Inaktivität ab.
+      </li>
+      <li>
+        <code>csrf_token</code> — schützt vor Cross-Site Request Forgery.
+      </li>
+    </ul>
+
+    <h2>5. Hosting und Auftragsverarbeitung</h2>
+    <p class="legal-fill">
+      Die Anwendung läuft auf einem Server der [HETZNER ONLINE GMBH,
+      Industriestr. 25, 91710 Gunzenhausen] in [Nürnberg, Deutschland].
+      Mit dem Anbieter besteht ein Vertrag zur Auftragsverarbeitung nach
+      Art. 28 DSGVO. [PRÜFEN: AVV in der Hetzner-Konsole abgeschlossen?]
+    </p>
+    <p>
+      Eine Übermittlung in Drittländer findet nicht statt. Schriftarten werden
+      lokal von unserem Server ausgeliefert — es besteht keine Verbindung zu
+      Google Fonts oder anderen externen Diensten.
+    </p>
+
+    <h2>6. Speicherdauer</h2>
+    <ul>
+      <li>
+        <strong>Kontodaten und Inhalte:</strong> bis zur Löschung des Kontos.
+        Du kannst dein Konto jederzeit selbst im Profil löschen — das entfernt
+        alle zugehörigen Daten unwiderruflich und sofort.
+      </li>
+      <li class="legal-fill">
+        <strong>Server-Logs:</strong> [PRÜFEN UND EINTRAGEN — üblich sind
+        7 Tage, danach automatische Löschung. Konfiguration der nginx-Logrotation
+        auf dem Server prüfen.]
+      </li>
+      <li>
+        <strong>Geteilte Links:</strong> werden automatisch gelöscht, sobald
+        das Ablaufdatum erreicht oder die maximale Zahl an Ansichten
+        aufgebraucht ist.
+      </li>
+    </ul>
+
+    <h2>7. Deine Rechte</h2>
+    <p>
+      Dir stehen die Rechte auf Auskunft (Art. 15), Berichtigung (Art. 16),
+      Löschung (Art. 17), Einschränkung (Art. 18), Datenübertragbarkeit
+      (Art. 20) und Widerspruch (Art. 21) zu. Zwei davon kannst du direkt in
+      der Anwendung ausüben, ohne uns kontaktieren zu müssen:
+    </p>
+    <ul>
+      <li>
+        <strong>Datenübertragbarkeit:</strong> Profil → Datenexport → „Alle
+        Daten als JSON" liefert deinen vollständigen Datenbestand
+        entschlüsselt in einem maschinenlesbaren Format.
+      </li>
+      <li>
+        <strong>Löschung:</strong> Profil → Gefahrenzone → „Konto
+        unwiderruflich löschen".
+      </li>
+    </ul>
+    <p class="legal-fill">
+      Für alles Weitere erreichst du uns unter [DEINE-EMAIL@DOMAIN.DE].
+      Außerdem steht dir ein Beschwerderecht bei einer Aufsichtsbehörde zu
+      (Art. 77 DSGVO), etwa der für [DEIN BUNDESLAND] zuständigen Stelle.
+    </p>
+
+    <h2>8. Sicherheit der Verarbeitung (Art. 32 DSGVO)</h2>
+    <ul>
+      <li>Verschlüsselung aller Inhalte mit AES-256-GCM vor dem Speichern</li>
+      <li>Schlüsselableitung aus dem Passwort per PBKDF2 (SHA-512, 100.000 Iterationen)</li>
+      <li>Passwort-Hashing mit bcrypt (Cost 12)</li>
+      <li>Geteilte Tresore: Schlüssel pro Mitglied per RSA-2048-OAEP gekapselt</li>
+      <li>Geteilte Links: Verschlüsselung im Browser, der Schlüssel steht nur im Link-Fragment und erreicht den Server nie</li>
+      <li>Transportverschlüsselung (HTTPS/TLS) mit HSTS</li>
+      <li>Strikte Content-Security-Policy, Schutz gegen CSRF und Clickjacking</li>
+      <li>Trennung der Nutzerdaten auf Datenbankebene (jede Abfrage ist an das Konto gebunden)</li>
+    </ul>
+
+    <h2>9. Mindestalter</h2>
+    <p>
+      Das Angebot richtet sich an Personen ab 16 Jahren. Jüngere Nutzerinnen
+      und Nutzer benötigen die Einwilligung der Sorgeberechtigten
+      (Art. 8 DSGVO).
+    </p>
+
+    <h2>10. Änderungen</h2>
+    <p class="legal-fill">
+      Stand: [DATUM EINTRAGEN]. Wir passen diese Erklärung an, wenn sich die
+      Anwendung ändert.
+    </p>
+
+    <div class="legal-footer">
+      <a href="/">Startseite</a>
+      <span>·</span>
+      <a href="/impressum">Impressum</a>
+      <span>·</span>
+      <a href="/portal">Zum Portal</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
