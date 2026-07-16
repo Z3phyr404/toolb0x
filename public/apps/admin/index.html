@@ -353,6 +353,16 @@
       background: rgba(52,211,153,0.16);
     }
 
+    .suspend-btn.delete {
+      border: 1px solid rgba(255,59,48,0.35);
+      background: rgba(255,59,48,0.16);
+      color: #ff6b60;
+    }
+
+    .suspend-btn.delete:hover {
+      background: rgba(255,59,48,0.28);
+    }
+
     .suspend-btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -610,10 +620,13 @@
             actionBtn = '<span class="self-label">Du</span>';
           } else if (u.role === 'admin') {
             actionBtn = '<button class="suspend-btn is-admin" disabled>Admin</button>';
-          } else if (u.suspended) {
-            actionBtn = '<button class="suspend-btn unsuspend" data-id="' + u.id + '" data-action="unsuspend">Entsperren</button>';
           } else {
-            actionBtn = '<button class="suspend-btn suspend" data-id="' + u.id + '" data-action="suspend">Sperren</button>';
+            if (u.suspended) {
+              actionBtn = '<button class="suspend-btn unsuspend" data-id="' + u.id + '" data-action="unsuspend">Entsperren</button>';
+            } else {
+              actionBtn = '<button class="suspend-btn suspend" data-id="' + u.id + '" data-action="suspend">Sperren</button>';
+            }
+            actionBtn += ' <button class="suspend-btn delete" data-id="' + u.id + '" data-action="delete">Löschen</button>';
           }
 
           html +=
@@ -636,52 +649,65 @@
         var root = document.getElementById('adminRoot');
         if (typeof initGlow === 'function') initGlow(root);
         if (typeof initReveal === 'function') initReveal(root);
+      }
 
-        // Event-Handler für Sperr-Buttons
-        contentEl.addEventListener('click', async function (e) {
-          var btn = e.target.closest('.suspend-btn[data-action]');
-          if (!btn) return;
+      // Event-Handler für Aktions-Buttons — EINMAL registrieren, nicht pro
+      // Render (sonst stapeln sich Listener → doppelte Confirm-Dialoge)
+      document.getElementById('content').addEventListener('click', async function (e) {
+        var btn = e.target.closest('.suspend-btn[data-action]');
+        if (!btn) return;
 
-          var userId = btn.getAttribute('data-id');
-          var action = btn.getAttribute('data-action');
+        var userId = btn.getAttribute('data-id');
+        var action = btn.getAttribute('data-action');
+
+        var request;
+        if (action === 'delete') {
+          var nameEl = btn.closest('tr') && btn.closest('tr').querySelector('.user-name');
+          var userName = nameEl ? nameEl.textContent : 'Nutzer';
+          if (!confirm('„' + userName + '“ wirklich ENDGÜLTIG löschen?\n\nAlle Daten (Finanzen, Notizen, Passwörter, eigene Tresore) werden unwiderruflich entfernt.')) return;
+          request = fetch('/api/admin/users/' + userId, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'X-CSRF-Token': getCsrfToken() },
+          });
+        } else {
           var suspend = action === 'suspend';
-
           var confirmMsg = suspend
             ? 'Nutzer wirklich sperren? Die aktive Sitzung wird sofort beendet.'
             : 'Nutzer wieder entsperren?';
-
           if (!confirm(confirmMsg)) return;
+          request = fetch('/api/admin/users/' + userId + '/suspend', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ suspended: suspend }),
+          });
+        }
 
-          btn.disabled = true;
-          try {
-            var res = await fetch('/api/admin/users/' + userId + '/suspend', {
-              method: 'PATCH',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-              body: JSON.stringify({ suspended: suspend }),
-            });
-            var data = await res.json();
+        btn.disabled = true;
+        try {
+          var res = await request;
+          var data = await res.json();
 
-            if (!res.ok) {
-              showToast(data.error || 'Fehler', true);
-              btn.disabled = false;
-              return;
-            }
-
-            showToast(data.message);
-
-            // Seite neu laden um Tabelle zu aktualisieren
-            var newStatsRes = await fetch('/api/admin/stats');
-            var newUsersRes = await fetch('/api/admin/users');
-            var newStats = await newStatsRes.json();
-            var newUsers = await newUsersRes.json();
-            renderDashboard(newStats, newUsers.users, myId);
-          } catch (err) {
-            showToast('Netzwerkfehler', true);
+          if (!res.ok) {
+            showToast(data.error || 'Fehler', true);
             btn.disabled = false;
+            return;
           }
-        });
-      }
+
+          showToast(data.message);
+
+          // Tabelle aktualisieren
+          var newStatsRes = await fetch('/api/admin/stats');
+          var newUsersRes = await fetch('/api/admin/users');
+          var newStats = await newStatsRes.json();
+          var newUsers = await newUsersRes.json();
+          renderDashboard(newStats, newUsers.users, me.id);
+        } catch (err) {
+          showToast('Netzwerkfehler', true);
+          btn.disabled = false;
+        }
+      });
 
       function escapeHtml(str) {
         var div = document.createElement('div');

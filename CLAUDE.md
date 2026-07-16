@@ -326,6 +326,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | GET | `/stats` | Nutzeranzahl + neuester Nutzer (`requireAuth` + `requireAdmin`) |
 | GET | `/users` | Nutzerliste mit E-Mail, Rolle, Datenstatistiken |
 | PATCH | `/users/:id/suspend` | Nutzer sperren/entsperren (body: `{ suspended: bool }`) |
+| DELETE | `/users/:id` | Nutzer endgültig löschen (Kaskade löscht alle Daten; nicht für Admins/sich selbst) |
 
 ---
 
@@ -484,6 +485,8 @@ pm2 restart all            # Prozess neu starten — lädt neuen Client + Code i
 - Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)
 - Portal zeigt fällige Erinnerungen als dynamische Glass-Karte (nur sichtbar wenn Erinnerungen anstehen)
 - **Admin-Bereich** (`/app/admin`): Nur für User mit `role: 'admin'` sichtbar. Admin-Karte im Portal wird per JS bedingt angezeigt. Backend geschützt durch `requireAdmin` Middleware. Admin sieht nur unverschlüsselte Felder (Zero-Knowledge gewahrt). Admin-Rolle nur per DB-Zugriff setzbar.
+- **Registrierungs-UX**: Doppelte E-Mail liefert `400 + code: 'EMAIL_EXISTS'` — das Portal wechselt dann automatisch in den Anmelde-Modus (E-Mail bleibt stehen). Nach Browser-Neustart-Logout zeigt das Portal einen Info-Hinweis „Zur Sicherheit abgemeldet" — aber nur, wenn `localStorage.toolbox_known` gesetzt ist (wird bei erfolgreichem Login/Register gesetzt; verhindert die Meldung bei Erstbesuchern). Grund: Nutzer hielten die Registrierung für fehlgeschlagen, weil sie nach Browser-Neustart wieder das Login-Formular sahen, und versuchten sich erneut zu registrieren.
+- **Nutzer löschen (Admin)**: `DELETE /api/admin/users/:id` — Kaskade löscht alle Daten inkl. eigener Tresore (auch für Tresor-Mitglieder weg!). Sessions werden sofort beendet. Admins und sich selbst kann man nicht löschen.
 - **Nutzersperre** (`suspended`-Feld): Gesperrte Nutzer können sich nicht einloggen (403 beim Login). Beim Sperren werden alle aktiven Sessions sofort beendet (`sessionStore.deleteAllForUser`). Admins können nicht gesperrt werden. Admin kann sich nicht selbst sperren.
 - **Secret-Sharing** (`/app/passwords` → Teilen-Button/Ad-hoc-Box, View unter `/s`): Anders als der Rest der App nutzt Sharing **NICHT** den User-Encryption-Key aus `encryption.js`. Stattdessen erzeugt der Browser des Absenders einen frischen Zufalls-Schlüssel (`public/shared/share-crypto.js`, Web Crypto), verschlüsselt clientseitig (AES-256-GCM) und legt nur den opaken `blob` auf dem Server ab. Der Schlüssel wandert im **URL-Fragment** (`/s#<token>~<key>`) — Fragmente werden vom Browser nicht an den Server gesendet → echter Zero-Knowledge, auch der Betreiber kann geteilte Geheimnisse nicht lesen.
 - **PIN beim Share** ist kein Server-Check: die PIN wird via `PBKDF2(keyMaterial ‖ PIN, salt)` kryptografisch in den AES-Key eingemischt. Falsche/fehlende PIN → GCM-Auth-Tag schlägt fehl → Entschlüsselung wirft. `hasPin` (DB) steuert nur die PIN-Abfrage im View.

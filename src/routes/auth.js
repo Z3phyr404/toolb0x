@@ -73,8 +73,11 @@ router.post('/register', async (req, res) => {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      // code: Frontend wechselt damit automatisch in den Anmelde-Modus.
+      // Klartext statt vager Meldung: /profile verrät die Existenz ohnehin schon.
       return res.status(400).json({
-        errors: ['Registrierung fehlgeschlagen. Bitte versuche es mit anderen Daten.'],
+        code: 'EMAIL_EXISTS',
+        errors: ['Diese E-Mail-Adresse ist bereits registriert. Melde dich stattdessen an.'],
       });
     }
 

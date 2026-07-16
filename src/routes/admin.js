@@ -129,4 +129,44 @@ router.patch('/users/:id/suspend', async (req, res) => {
   }
 });
 
+// ============================================================
+// DELETE /api/admin/users/:id — Nutzer endgültig löschen
+// ============================================================
+// Kaskade löscht alle Daten des Nutzers (Kategorien, Ausgaben,
+// Einnahmen, Erinnerungen, Notizen, Passwörter, eigene Tresore).
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Admin kann sich nicht selbst löschen
+    if (id === req.userId) {
+      return res.status(400).json({ error: 'Du kannst dich nicht selbst löschen.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Nutzer nicht gefunden.' });
+    }
+
+    // Andere Admins können nicht gelöscht werden
+    if (user.role === 'admin') {
+      return res.status(400).json({ error: 'Admins können nicht gelöscht werden.' });
+    }
+
+    await prisma.user.delete({ where: { id } });
+
+    // Aktive Sessions des Nutzers sofort beenden
+    sessionStore.deleteAllForUser(id);
+
+    res.json({ message: `${user.name} wurde endgültig gelöscht.` });
+  } catch (error) {
+    console.error('Nutzer-Löschung fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
 module.exports = router;

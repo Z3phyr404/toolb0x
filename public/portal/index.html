@@ -29,6 +29,7 @@
 .auth-switch a { color:#f97316; cursor:pointer; text-decoration:none; font-weight:500; }
 .auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--error-text); font-size:13px; padding:10px 14px; border-radius:var(--radius-btn); display:none; }
 .auth-error.show { display:block; }
+.auth-error.info { background:rgba(255,150,40,0.08); border-color:rgba(255,150,40,0.25); color:#ffb662; }
 .auth-name-hidden { display:none !important; }
 
 /* ===== PORTAL ===== */
@@ -315,13 +316,20 @@ function toggleAuthMode() {
   document.getElementById('authBtn').textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
   document.getElementById('authSwitchText').textContent = isLoginMode ? 'Noch kein Konto?' : 'Bereits registriert?';
   document.getElementById('authSwitchLink').textContent = isLoginMode ? 'Registrieren' : 'Anmelden';
-  document.getElementById('authError').classList.remove('show');
+  document.getElementById('authError').classList.remove('show', 'info');
+}
+
+function showAuthMessage(msg, isInfo) {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = msg;
+  errEl.classList.toggle('info', !!isInfo);
+  errEl.classList.add('show');
 }
 
 async function handleAuth(e) {
   e.preventDefault();
   const errEl = document.getElementById('authError');
-  errEl.classList.remove('show');
+  errEl.classList.remove('show', 'info');
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const name = document.getElementById('authName').value.trim();
@@ -331,6 +339,7 @@ async function handleAuth(e) {
   try {
     const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
     const body = isLoginMode ? { email, password } : { email, password, name };
+    const wasRegister = !isLoginMode;
     if (!isLoginMode && !name) throw { errors: ['Bitte gib deinen Namen ein.'] };
 
     const res = await fetch(API + endpoint, {
@@ -342,10 +351,20 @@ async function handleAuth(e) {
     if (!res.ok) throw data;
 
     SessionTimeout.markActive();
+    // Merker: Auf diesem Gerät existiert ein Konto (für den Neustart-Hinweis)
+    try { localStorage.setItem('toolbox_known', '1'); } catch {}
+    if (wasRegister) toast('Konto erstellt — willkommen!');
     await checkAuth();
   } catch (err) {
-    errEl.textContent = err.errors?.join(', ') || err.error || 'Ein Fehler ist aufgetreten.';
-    errEl.classList.add('show');
+    // E-Mail existiert schon → direkt in den Anmelde-Modus wechseln
+    // (E-Mail bleibt im Feld stehen, nur das Passwort ist noch einzugeben)
+    if (err.code === 'EMAIL_EXISTS' && !isLoginMode) {
+      toggleAuthMode();
+      showAuthMessage('Diese E-Mail-Adresse ist bereits registriert — melde dich hier mit deinem Passwort an.', true);
+      document.getElementById('authPassword').focus();
+    } else {
+      showAuthMessage(err.errors?.join(', ') || err.error || 'Ein Fehler ist aufgetreten.');
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
@@ -364,6 +383,11 @@ async function checkAuth() {
   try {
     if (SessionTimeout.wasRestarted()) {
       await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(function () {});
+      // Nur für Geräte, auf denen schon mal ein Login/Register erfolgreich war —
+      // sonst würden Erstbesucher fälschlich "abgemeldet" sehen.
+      if (localStorage.getItem('toolbox_known')) {
+        showAuthMessage('Du wurdest zur Sicherheit abgemeldet. Melde dich mit deinem bestehenden Konto an.', true);
+      }
       throw new Error('browser-restart');
     }
 
