@@ -14,19 +14,18 @@
 .auth-screen.hidden { opacity:0; pointer-events:none; transform:scale(1.02); }
 .auth-card { width:100%; max-width:420px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:48px 40px 40px; text-align:center; }
 .auth-logo { font-size:32px; font-weight:700; letter-spacing:-0.03em; margin-bottom:4px; display:flex; align-items:center; justify-content:center; gap:12px; }
-.auth-logo-mark { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#ffa83d,#f97316); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(249,115,22,0.35); }
-.auth-logo-mark-inner { width:12px; height:12px; border:2px solid #2a1405; border-radius:3px; }
+.auth-logo-mark { width:36px; height:36px; }
 .auth-subtitle { font-size:14px; color:var(--text-2); margin-bottom:32px; }
 .auth-form { display:flex; flex-direction:column; gap:14px; }
 .auth-input { width:100%; padding:14px 16px; border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-btn); background:rgba(255,255,255,0.04); font-family:inherit; font-size:15px; color:var(--text); outline:none; transition:border-color 0.2s,background 0.2s; }
 .auth-input:focus { border-color:rgba(249,115,22,0.6); background:rgba(255,255,255,0.07); }
 .auth-input::placeholder { color:var(--text-3); }
-.auth-btn { width:100%; padding:14px; border:none; border-radius:var(--radius-btn); background:linear-gradient(135deg,#ffa83d,#f97316); color:#2a1405; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:opacity 0.2s,transform 0.1s; margin-top:4px; box-shadow:0 6px 20px rgba(249,115,22,0.3); }
-.auth-btn:hover { transform:translateY(-1px); box-shadow:0 8px 26px rgba(249,115,22,0.42); }
+.auth-btn { width:100%; padding:14px; border:none; border-radius:var(--radius-btn); background:var(--brand-grad); color:var(--brand-ink); font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:opacity 0.2s,transform 0.1s; margin-top:4px; box-shadow:0 6px 20px rgba(255,110,100,0.28); }
+.auth-btn:hover { transform:translateY(-1px); box-shadow:0 8px 26px rgba(255,110,100,0.4); }
 .auth-btn:active { transform:scale(0.98); }
 .auth-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
 .auth-switch { margin-top:20px; font-size:13px; color:var(--text-2); }
-.auth-switch a { color:#f97316; cursor:pointer; text-decoration:none; font-weight:500; }
+.auth-switch a { color:var(--brand-link); cursor:pointer; text-decoration:none; font-weight:500; }
 .auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--error-text); font-size:13px; padding:10px 14px; border-radius:var(--radius-btn); display:none; }
 .auth-error.show { display:block; }
 .auth-error.info { background:rgba(255,150,40,0.08); border-color:rgba(255,150,40,0.25); color:#ffb662; }
@@ -41,14 +40,13 @@
 
 .portal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:52px; flex-wrap:wrap; gap:16px; }
 .portal-brand { display:flex; align-items:center; gap:14px; }
-.portal-brand-mark { width:38px; height:38px; border-radius:11px; background:linear-gradient(135deg,#ffa83d,#f97316); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(249,115,22,0.4); }
-.portal-brand-mark-inner { width:14px; height:14px; border:2px solid #2a1405; border-radius:4px; }
+.portal-brand-mark { width:38px; height:38px; }
 .portal-brand-name { font-size:21px; font-weight:700; letter-spacing:-0.02em; }
 .portal-user { display:flex; align-items:center; gap:16px; }
 .portal-badge { font-family:'JetBrains Mono',monospace; font-size:11px; color:#ffb662; background:rgba(255,150,40,0.1); border:1px solid rgba(255,150,40,0.24); padding:6px 11px; border-radius:8px; }
 .portal-avatar { width:32px; height:32px; border-radius:50%; background:#232b37; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:#a9bccd; }
 .portal-user-name { font-size:14px; font-weight:500; text-decoration:none; color:inherit; transition:color 0.2s; }
-.portal-user-name:hover { color:#f97316; }
+.portal-user-name:hover { color:var(--brand-link); }
 
 .portal-welcome { margin-bottom:40px; }
 .portal-section-label { font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.14em; color:#ff9f43; margin-bottom:12px; }
@@ -75,7 +73,7 @@
 .reminder-action-btn.done { background:rgba(52,211,153,0.15); color:#34d399; }
 .reminder-action-btn.dismiss { background:rgba(255,255,255,0.06); color:var(--text-3); }
 .reminder-more { text-align:center; padding:10px; font-size:12px; color:var(--text-3); }
-.reminder-more a { color:#f97316; text-decoration:none; font-weight:500; }
+.reminder-more a { color:var(--brand-link); text-decoration:none; font-weight:500; }
 
 /* ===== TOOL GRID ===== */
 .tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:18px; }
@@ -130,8 +128,18 @@
 <div class="auth-screen" id="authScreen">
   <div class="auth-card">
     <div class="auth-logo">
-      <div class="auth-logo-mark"><div class="auth-logo-mark-inner"></div></div>
-      <span>ToolBox</span>
+      <div class="auth-logo-mark brand-tile">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+          <defs><linearGradient id="brandGradAuth" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
+          <g stroke="url(#brandGradAuth)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="8.5" width="18" height="11" rx="2.5"/>
+            <path d="M9 8.5V7.5a3 3 0 0 1 6 0v1"/>
+            <path d="M3 13.5h7M14 13.5h7"/>
+            <path d="M10 12h4v3h-4z"/>
+          </g>
+        </svg>
+      </div>
+      <span>Toolb0x</span>
     </div>
     <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
     <div class="auth-error" id="authError"></div>
@@ -178,8 +186,18 @@
     <!-- HEADER -->
     <header class="portal-header" data-reveal data-reveal-index="0">
       <div class="portal-brand">
-        <div class="portal-brand-mark"><div class="portal-brand-mark-inner"></div></div>
-        <span class="portal-brand-name jitter">ToolBox</span>
+        <div class="portal-brand-mark brand-tile">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <defs><linearGradient id="brandGradHead" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
+            <g stroke="url(#brandGradHead)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="8.5" width="18" height="11" rx="2.5"/>
+              <path d="M9 8.5V7.5a3 3 0 0 1 6 0v1"/>
+              <path d="M3 13.5h7M14 13.5h7"/>
+              <path d="M10 12h4v3h-4z"/>
+            </g>
+          </svg>
+        </div>
+        <span class="portal-brand-name jitter">Toolb0x</span>
       </div>
       <div class="portal-user">
         <span class="portal-badge">AES-256 · ZERO-KNOWLEDGE</span>

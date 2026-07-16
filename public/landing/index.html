@@ -17,8 +17,7 @@
 /* ===== TOPBAR ===== */
 .topbar { display:flex; align-items:center; justify-content:space-between; padding:26px 0; }
 .brand { display:flex; align-items:center; gap:13px; }
-.brand-mark { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#ffa83d,#f97316); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(249,115,22,0.4); }
-.brand-mark-inner { width:13px; height:13px; border:2px solid #2a1405; border-radius:4px; }
+.brand-mark { width:38px; height:38px; }
 .brand-name { font-size:20px; font-weight:700; letter-spacing:-0.02em; }
 .topbar-login { padding:9px 18px; border-radius:var(--radius-btn); border:1px solid var(--border-strong); font-size:14px; font-weight:600; transition:background .2s,border-color .2s; }
 .topbar-login:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.2); }
@@ -27,11 +26,11 @@
 .hero { padding:72px 0 64px; text-align:center; }
 .hero-pill { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.1em; color:#ffb662; background:rgba(255,150,40,0.1); border:1px solid rgba(255,150,40,0.24); padding:7px 14px; border-radius:var(--radius-pill); margin-bottom:26px; }
 .hero h1 { font-size:52px; font-weight:700; letter-spacing:-0.03em; line-height:1.08; max-width:760px; margin:0 auto 20px; }
-.hero h1 em { font-style:normal; background:linear-gradient(135deg,#ffa83d,#f97316); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.hero h1 em { font-style:normal; background:var(--brand-grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
 .hero p { font-size:17px; color:var(--text-2); line-height:1.6; max-width:560px; margin:0 auto 36px; }
 .hero-cta { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
-.btn-cta { display:inline-block; padding:15px 32px; border-radius:var(--radius-btn); background:linear-gradient(135deg,#ffa83d,#f97316); color:#2a1405; font-size:15px; font-weight:700; box-shadow:0 8px 26px rgba(249,115,22,0.35); transition:transform .15s, box-shadow .2s; }
-.btn-cta:hover { transform:translateY(-2px); box-shadow:0 12px 34px rgba(249,115,22,0.45); }
+.btn-cta { display:inline-block; padding:15px 32px; border-radius:var(--radius-btn); background:var(--brand-grad); color:var(--brand-ink); font-size:15px; font-weight:700; box-shadow:0 8px 26px rgba(255,110,100,0.3); transition:transform .15s, box-shadow .2s; }
+.btn-cta:hover { transform:translateY(-2px); box-shadow:0 12px 34px rgba(255,110,100,0.42); }
 .btn-ghost { display:inline-block; padding:15px 32px; border-radius:var(--radius-btn); border:1px solid var(--border-strong); font-size:15px; font-weight:600; color:var(--text); transition:background .2s; }
 .btn-ghost:hover { background:rgba(255,255,255,0.06); }
 .hero-trust { margin-top:22px; font-size:13px; color:var(--text-3); }
@@ -71,7 +70,7 @@
 .step p { font-size:14px; color:var(--text-2); line-height:1.6; }
 
 /* ===== BOTTOM CTA ===== */
-.bottom-cta { margin-top:72px; padding:52px 32px; text-align:center; background:linear-gradient(135deg,rgba(255,150,40,0.09),rgba(249,115,22,0.04)); border:1px solid rgba(255,150,40,0.2); border-radius:var(--radius-card); }
+.bottom-cta { margin-top:72px; padding:52px 32px; text-align:center; background:linear-gradient(135deg,rgba(255,179,71,0.09),rgba(255,92,122,0.05)); border:1px solid rgba(255,140,100,0.22); border-radius:var(--radius-card); }
 .bottom-cta h2 { font-size:28px; font-weight:700; letter-spacing:-0.02em; margin-bottom:10px; }
 .bottom-cta p { font-size:15px; color:var(--text-2); margin-bottom:28px; }
 
@@ -94,7 +93,7 @@
 
 <div class="landing">
   <!-- Glow -->
-  <div data-glow data-glow-primary data-depth="60" style="position:absolute;top:-200px;right:-140px;width:680px;height:680px;background:radial-gradient(circle,rgba(255,146,32,0.22),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1);"></div>
+  <div data-glow data-glow-primary data-depth="60" style="position:absolute;top:-200px;right:-140px;width:680px;height:680px;background:radial-gradient(circle,rgba(255,122,100,0.2),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1);"></div>
   <div data-glow data-depth="32" style="position:absolute;top:820px;left:-180px;width:560px;height:560px;background:radial-gradient(circle,rgba(45,212,191,0.07),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
 
   <div class="landing-inner">
@@ -102,8 +101,18 @@
     <!-- TOPBAR -->
     <header class="topbar">
       <div class="brand">
-        <div class="brand-mark"><div class="brand-mark-inner"></div></div>
-        <span class="brand-name jitter">ToolBox</span>
+        <div class="brand-mark brand-tile">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <defs><linearGradient id="brandGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
+            <g stroke="url(#brandGrad)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="8.5" width="18" height="11" rx="2.5"/>
+              <path d="M9 8.5V7.5a3 3 0 0 1 6 0v1"/>
+              <path d="M3 13.5h7M14 13.5h7"/>
+              <path d="M10 12h4v3h-4z"/>
+            </g>
+          </svg>
+        </div>
+        <span class="brand-name jitter">Toolb0x</span>
       </div>
       <a href="/portal" class="topbar-login" id="topbarLogin">Anmelden</a>
     </header>

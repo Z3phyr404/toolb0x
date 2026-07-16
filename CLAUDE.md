@@ -383,6 +383,13 @@ Konsistentes CSS-System, das in allen HTML-Dateien gleich ist:
 
 **Font:** SF Pro (System-Font via `local()`), kein externer Font-Download
 
+**Marke (seit Juli 2026):** Wortmarke ist einheitlich **„Toolb0x"** (mit Null, wie die Domain).
+Logo-Mark = Werkzeugkasten-Glyph als Kontur-SVG mit Verlaufs-Stroke auf dezenter Kachel
+(`.brand-tile` in obsidian.css) — bewusst KEIN gefüllter oranger Kasten mehr (zu nah an
+bekannten Orange-auf-Schwarz-Marken). Verlauf Orange→Koralle über Tokens in obsidian.css:
+`--brand-1: #ffb347`, `--brand-2: #ff5c7a`, `--brand-grad`, `--brand-ink` (dunkle Schrift
+auf Verlaufs-Buttons), `--brand-link`. Neue Brand-Flächen IMMER über diese Tokens stylen.
+
 ---
 
 ## Neues Tool hinzufügen — Checkliste

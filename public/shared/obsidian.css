@@ -25,6 +25,26 @@
   --radius-btn: 11px;
   --radius-icon: 14px;
   --radius-pill: 99px;
+
+  /* Marke: Orange→Koralle-Verlauf (bewusst weg vom reinen Orange-Kasten-Look) */
+  --brand-1: #ffb347;
+  --brand-2: #ff5c7a;
+  --brand-grad: linear-gradient(135deg, #ffb347, #ff5c7a);
+  --brand-ink: #2f0e14;              /* dunkle Schrift auf Verlauf-Buttons */
+  --brand-link: #ff9166;             /* Linkfarbe */
+  --brand-glow: rgba(255,199,100,0.3);
+}
+
+/* Marken-Tile: dezente Kachel mit Kontur-Glyph statt gefülltem Kasten */
+.brand-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,140,90,0.08);
+  border: 1px solid rgba(255,140,90,0.32);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(255,110,100,0.18);
+  flex-shrink: 0;
 }
 
 /* ===== RESET ===== */
