@@ -125,8 +125,10 @@ app.use('/api/vaults', vaultRoutes);
 // FRONTEND-ROUTING
 // ============================================================
 
-// Root → Portal
-app.get('/', (req, res) => res.redirect('/portal'));
+// Root → Öffentliche Landing Page (erklärt das Portal, CTA → /portal)
+app.get('/', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'landing', 'index.html')
+));
 
 // Portal
 app.get('/portal', serveHtmlWithNonce(
@@ -184,6 +186,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Tool-Portal läuft auf http://localhost:${PORT}`);
+  console.log(`🏠 Landing:     http://localhost:${PORT}/`);
   console.log(`📊 Portal:      http://localhost:${PORT}/portal`);
   console.log(`💰 Finanz-App:  http://localhost:${PORT}/app/finanzen`);
   console.log(`📡 API:         http://localhost:${PORT}/api`);

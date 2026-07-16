@@ -302,6 +302,8 @@
 const API = '/api';
 // Admin-Reset-Link: /portal?reset=<token> → Modus "token" (neues Passwort setzen)
 const resetToken = new URLSearchParams(window.location.search).get('reset');
+// Landing-Page-CTA: /portal?register=1 → direkt im Registrieren-Modus starten
+const wantsRegister = new URLSearchParams(window.location.search).get('register');
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('authForm').addEventListener('submit', handleAuth);
@@ -614,6 +616,11 @@ if (resetToken) {
   document.addEventListener('DOMContentLoaded', function () { setAuthMode('token'); });
   hideLoading();
 } else {
+  if (wantsRegister) {
+    // Von der Landing Page: Registrieren-Modus vorwählen
+    // (checkAuth läuft trotzdem — bestehende Sessions landen im Portal)
+    document.addEventListener('DOMContentLoaded', function () { setAuthMode('register'); });
+  }
   checkAuth();
 }
 </script>

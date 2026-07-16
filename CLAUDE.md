@@ -46,6 +46,8 @@ toolb0x/
 │       ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
 │       └── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
 └── public/
+    ├── landing/
+    │   └── index.html                   # ÖFFENTLICHE Landing Page (/, kein Login)
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
     │   └── profil.html                  # Profil-/Einstellungsseite
@@ -69,7 +71,7 @@ toolb0x/
 
 | URL | Beschreibung |
 |-----|-------------|
-| `/` | Redirect → `/portal` |
+| `/` | **Öffentliche Landing Page** (`public/landing/index.html`) — erklärt das Portal, CTAs → `/portal` bzw. `/portal?register=1` (öffnet direkt den Registrieren-Modus). Eingeloggte Besucher sehen „Zum Portal"-CTAs |
 | `/portal` | Tool-Übersicht (HTML mit Nonce) |
 | `/portal/profil` | Profilseite (HTML mit Nonce) |
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |

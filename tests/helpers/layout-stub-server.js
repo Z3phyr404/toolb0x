@@ -46,6 +46,7 @@ const API = {
 };
 
 const PAGES = {
+  '/': '/landing/index.html',
   '/portal': '/portal/index.html',
   '/portal/profil': '/portal/profil.html',
   '/app/passwords': '/apps/passwords/index.html',

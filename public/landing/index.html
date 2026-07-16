@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Toolb0x — Deine Tools. Deine Daten. Verschlüsselt.</title>
+<meta name="description" content="Toolb0x ist dein privates, verschlüsseltes Tool-Portal: Finanzen, Notizen und Passwörter — Zero-Knowledge-verschlüsselt, ohne Werbung, ohne Tracking.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/obsidian.css">
+<style nonce="__CSP_NONCE__">
+/* ===== LAYOUT ===== */
+.landing { position:relative; min-height:100vh; overflow:hidden; }
+.landing-inner { position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:0 28px 90px; }
+
+/* ===== TOPBAR ===== */
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:26px 0; }
+.brand { display:flex; align-items:center; gap:13px; }
+.brand-mark { width:36px; height:36px; border-radius:10px; background:linear-gradient(135deg,#ffa83d,#f97316); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(249,115,22,0.4); }
+.brand-mark-inner { width:13px; height:13px; border:2px solid #2a1405; border-radius:4px; }
+.brand-name { font-size:20px; font-weight:700; letter-spacing:-0.02em; }
+.topbar-login { padding:9px 18px; border-radius:var(--radius-btn); border:1px solid var(--border-strong); font-size:14px; font-weight:600; transition:background .2s,border-color .2s; }
+.topbar-login:hover { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.2); }
+
+/* ===== HERO ===== */
+.hero { padding:72px 0 64px; text-align:center; }
+.hero-pill { display:inline-block; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.1em; color:#ffb662; background:rgba(255,150,40,0.1); border:1px solid rgba(255,150,40,0.24); padding:7px 14px; border-radius:var(--radius-pill); margin-bottom:26px; }
+.hero h1 { font-size:52px; font-weight:700; letter-spacing:-0.03em; line-height:1.08; max-width:760px; margin:0 auto 20px; }
+.hero h1 em { font-style:normal; background:linear-gradient(135deg,#ffa83d,#f97316); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.hero p { font-size:17px; color:var(--text-2); line-height:1.6; max-width:560px; margin:0 auto 36px; }
+.hero-cta { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+.btn-cta { display:inline-block; padding:15px 32px; border-radius:var(--radius-btn); background:linear-gradient(135deg,#ffa83d,#f97316); color:#2a1405; font-size:15px; font-weight:700; box-shadow:0 8px 26px rgba(249,115,22,0.35); transition:transform .15s, box-shadow .2s; }
+.btn-cta:hover { transform:translateY(-2px); box-shadow:0 12px 34px rgba(249,115,22,0.45); }
+.btn-ghost { display:inline-block; padding:15px 32px; border-radius:var(--radius-btn); border:1px solid var(--border-strong); font-size:15px; font-weight:600; color:var(--text); transition:background .2s; }
+.btn-ghost:hover { background:rgba(255,255,255,0.06); }
+.hero-trust { margin-top:22px; font-size:13px; color:var(--text-3); }
+
+/* ===== SECTIONS ===== */
+.section { padding:56px 0 0; }
+.section-label { font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.14em; color:#ff9f43; margin-bottom:12px; }
+.section h2 { font-size:30px; font-weight:700; letter-spacing:-0.02em; margin-bottom:10px; }
+.section-sub { font-size:15px; color:var(--text-2); line-height:1.6; max-width:600px; margin-bottom:34px; }
+
+/* ===== TOOL GRID ===== */
+.tool-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+.tool-card { padding:28px; }
+.tool-card .ob-icon-tile { margin-bottom:18px; }
+.tool-card h3 { font-size:18px; font-weight:700; margin-bottom:8px; }
+.tool-card p { font-size:14px; color:var(--text-2); line-height:1.6; }
+.tool-card ul { margin:12px 0 0; padding:0; list-style:none; }
+.tool-card li { font-size:13px; color:var(--text-2); padding:4px 0 4px 22px; position:relative; }
+.tool-card li::before { content:'✓'; position:absolute; left:0; color:#34d399; font-weight:700; }
+.tool-soon { border-style:dashed; opacity:0.75; }
+
+/* ===== SECURITY ===== */
+.sec-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; }
+.sec-card { padding:28px; }
+.sec-card h3 { font-size:16px; font-weight:700; margin:16px 0 8px; }
+.sec-card p { font-size:14px; color:var(--text-2); line-height:1.6; }
+.crypto-demo { margin-top:34px; padding:24px 28px; display:flex; align-items:center; justify-content:center; gap:18px; flex-wrap:wrap; font-family:'JetBrains Mono',monospace; font-size:13px; }
+.crypto-plain { color:var(--text); background:rgba(255,255,255,0.06); border:1px solid var(--border); border-radius:10px; padding:10px 16px; }
+.crypto-arrow { color:#ff9f43; font-size:16px; white-space:nowrap; }
+.crypto-cipher { color:rgba(238,241,246,0.45); background:rgba(52,211,153,0.06); border:1px dashed rgba(52,211,153,0.3); border-radius:10px; padding:10px 16px; word-break:break-all; max-width:340px; }
+
+/* ===== STEPS ===== */
+.steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; }
+.step { padding:26px 28px; }
+.step-num { font-family:'JetBrains Mono',monospace; font-size:13px; color:#ff9f43; margin-bottom:12px; }
+.step h3 { font-size:16px; font-weight:700; margin-bottom:8px; }
+.step p { font-size:14px; color:var(--text-2); line-height:1.6; }
+
+/* ===== BOTTOM CTA ===== */
+.bottom-cta { margin-top:72px; padding:52px 32px; text-align:center; background:linear-gradient(135deg,rgba(255,150,40,0.09),rgba(249,115,22,0.04)); border:1px solid rgba(255,150,40,0.2); border-radius:var(--radius-card); }
+.bottom-cta h2 { font-size:28px; font-weight:700; letter-spacing:-0.02em; margin-bottom:10px; }
+.bottom-cta p { font-size:15px; color:var(--text-2); margin-bottom:28px; }
+
+/* ===== FOOTER ===== */
+.footer { margin-top:64px; padding-top:28px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; color:var(--text-3); }
+
+/* ===== MOBILE ===== */
+@media (max-width:640px) {
+  .hero { padding:48px 0 44px; }
+  .hero h1 { font-size:34px; }
+  .hero p { font-size:15px; }
+  .section h2 { font-size:24px; }
+  .crypto-demo { flex-direction:column; gap:10px; }
+  .crypto-arrow { transform:rotate(90deg); }
+  .landing-inner { padding:0 18px 60px; }
+}
+</style>
+</head>
+<body>
+
+<div class="landing">
+  <!-- Glow -->
+  <div data-glow data-glow-primary data-depth="60" style="position:absolute;top:-200px;right:-140px;width:680px;height:680px;background:radial-gradient(circle,rgba(255,146,32,0.22),transparent 70%);pointer-events:none;transition:transform 0.35s cubic-bezier(0.2,0.8,0.2,1);"></div>
+  <div data-glow data-depth="32" style="position:absolute;top:820px;left:-180px;width:560px;height:560px;background:radial-gradient(circle,rgba(45,212,191,0.07),transparent 72%);pointer-events:none;transition:transform 0.55s cubic-bezier(0.2,0.8,0.2,1);"></div>
+
+  <div class="landing-inner">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"><div class="brand-mark-inner"></div></div>
+        <span class="brand-name jitter">ToolBox</span>
+      </div>
+      <a href="/portal" class="topbar-login" id="topbarLogin">Anmelden</a>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero" data-reveal data-reveal-index="0">
+      <div class="hero-pill">AES-256 · ZERO-KNOWLEDGE · WERBEFREI</div>
+      <h1>Deine Tools. Deine Daten. <em>Nur deine.</em></h1>
+      <p>
+        Toolb0x bündelt Finanzen, Notizen und Passwörter in einem privaten Portal.
+        Alles wird verschlüsselt, bevor es gespeichert wird — nicht einmal der
+        Betreiber kann deine Daten lesen.
+      </p>
+      <div class="hero-cta">
+        <a href="/portal?register=1" class="btn-cta" id="heroCta">Kostenlos registrieren</a>
+        <a href="/portal" class="btn-ghost">Anmelden</a>
+      </div>
+      <div class="hero-trust">Keine Werbung · Kein Tracking · Keine Datenweitergabe</div>
+    </section>
+
+    <!-- TOOLS -->
+    <section class="section">
+      <div class="section-label" data-reveal data-reveal-index="1">// WERKZEUGE</div>
+      <h2 data-reveal data-reveal-index="1">Ein Login, alle Tools</h2>
+      <p class="section-sub" data-reveal data-reveal-index="1">
+        Einmal anmelden, alles nutzen. Jedes Werkzeug arbeitet mit denselben
+        verschlüsselten Daten — ohne Extra-Konten, ohne Abo.
+      </p>
+      <div class="tool-grid">
+        <div class="ob-card tool-card" data-reveal data-reveal-index="2">
+          <div class="ob-icon-tile" style="background:rgba(45,212,191,0.12);color:#2dd4bf;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M6.5 15h4"/></svg>
+          </div>
+          <h3>Finanzen</h3>
+          <p>Einnahmen, Ausgaben und Kategorien im Griff — Monat für Monat.</p>
+          <ul>
+            <li>Wiederkehrende Buchungen &amp; Tags</li>
+            <li>Kündigungserinnerungen für Abos</li>
+            <li>PDF-Export deiner Übersichten</li>
+          </ul>
+        </div>
+        <div class="ob-card tool-card" data-reveal data-reveal-index="3">
+          <div class="ob-icon-tile" style="background:rgba(167,139,250,0.12);color:#a78bfa;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+          </div>
+          <h3>Notizen</h3>
+          <p>Verschlüsselte Notizen und Dokumente mit WYSIWYG-Editor.</p>
+          <ul>
+            <li>Hierarchische Seiten wie in Notion</li>
+            <li>Volltextsuche &amp; Anpinnen</li>
+            <li>Archiv statt versehentlich löschen</li>
+          </ul>
+        </div>
+        <div class="ob-card tool-card" data-reveal data-reveal-index="4">
+          <div class="ob-icon-tile" style="background:rgba(251,191,36,0.12);color:#fbbf24;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3>Passwort-Manager</h3>
+          <p>Sichere Zugangsdaten samt starkem Generator.</p>
+          <ul>
+            <li>Geteilte Tresore für Familie &amp; Team</li>
+            <li>Geheimnisse sicher per Link teilen</li>
+            <li>Burn-after-read &amp; PIN-Schutz</li>
+          </ul>
+        </div>
+        <div class="ob-card tool-card tool-soon" data-reveal data-reveal-index="5">
+          <div class="ob-icon-tile" style="background:rgba(255,255,255,0.05);color:rgba(238,241,246,0.6);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5h9M4 12h9M4 17.5h6"/><path d="M15.5 6.5 17.5 8.5 21 4.5"/></svg>
+          </div>
+          <h3>Aufgaben <span class="ob-pill" style="background:rgba(255,204,0,0.1);color:#d4a520;margin-left:6px;">Demnächst</span></h3>
+          <p>To-Do-Listen mit Projekten, Deadlines und Prioritäten — in Arbeit.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECURITY -->
+    <section class="section">
+      <div class="section-label" data-reveal data-reveal-index="1">// SICHERHEIT</div>
+      <h2 data-reveal data-reveal-index="1">Zero-Knowledge, ernst gemeint</h2>
+      <p class="section-sub" data-reveal data-reveal-index="1">
+        Deine Daten werden auf dem Server verschlüsselt gespeichert — der Schlüssel
+        entsteht aus deinem Passwort und existiert nur, während du angemeldet bist.
+      </p>
+      <div class="sec-grid">
+        <div class="ob-card sec-card" data-reveal data-reveal-index="2">
+          <div class="ob-icon-tile" style="background:rgba(52,211,153,0.12);color:#34d399;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z"/></svg>
+          </div>
+          <h3>Verschlüsselt, bevor gespeichert wird</h3>
+          <p>Jeder Eintrag wird mit AES-256-GCM verschlüsselt, bevor er die Datenbank erreicht — Namen, Beträge, Notizen, Passwörter.</p>
+        </div>
+        <div class="ob-card sec-card" data-reveal data-reveal-index="3">
+          <div class="ob-icon-tile" style="background:rgba(56,189,248,0.12);color:#38bdf8;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </div>
+          <h3>Der Server ist blind</h3>
+          <p>In der Datenbank steht nur unlesbarer Chiffretext. Selbst mit vollem Serverzugriff lässt sich nichts entziffern.</p>
+        </div>
+        <div class="ob-card sec-card" data-reveal data-reveal-index="4">
+          <div class="ob-icon-tile" style="background:rgba(255,150,40,0.12);color:#ffb662;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          </div>
+          <h3>Recovery-Code als Rettungsanker</h3>
+          <p>Passwort vergessen? Mit deinem persönlichen Recovery-Code setzt du es zurück — ohne einen einzigen Eintrag zu verlieren.</p>
+        </div>
+      </div>
+      <div class="ob-card crypto-demo" data-reveal data-reveal-index="5">
+        <span class="crypto-plain">Miete&nbsp;·&nbsp;640,00&nbsp;€</span>
+        <span class="crypto-arrow">→ AES-256-GCM →</span>
+        <span class="crypto-cipher">kX9f2:Rq7Lm:v83ZpTqUw1sYc4B…</span>
+      </div>
+    </section>
+
+    <!-- STEPS -->
+    <section class="section">
+      <div class="section-label" data-reveal data-reveal-index="1">// LOSLEGEN</div>
+      <h2 data-reveal data-reveal-index="1">In einer Minute startklar</h2>
+      <p class="section-sub" data-reveal data-reveal-index="1">Kein Setup, keine App-Installation — Toolb0x läuft im Browser.</p>
+      <div class="steps">
+        <div class="ob-card step" data-reveal data-reveal-index="2">
+          <div class="step-num">SCHRITT 01</div>
+          <h3>Konto erstellen</h3>
+          <p>Name, E-Mail, Passwort — mehr braucht es nicht. Keine Bestätigungs-Mail, kein Warten.</p>
+        </div>
+        <div class="ob-card step" data-reveal data-reveal-index="3">
+          <div class="step-num">SCHRITT 02</div>
+          <h3>Recovery-Code sichern</h3>
+          <p>Du bekommst einmalig einen Code angezeigt. Sicher aufbewahren — er ist dein Rettungsanker.</p>
+        </div>
+        <div class="ob-card step" data-reveal data-reveal-index="4">
+          <div class="step-num">SCHRITT 03</div>
+          <h3>Loslegen</h3>
+          <p>Erste Ausgabe eintragen, Notiz anlegen oder Passwörter importieren — alles ab Sekunde eins verschlüsselt.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTTOM CTA -->
+    <section class="bottom-cta" data-reveal data-reveal-index="1">
+      <h2>Bereit für dein privates Portal?</h2>
+      <p>Kostenlos, werbefrei und in unter einer Minute eingerichtet.</p>
+      <a href="/portal?register=1" class="btn-cta" id="bottomCta">Jetzt Konto erstellen</a>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <span>© 2026 Toolb0x — privates Projekt</span>
+      <span class="mono" style="font-family:'JetBrains Mono',monospace;">AES-256-GCM · Zero-Knowledge · toolb0x.eu</span>
+    </footer>
+
+  </div>
+</div>
+
+<script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
+<script nonce="__CSP_NONCE__">
+// Eingeloggte Besucher: CTAs direkt zum Portal
+fetch('/api/auth/me', { credentials: 'include' })
+  .then(function (res) { if (!res.ok) throw new Error(); return res.json(); })
+  .then(function () {
+    document.getElementById('topbarLogin').textContent = 'Zum Portal';
+    var hero = document.getElementById('heroCta');
+    hero.textContent = 'Zum Portal';
+    hero.href = '/portal';
+    var bottom = document.getElementById('bottomCta');
+    bottom.textContent = 'Zum Portal';
+    bottom.href = '/portal';
+  })
+  .catch(function () { /* nicht eingeloggt — Standard-CTAs */ });
+
+// Obsidian-Interaktionen
+initGlow(document.body);
+initReveal(document.body);
+</script>
+</body>
+</html>
