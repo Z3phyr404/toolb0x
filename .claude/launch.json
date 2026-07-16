@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "layout-stub",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tests/helpers/layout-stub-server.js"],
+      "port": 3999
     }
   ]
 }
