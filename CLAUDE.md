@@ -423,7 +423,12 @@ auf Verlaufs-Buttons), `--brand-link`. Neue Brand-Flächen IMMER über diese Tok
 6. **Sidebar-Layout verwenden** (Pflicht, UX-Konsistenz): Jedes Tool hat eine LINKE Sidebar
    mit den geteilten Klassen aus `obsidian.css` (`.ob-layout`, `.ob-sidebar`, `.ob-main-col`):
    - Ganz oben: `<a href="/portal" class="ob-sidebar-back">← Zur Übersicht</a>`
-   - Darunter: `.ob-sidebar-logo` (App-Icon-Tile + Name)
+   - Darunter: `.ob-sidebar-logo` (App-Icon-Tile + Name) — muss ein
+     `<a href="/portal" class="ob-sidebar-logo ob-logo-link">` sein: **Das Logo führt
+     IMMER zur Übersicht.** Auf öffentlichen Seiten (Landing, `/s`, Auth-Karte) zeigt es
+     stattdessen auf `/`, weil `/portal` dort nur ein Login-Formular wäre.
+     `.ob-logo-link` (obsidian.css) liefert Cursor + Hover und überschreibt das
+     `cursor:default` von `.jitter`
    - Navigation: `.ob-nav-btn` (Akzentfarbe pro App via `--sb-accent`, `--sb-accent-border`, `--sb-accent-bg` auf dem Layout-Container)
    - Ganz unten: `.ob-sidebar-user` (Avatar, Name, `.ob-sidebar-logout`)
    - Mobil (≤768px) versteckt sich die Sidebar automatisch → am Anfang des `<main>` einen

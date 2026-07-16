@@ -127,7 +127,8 @@
 <!-- AUTH -->
 <div class="auth-screen" id="authScreen">
   <div class="auth-card">
-    <div class="auth-logo">
+    <!-- Nicht eingeloggt → Startseite (erklärt das Portal), nicht /portal -->
+    <a href="/" class="auth-logo ob-logo-link" title="Was ist Toolb0x?">
       <div class="auth-logo-mark brand-tile">
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
           <defs><linearGradient id="brandGradAuth" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
@@ -140,7 +141,7 @@
         </svg>
       </div>
       <span>Toolb0x</span>
-    </div>
+    </a>
     <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
     <div class="auth-error" id="authError"></div>
     <form class="auth-form" id="authForm" novalidate>
@@ -185,7 +186,7 @@
 
     <!-- HEADER -->
     <header class="portal-header" data-reveal data-reveal-index="0">
-      <div class="portal-brand">
+      <a href="/portal" class="portal-brand ob-logo-link" title="Zur Übersicht">
         <div class="portal-brand-mark brand-tile">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <defs><linearGradient id="brandGradHead" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
@@ -198,7 +199,7 @@
           </svg>
         </div>
         <span class="portal-brand-name jitter">Toolb0x</span>
-      </div>
+      </a>
       <div class="portal-user">
         <span class="portal-badge">AES-256 · ZERO-KNOWLEDGE</span>
         <div style="display:flex;align-items:center;gap:9px;">

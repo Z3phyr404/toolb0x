@@ -280,6 +280,15 @@ h2, .h2 {
   margin: 0 16px;
 }
 
+/* ===== LOGO-LINK ===== */
+/* Das Logo führt IMMER zur Übersicht (/portal); auf den öffentlichen Seiten
+   (Landing, /s) zur Startseite. Wird zusätzlich zur vorhandenen Layout-Klasse
+   gesetzt, damit Abstände/Ausrichtung unverändert bleiben. */
+.ob-logo-link { cursor: pointer; transition: opacity .2s; }
+.ob-logo-link:hover { opacity: .75; }
+/* .jitter setzt cursor:default — auf einem Logo-Link soll der Zeiger bleiben */
+.ob-logo-link .jitter:hover, .ob-logo-link:hover .jitter { cursor: pointer; }
+
 /* ===== SIDEBAR-LAYOUT ===== */
 /* Einheitliches Muster für alle Tools: Sidebar IMMER links mit
    "Zur Übersicht" ganz oben, Logo darunter, Nutzer + Abmelden unten.
