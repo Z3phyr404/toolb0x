@@ -120,6 +120,8 @@ router.get('/library', async (req, res) => {
     res.json({
       generatedAt: typeof manifest.generatedAt === 'string' ? manifest.generatedAt : null,
       photoCount: Number.isInteger(manifest.photoCount) ? manifest.photoCount : 0,
+      // Benannte Personen (fotob0x KI Etappe 5) für den Personen-Filter
+      persons: Array.isArray(manifest.persons) ? manifest.persons : [],
       photos: Array.isArray(manifest.photos) ? manifest.photos : [],
     });
   } catch (error) {
