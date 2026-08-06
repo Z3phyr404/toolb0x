@@ -505,6 +505,19 @@ pm2 restart all            # Prozess neu starten — lädt neuen Client + Code i
 
 ---
 
+## Foto-Galerien unter /fotos/ (fotob0x, Phase 5)
+
+`https://toolb0x.eu/fotos/<token>/` liefert statische Foto-Galerien aus, die
+die Desktop-App fotob0x (C:\dev\fotob0x\fotob0x) per rclone/SFTP nach
+`/var/www/fotos/<token>/` hochlädt. BEWUSST kein Express-Endpunkt (entschieden
+2026-08-06): nginx liefert nur Statik aus, die Node-App ist nicht beteiligt -
+keine neue Angriffsfläche, Galerien laufen auch bei App-Ausfall weiter.
+nginx-Konfiguration: `deploy/nginx-fotos.conf` (dort steht auch der Einbau).
+„Teilen beenden" in fotob0x löscht den Token-Ordner; auf dem Server ist nie
+etwas anderes zu pflegen als diese location-Blöcke.
+
+---
+
 ## Wichtige Designentscheidungen
 
 - **Kein Frontend-Framework** — reines Vanilla JS, alles in einer HTML-Datei pro Tool
