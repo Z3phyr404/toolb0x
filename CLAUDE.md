@@ -545,10 +545,20 @@ nur die Node-App streamt daraus, mit requireAdmin: `GET /api/fotos/library`
 (Manifest; fehlt die Datei → leere Liste) und
 `GET /api/fotos/library/img|thumb/:name` (Namens-Whitelist `<zahl>.jpg` +
 sendFile-root, Cache-Control private). Env-Override für Dev: `FOTOS_PRIVAT_DIR`.
-UI: `/app/fotos` hat zwei Ansichten — „Alle Fotos" (Monats-Zeitleiste,
-häppchenweises Nachrendern via IntersectionObserver, Lightbox mit
-Pfeilen/Wischgesten) und „Geteilte Alben". Der Stub fakt das Manifest und
-liefert für `/api/fotos/library/img|thumb/*` bunte SVG-Platzhalter.
+UI: `/app/fotos` hat zwei Ansichten — „Alle Fotos" und „Geteilte Alben".
+„Alle Fotos" gruppiert primär nach EVENTS aus dem Manifest-Feld `events`
+(`{n, s, e, ids}` — Event-Name, Start/Ende, betroffene Asset-IDs; von fotob0x
+neueste-zuerst sortiert geliefert, Route validiert/cappt bei 500 Einträgen).
+Fotos ohne Event fallen auf die alte Monats-Zeitleiste zurück; Events und
+Monatsblöcke werden gemeinsam chronologisch absteigend sortiert (ein Event
+kann also zwischen zwei Monatsblöcken erscheinen), Event-Blöcke sind farblich
+abgesetzt (📅-Marker, Rahmen in Sidebar-Akzent, Zeitraum wie „12.–15. Juli
+2025 · 43 Fotos"). Gehört ein Foto zu mehreren Events, zählt nur das erste
+(neueste). Häppchenweises Nachrendern via IntersectionObserver und die
+Lightbox (Pfeilen/Wischgesten) laufen unverändert über die flache, aus den
+Gruppen neu zusammengesetzte Fotoliste. Der Stub fakt Manifest (inkl. zwei
+Beispiel-Events) und liefert für `/api/fotos/library/img|thumb/*` bunte
+SVG-Platzhalter.
 
 ---
 

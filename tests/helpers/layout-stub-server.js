@@ -55,7 +55,15 @@ const API = {
     { id: 'user-2', email: 'lena@test.de', name: 'Lena Beispiel', role: 'user', suspended: false, createdAt: '2026-05-10T00:00:00.000Z', _count: { categories: 9, expenses: 4, incomes: 2, reminders: 1 } },
   ] },
   '/api/admin/users/user-2/reset-link': { message: 'Reset-Link erstellt.', token: 'deadbeef'.repeat(8), expiresAt: '2026-07-16T12:00:00.000Z' },
-  '/api/fotos/library': { generatedAt: '2026-08-06T12:00:00.000Z', photoCount: 74, persons: ['Lena', 'Michael'], photos: (function() {
+  '/api/fotos/library': { generatedAt: '2026-08-06T12:00:00.000Z', photoCount: 74, persons: ['Lena', 'Michael'],
+    // Zwei Beispiel-Events (fotob0x Etappe 6) für die Event-Gruppierung in
+    // "Alle Fotos" - Asset-IDs müssen zu den unten generierten Fotos passen
+    // (Monat 2026-08 → IDs 4979-5000, Monat 2026-07 → IDs 4961-4978).
+    events: [
+      { n: 'Wochenendtrip an den Königssee', s: '2026-08-20T09:00:00', e: '2026-08-23T20:00:00', ids: [4995, 4994, 4993, 4992] },
+      { n: 'Grillabend im Garten', s: '2026-07-16T15:00:00', e: '2026-07-16T21:00:00', ids: [4967, 4966, 4965] },
+    ],
+    photos: (function() {
     // 74 Fake-Fotos über 5 Monate (neueste zuerst), IDs wie im echten Mirror;
     // einige mit benannten Personen für den Personen-Filter
     const months = ['2026-08', '2026-07', '2026-05', '2025-12', 'unbekannt'];

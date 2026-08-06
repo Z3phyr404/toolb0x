@@ -161,7 +161,7 @@
       color: #f472b6;
     }
 
-    /* ===== ALLE FOTOS (Zeitleiste) ===== */
+    /* ===== ALLE FOTOS (Events + Monats-Fallback) ===== */
     .month-block { margin-bottom: 28px; }
     .month-title {
       font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
@@ -171,6 +171,14 @@
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px; color: rgba(238,241,246,0.45); margin-left: 8px;
     }
+    /* Event-Gruppen (aus dem fotob0x-Manifest) heben sich farblich +
+       per Rahmen von den Monats-Fallback-Blöcken ab. */
+    .month-block.event-block {
+      border-left: 3px solid rgba(244,114,182,0.5);
+      padding-left: 14px;
+    }
+    .month-block.event-block .month-title { color: #f472b6; }
+    .month-block.event-block .month-title .month-count { color: rgba(244,114,182,0.55); }
     .photo-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -425,10 +433,12 @@
 
   var libraryAll = [];      // komplettes Manifest [{n, d, p?}], neueste zuerst
   var libraryPersons = [];  // benannte Personen (aus fotob0x, Manifest-Feld "persons")
+  var libraryEvents = [];   // Ereignisse (aus fotob0x, Manifest-Feld "events"), neueste zuerst
   var activePerson = null;  // aktiver Personen-Filter (Name) oder null
-  var libraryPhotos = [];   // aktuell sichtbare Fotos (ggf. personengefiltert)
-  var libraryMonths = [];   // [{key, title, photos: [indexe in libraryPhotos]}]
-  var renderedMonths = 0;
+  var libraryPhotos = [];   // aktuell sichtbare Fotos, NACH der Gruppierung in
+                             // Anzeige-Reihenfolge neu aufgebaut (Lightbox-Ordnung!)
+  var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
+  var renderedGroups = 0;
   var sentinelObserver = null;
 
   function monthTitle(key) {
@@ -437,39 +447,135 @@
     return (MONTH_NAMES[m - 1] || key) + ' ' + y;
   }
 
-  function groupByMonth() {
-    libraryMonths = [];
-    var byKey = {};
-    libraryPhotos.forEach(function(p, i) {
-      var key = (p.d && p.d.length >= 7) ? p.d.slice(0, 7) : 'unbekannt';
-      if (!byKey[key]) {
-        byKey[key] = { key: key, title: monthTitle(key), photos: [] };
-        libraryMonths.push(byKey[key]);
-      }
-      byKey[key].photos.push(i);
-    });
+  // Größtes Aufnahmedatum unter den Fotos einer Gruppe (ISO-Strings sind
+  // lexikalisch sortierbar) - dient als chronologischer Sortierschlüssel.
+  function maxPhotoDate(photos) {
+    var max = '';
+    photos.forEach(function(p) { if (p.d && p.d > max) max = p.d; });
+    return max;
   }
 
-  function renderNextMonths() {
+  // Deutsches kurzes Datumsformat für Event-Zeiträume, z.B. "12.–15. Juli 2025"
+  // oder "30. Dezember 2025 – 2. Januar 2026". Robust gegen fehlende s/e.
+  function formatEventRange(s, e) {
+    var ds = s ? new Date(s) : null;
+    var de = e ? new Date(e) : null;
+    var validS = !!(ds && !isNaN(ds.getTime()));
+    var validE = !!(de && !isNaN(de.getTime()));
+    if (!validS && !validE) return '';
+    if (!validS) ds = de;
+    if (!validE) de = ds;
+    var a = { day: ds.getDate(), month: MONTH_NAMES[ds.getMonth()], year: ds.getFullYear() };
+    var b = { day: de.getDate(), month: MONTH_NAMES[de.getMonth()], year: de.getFullYear() };
+    if (a.year === b.year && a.month === b.month && a.day === b.day) {
+      return a.day + '. ' + a.month + ' ' + a.year;
+    }
+    if (a.year === b.year && a.month === b.month) {
+      return a.day + '.–' + b.day + '. ' + a.month + ' ' + a.year;
+    }
+    if (a.year === b.year) {
+      return a.day + '. ' + a.month + ' – ' + b.day + '. ' + b.month + ' ' + a.year;
+    }
+    return a.day + '. ' + a.month + ' ' + a.year + ' – ' + b.day + '. ' + b.month + ' ' + b.year;
+  }
+
+  // Baut die Anzeige-Gruppen aus dem aktuell (ggf. personengefilterten)
+  // libraryPhotos: jedes Event, das mindestens ein sichtbares Foto enthält,
+  // wird eine Gruppe; alle übrigen Fotos fallen auf Monatsgruppen zurück.
+  // Gehört ein Foto zu mehreren Events, zählt nur das erste (= neueste,
+  // da libraryEvents neueste-zuerst sortiert ist). Am Ende wird libraryPhotos
+  // komplett neu aus den Gruppen (in Anzeige-Reihenfolge) zusammengesetzt -
+  // DAS ist die Ordnung, die die Lightbox (Index/Modulo/Preload) sieht.
+  function buildGroups() {
+    var sourcePhotos = libraryPhotos;
+    libraryGroups = [];
+    if (sourcePhotos.length === 0) { libraryPhotos = []; return; }
+
+    // 1) Asset-ID -> Event-Index (erster Treffer in libraryEvents gewinnt)
+    var idToEventIndex = {};
+    libraryEvents.forEach(function(ev, idx) {
+      (ev.ids || []).forEach(function(id) {
+        if (!(id in idToEventIndex)) idToEventIndex[id] = idx;
+      });
+    });
+
+    // 2) Fotos den Events zuordnen, Rest sammeln (Reihenfolge bleibt erhalten)
+    var eventPhotoLists = libraryEvents.map(function() { return []; });
+    var unclaimed = [];
+    sourcePhotos.forEach(function(p) {
+      var id = parseInt(p.n, 10);
+      var idx = idToEventIndex[id];
+      if (idx !== undefined) eventPhotoLists[idx].push(p);
+      else unclaimed.push(p);
+    });
+
+    var groups = [];
+    libraryEvents.forEach(function(ev, idx) {
+      var photos = eventPhotoLists[idx];
+      if (photos.length === 0) return; // leere Events verschwinden
+      groups.push({
+        type: 'event',
+        title: ev.n,
+        rangeLabel: formatEventRange(ev.s, ev.e),
+        photos: photos,
+        sortKey: maxPhotoDate(photos) || ev.e || ev.s || '',
+      });
+    });
+
+    // 3) Monats-Fallback aus den unclaimed Fotos (erste Sichtung = Reihenfolge)
+    var byKey = {};
+    unclaimed.forEach(function(p) {
+      var key = (p.d && p.d.length >= 7) ? p.d.slice(0, 7) : 'unbekannt';
+      if (!byKey[key]) {
+        byKey[key] = { type: 'month', key: key, title: monthTitle(key), photos: [] };
+        groups.push(byKey[key]);
+      }
+      byKey[key].photos.push(p);
+    });
+    groups.forEach(function(g) {
+      if (g.type === 'month') g.sortKey = maxPhotoDate(g.photos);
+    });
+
+    // 4) Chronologisch absteigend sortieren (stabil) - so kann ein Event
+    // zwischen zwei Monaten landen, statt fix an einer Monatsposition zu kleben.
+    groups.sort(function(a, b) {
+      return a.sortKey < b.sortKey ? 1 : a.sortKey > b.sortKey ? -1 : 0;
+    });
+
+    // 5) libraryPhotos neu aufbauen (Konkatenation in Anzeige-Reihenfolge)
+    // und jeder Gruppe ihre Flach-Indexe zuweisen.
+    var flat = [];
+    groups.forEach(function(g) {
+      g.indices = g.photos.map(function(p) { flat.push(p); return flat.length - 1; });
+    });
+    libraryPhotos = flat;
+    libraryGroups = groups;
+  }
+
+  function renderNextGroups() {
     var timeline = $('timeline');
     var added = 0;
-    while (renderedMonths < libraryMonths.length && added < CHUNK_PHOTOS) {
-      var month = libraryMonths[renderedMonths++];
+    while (renderedGroups < libraryGroups.length && added < CHUNK_PHOTOS) {
+      var group = libraryGroups[renderedGroups++];
       var block = document.createElement('div');
-      block.className = 'month-block';
+      block.className = 'month-block' + (group.type === 'event' ? ' event-block' : '');
 
       var title = document.createElement('div');
       title.className = 'month-title';
-      title.textContent = month.title;
+      title.textContent = (group.type === 'event' ? '📅 ' : '') + group.title;
       var count = document.createElement('span');
       count.className = 'month-count';
-      count.textContent = month.photos.length + (month.photos.length === 1 ? ' Foto' : ' Fotos');
+      var n = group.indices.length;
+      var countText = n + (n === 1 ? ' Foto' : ' Fotos');
+      count.textContent = (group.type === 'event' && group.rangeLabel)
+        ? (group.rangeLabel + ' · ' + countText)
+        : countText;
       title.appendChild(count);
       block.appendChild(title);
 
       var grid = document.createElement('div');
       grid.className = 'photo-grid';
-      month.photos.forEach(function(photoIndex) {
+      group.indices.forEach(function(photoIndex) {
         var photo = libraryPhotos[photoIndex];
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -483,9 +589,9 @@
       });
       block.appendChild(grid);
       timeline.appendChild(block);
-      added += month.photos.length;
+      added += n;
     }
-    if (renderedMonths >= libraryMonths.length && sentinelObserver) {
+    if (renderedGroups >= libraryGroups.length && sentinelObserver) {
       sentinelObserver.disconnect();
       sentinelObserver = null;
     }
@@ -525,16 +631,17 @@
   }
 
   function rebuildTimeline() {
-    $('libraryEmpty').hidden = libraryPhotos.length > 0;
+    var hasPhotos = libraryPhotos.length > 0;
+    buildGroups(); // baut libraryGroups UND baut libraryPhotos in Anzeige-Reihenfolge neu auf
+    $('libraryEmpty').hidden = hasPhotos;
     $('timeline').textContent = '';
-    renderedMonths = 0;
-    groupByMonth();
-    renderNextMonths();
+    renderedGroups = 0;
+    renderNextGroups();
 
-    // Weitere Monate nachladen, sobald das Ende der Liste in Sicht kommt.
+    // Weitere Gruppen nachladen, sobald das Ende der Liste in Sicht kommt.
     if (sentinelObserver) sentinelObserver.disconnect();
     sentinelObserver = new IntersectionObserver(function(entries) {
-      if (entries.some(function(e) { return e.isIntersecting; })) renderNextMonths();
+      if (entries.some(function(e) { return e.isIntersecting; })) renderNextGroups();
     }, { root: document.querySelector('.ob-main'), rootMargin: '1200px' });
     sentinelObserver.observe($('timelineSentinel'));
   }
@@ -543,6 +650,7 @@
     api('/fotos/library').then(function(data) {
       libraryAll = data.photos || [];
       libraryPersons = data.persons || [];
+      libraryEvents = data.events || [];
       activePerson = null;
       libraryPhotos = libraryAll;
       renderPersonChips();
