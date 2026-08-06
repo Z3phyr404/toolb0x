@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Toolb0x — Fotos</title>
+  <link rel="stylesheet" href="/shared/obsidian.css" nonce="__CSP_NONCE__">
+  <style nonce="__CSP_NONCE__">
+    /* ============================================================
+       OBSIDIAN — FOTOS (geteilte fotob0x-Galerien, Admin-only)
+       ============================================================ */
+
+    html, body { height:100%; overflow:hidden; }
+
+    .ob-page {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+      /* Sidebar-Akzent (rose) für .ob-nav-btn.active */
+      --sb-accent: #f472b6;
+      --sb-accent-border: rgba(244,114,182,0.25);
+      --sb-accent-bg: rgba(244,114,182,0.12);
+    }
+
+    /* ===== GLOW BLOBS ===== */
+    .glow-blob {
+      position: absolute;
+      pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;
+    }
+    .glow-primary {
+      top: -160px; right: -120px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(244,114,182,0.20), transparent 70%);
+    }
+    .glow-secondary {
+      bottom: -200px; left: -140px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(167,139,250,0.07), transparent 72%);
+      transition-duration: 0.55s;
+    }
+
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg,#f9a8d4,#ec4899);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 5px 16px rgba(236,72,153,0.35);
+      flex-shrink: 0;
+    }
+    .brand-icon svg { color: #3b0a24; }
+
+    /* ===== MAIN ===== */
+    .ob-main {
+      padding: 34px 5% 72px;
+      overflow-y: auto;
+    }
+
+    /* ===== TOOLBAR ===== */
+    .ob-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 14px; margin-bottom: 26px;
+    }
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; letter-spacing: 0.14em;
+      color: rgba(244,114,182,0.9);
+      margin-bottom: 8px;
+    }
+    .ob-toolbar h1 {
+      font-size: 32px; font-weight: 700; letter-spacing: -0.03em;
+    }
+
+    /* ===== ALBUM-GRID ===== */
+    .album-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .album-card {
+      display: flex; flex-direction: column;
+      border-radius: var(--radius-card, 18px);
+      overflow: hidden;
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .album-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(244,114,182,0.35);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.35);
+    }
+    .album-thumb {
+      display: block;
+      width: 100%; aspect-ratio: 16 / 10;
+      background: rgba(255,255,255,0.04);
+      position: relative;
+    }
+    .album-thumb img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+    }
+    .album-thumb .no-thumb {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(238,241,246,0.25);
+    }
+    .album-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .album-name {
+      font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .album-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px; color: rgba(238,241,246,0.5);
+    }
+    .album-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .album-btn {
+      flex: 1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 10px; border-radius: 10px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .album-btn.primary {
+      border: none;
+      background: linear-gradient(135deg,#f9a8d4,#ec4899);
+      color: #3b0a24;
+    }
+    .album-btn.primary:hover { filter: brightness(1.08); }
+    .album-btn.ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.14);
+      color: rgba(238,241,246,0.8);
+    }
+    .album-btn.ghost:hover {
+      border-color: rgba(244,114,182,0.45);
+      color: #f472b6;
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      padding: 70px 20px;
+      color: rgba(238,241,246,0.5);
+    }
+    .empty-state svg { color: rgba(244,114,182,0.5); margin-bottom: 14px; }
+    .empty-state h2 { font-size: 18px; color: rgba(238,241,246,0.8); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; max-width: 420px; margin: 0 auto; line-height: 1.55; }
+  </style>
+</head>
+
+<body>
+<div class="ob-loading" id="loadingOverlay"><div class="ob-spinner"></div></div>
+
+<div class="ob-page ob-layout" id="pageRoot">
+  <div class="glow-blob glow-primary"></div>
+  <div class="glow-blob glow-secondary"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="ob-sidebar">
+    <a href="/portal" class="ob-sidebar-back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Zur Übersicht
+    </a>
+    <a href="/portal" class="ob-sidebar-logo ob-logo-link" title="Zur Übersicht">
+      <div class="brand-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="12" cy="12" r="3.4"/><path d="M8 5l1.2-1.8h5.6L16 5"/></svg>
+      </div>
+      <span class="ob-sidebar-logo-text jitter">Fotos</span>
+    </a>
+    <button class="ob-nav-btn active" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L7 20"/></svg>
+      Geteilte Alben
+    </button>
+    <div class="ob-sidebar-user">
+      <div class="ob-sidebar-avatar" id="userAvatar">?</div>
+      <div class="ob-sidebar-user-info">
+        <div class="ob-sidebar-user-name" id="userName"></div>
+      </div>
+      <button class="ob-sidebar-logout" id="logoutBtn" title="Abmelden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main class="ob-main ob-main-col">
+    <!-- Mobile-Header (nur sichtbar, wenn Sidebar versteckt) -->
+    <div class="ob-mobile-header">
+      <a href="/portal" class="ob-mobile-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </a>
+      <h1>Fotos</h1>
+      <button class="ob-btn-logout" id="logoutBtnM">Abmelden</button>
+    </div>
+
+    <div class="ob-toolbar" data-reveal data-reveal-index="0">
+      <div>
+        <div class="section-label">// GALERIEN</div>
+        <h1 class="jitter">Geteilte Alben</h1>
+      </div>
+    </div>
+
+    <div class="album-grid" id="albumGrid"></div>
+    <div class="empty-state" id="emptyState" hidden>
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L7 20"/></svg>
+      <h2>Keine geteilten Alben</h2>
+      <p>Alben teilst du in der Desktop-App fotob0x (Album öffnen → „Teilen").
+         Geteilte Galerien erscheinen dann automatisch hier.</p>
+    </div>
+  </main>
+</div>
+
+<div class="ob-toast-box" id="toasts"></div>
+
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+<script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
+<script nonce="__CSP_NONCE__">
+(function() {
+  'use strict';
+
+  var API = '/api';
+
+  function $(id) { return document.getElementById(id); }
+
+  function getCsrfToken() {
+    var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+    return m ? m[1] : '';
+  }
+
+  function toast(msg, type) {
+    var el = document.createElement('div');
+    el.className = 'ob-toast ' + (type || 'success');
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3100);
+  }
+
+  function showLoading() { $('loadingOverlay').classList.remove('hidden'); }
+  function hideLoading() { $('loadingOverlay').classList.add('hidden'); }
+
+  function api(endpoint, options) {
+    var opts = options || {};
+    var headers = opts.headers || {};
+    headers['Content-Type'] = 'application/json';
+    if (opts.method && opts.method !== 'GET') {
+      headers['X-CSRF-Token'] = getCsrfToken();
+    }
+    return fetch(API + endpoint, {
+      method: opts.method || 'GET',
+      credentials: 'include',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function(res) {
+      return res.json().then(function(data) {
+        if (!res.ok) throw data;
+        return data;
+      });
+    });
+  }
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+
+  function logout() {
+    SessionTimeout.stop();
+    fetch(API + '/auth/logout', {
+      method: 'POST', credentials: 'include',
+      headers: { 'X-CSRF-Token': getCsrfToken() }
+    }).catch(function() {});
+    window.location.href = '/portal';
+  }
+
+  function checkAuth() {
+    showLoading();
+    if (SessionTimeout.wasRestarted()) {
+      fetch(API + '/auth/logout', {
+        method: 'POST', credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      }).catch(function() {});
+      window.location.href = '/portal';
+      return;
+    }
+
+    api('/auth/me').then(function(data) {
+      if (data.user.role !== 'admin') {
+        window.location.href = '/portal';
+        return;
+      }
+      $('userName').textContent = data.user.name;
+      $('userAvatar').textContent = (data.user.name || 'U').charAt(0).toUpperCase();
+      hideLoading();
+
+      SessionTimeout.start(function() {
+        window.location.href = '/portal';
+      });
+
+      loadAlbums();
+    }).catch(function() {
+      window.location.href = '/portal';
+    });
+  }
+
+  // ============================================================
+  // ALBEN
+  // ============================================================
+
+  function galleryUrl(token) {
+    // nginx liefert /fotos/<token>/ auf derselben Domain aus
+    return window.location.origin + '/fotos/' + encodeURIComponent(token) + '/';
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function renderAlbums(albums) {
+    var grid = $('albumGrid');
+    grid.textContent = '';
+    $('emptyState').hidden = albums.length > 0;
+
+    albums.forEach(function(album, i) {
+      var card = document.createElement('div');
+      card.className = 'album-card';
+      card.setAttribute('data-reveal', '');
+      card.setAttribute('data-reveal-index', String(Math.min(i + 1, 8)));
+
+      var thumbLink = document.createElement('a');
+      thumbLink.className = 'album-thumb';
+      thumbLink.href = galleryUrl(album.token);
+      thumbLink.target = '_blank';
+      thumbLink.rel = 'noopener';
+      if (album.thumb) {
+        var img = document.createElement('img');
+        img.src = galleryUrl(album.token) + 'thumb/' + encodeURIComponent(album.thumb);
+        img.alt = album.title;
+        img.loading = 'lazy';
+        thumbLink.appendChild(img);
+      } else {
+        var ph = document.createElement('div');
+        ph.className = 'no-thumb';
+        ph.innerHTML = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L7 20"/></svg>';
+        thumbLink.appendChild(ph);
+      }
+      card.appendChild(thumbLink);
+
+      var body = document.createElement('div');
+      body.className = 'album-body';
+
+      var name = document.createElement('div');
+      name.className = 'album-name';
+      name.textContent = album.title;
+      name.title = album.title;
+      body.appendChild(name);
+
+      var meta = document.createElement('div');
+      meta.className = 'album-meta';
+      var parts = [album.photoCount + (album.photoCount === 1 ? ' Foto' : ' Fotos')];
+      var date = formatDate(album.sharedAt);
+      if (date) parts.push('geteilt am ' + date);
+      meta.textContent = parts.join(' · ');
+      body.appendChild(meta);
+
+      var actions = document.createElement('div');
+      actions.className = 'album-actions';
+
+      var openBtn = document.createElement('a');
+      openBtn.className = 'album-btn primary';
+      openBtn.href = galleryUrl(album.token);
+      openBtn.target = '_blank';
+      openBtn.rel = 'noopener';
+      openBtn.textContent = 'Öffnen';
+      actions.appendChild(openBtn);
+
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'album-btn ghost';
+      copyBtn.type = 'button';
+      copyBtn.textContent = 'Link kopieren';
+      copyBtn.addEventListener('click', function() {
+        navigator.clipboard.writeText(galleryUrl(album.token)).then(function() {
+          toast('Link kopiert.');
+        }, function() {
+          toast('Kopieren fehlgeschlagen.', 'error');
+        });
+      });
+      actions.appendChild(copyBtn);
+
+      body.appendChild(actions);
+      card.appendChild(body);
+      grid.appendChild(card);
+    });
+
+    // Reveal-Animation für Toolbar + frisch gerenderte Karten
+    initReveal($('pageRoot'));
+  }
+
+  function loadAlbums() {
+    api('/fotos').then(function(data) {
+      renderAlbums(data.albums || []);
+    }).catch(function(err) {
+      toast(err.error || 'Alben konnten nicht geladen werden.', 'error');
+      renderAlbums([]);
+    });
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  $('logoutBtn').addEventListener('click', logout);
+  $('logoutBtnM').addEventListener('click', logout);
+
+  // Glow-Interaktion sofort, Reveal erst nach dem ersten Rendern (renderAlbums)
+  initGlow($('pageRoot'));
+
+  checkAuth();
+})();
+</script>
+</body>
+
+</html>

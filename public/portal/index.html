@@ -290,8 +290,21 @@
         <div class="tool-card-route">/app/servers →</div>
       </a>
 
+      <!-- FOTOS (Admin-only) -->
+      <a href="/app/fotos" class="tool-card" id="fotosCard" style="display:none" data-reveal data-reveal-index="7" data-glow-color="rgba(244,114,182,0.24)">
+        <div class="tool-card-header">
+          <div class="ob-icon-tile" style="background:rgba(244,114,182,0.13);color:#f472b6;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-4.5-4.5L7 20"/></svg>
+          </div>
+          <span class="ob-pill" style="background:rgba(244,114,182,0.12);color:#f472b6;">&#9679; Admin</span>
+        </div>
+        <div class="tool-card-name jitter">Fotos</div>
+        <div class="tool-card-desc">Übersicht deiner geteilten fotob0x-Alben. Nur für Administratoren.</div>
+        <div class="tool-card-route">/app/fotos →</div>
+      </a>
+
       <!-- ADMIN (Admin-only) -->
-      <a href="/app/admin" class="tool-card" id="adminCard" style="display:none" data-reveal data-reveal-index="7" data-glow-color="rgba(129,140,248,0.24)">
+      <a href="/app/admin" class="tool-card" id="adminCard" style="display:none" data-reveal data-reveal-index="8" data-glow-color="rgba(129,140,248,0.24)">
         <div class="tool-card-header">
           <div class="ob-icon-tile" style="background:rgba(129,140,248,0.13);color:#818cf8;">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="11" cy="17" r="2"/></svg>
@@ -532,6 +545,10 @@ async function checkAuth() {
     var serverCard = document.getElementById('serverCard');
     if (serverCard) {
       serverCard.style.display = (user.role === 'admin') ? '' : 'none';
+    }
+    var fotosCard = document.getElementById('fotosCard');
+    if (fotosCard) {
+      fotosCard.style.display = (user.role === 'admin') ? '' : 'none';
     }
 
     // Session-Timeout starten

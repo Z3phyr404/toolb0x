@@ -55,6 +55,11 @@ const API = {
     { id: 'user-2', email: 'lena@test.de', name: 'Lena Beispiel', role: 'user', suspended: false, createdAt: '2026-05-10T00:00:00.000Z', _count: { categories: 9, expenses: 4, incomes: 2, reminders: 1 } },
   ] },
   '/api/admin/users/user-2/reset-link': { message: 'Reset-Link erstellt.', token: 'deadbeef'.repeat(8), expiresAt: '2026-07-16T12:00:00.000Z' },
+  '/api/fotos': { albums: [
+    { token: 'aB3dEfGh1jKlMnOpQrStUvWx', title: 'Sommerurlaub Kroatien 2026', photoCount: 87, sharedAt: '2026-08-06T10:30:00.000Z', thumb: 'IMG_0001.jpg' },
+    { token: 'zY9xWvUtSrQpOnMlKjIhGfEd', title: 'Nicoles Geburtstag', photoCount: 23, sharedAt: '2026-07-21T18:05:00.000Z', thumb: 'IMG_0042.jpg' },
+    { token: 'Qq1Ww2Ee3Rr4Tt5Zz6Uu7Ii8', title: 'Wanderung Zugspitze', photoCount: 1, sharedAt: '2026-06-02T09:00:00.000Z', thumb: null },
+  ] },
 };
 
 const PAGES = {
@@ -65,6 +70,7 @@ const PAGES = {
   '/app/servers': '/apps/servers/index.html',
   '/app/admin': '/apps/admin/index.html',
   '/app/finanzen': '/apps/finanzen/index.html',
+  '/app/fotos': '/apps/fotos/index.html',
   '/app/notizen': '/apps/notizen/index.html',
   '/s': '/share/index.html',
   '/impressum': '/legal/impressum.html',
@@ -80,6 +86,16 @@ http.createServer((req, res) => {
     const body = API[url] || {};
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify(body));
+  }
+
+  // Galerie-Thumbnails (auf Prod von nginx) → Platzhalter-Bild
+  if (url.startsWith('/fotos/')) {
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400">'
+      + '<rect width="640" height="400" fill="#2a2f3a"/>'
+      + '<circle cx="230" cy="150" r="40" fill="#f9d977"/>'
+      + '<path d="M0 400 L220 210 L390 330 L500 240 L640 360 L640 400 Z" fill="#3d4657"/>'
+      + '</svg>');
   }
 
   const file = PAGES[url] || url;

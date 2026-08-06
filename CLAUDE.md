@@ -44,7 +44,8 @@ toolb0x/
 │       ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
 │       ├── passwords.js                 # /api/passwords CRUD (privat + Tresor-Einträge)
 │       ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
-│       └── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
+│       ├── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
+│       └── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
 └── public/
     ├── landing/
     │   └── index.html                   # ÖFFENTLICHE Landing Page (/, kein Login)
@@ -56,6 +57,8 @@ toolb0x/
     │   │   └── index.html               # Finanz-App (komplette SPA in einer HTML-Datei)
     │   ├── admin/
     │   │   └── index.html               # Admin-Bereich (Nutzerübersicht, nur für Admins)
+    │   ├── fotos/
+    │   │   └── index.html               # Fotos-Übersicht (geteilte fotob0x-Alben, nur für Admins)
     │   └── passwords/
     │       └── index.html               # Passwort-Manager (Generator + verschlüsselter Tresor + Teilen)
     ├── share/
@@ -77,6 +80,7 @@ toolb0x/
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
 | `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
+| `/app/fotos` | Fotos-Übersicht (nur für Admins, HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
 | `/impressum` | **Öffentlich.** Impressum (`public/legal/impressum.html`) — enthält noch Platzhalter |
 | `/datenschutz` | **Öffentlich.** Datenschutzerklärung (`public/legal/datenschutz.html`) — technische Angaben stimmen, juristische Prüfung offen |
@@ -90,6 +94,7 @@ toolb0x/
 | `/api/vaults/*` | Geteilte Tresore (anlegen, Mitglieder, löschen) |
 | `/api/share/*` | Secret-Sharing-API (öffentliches Reveal + Owner-CRUD) |
 | `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
+| `/api/fotos` | Geteilte fotob0x-Galerien listen (read-only, requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -518,6 +523,17 @@ Repo-Checkout eingebunden, die Datei IST die Live-Config. Deploy-Ablauf bei
 systemctl reload nginx` (zusätzlich zum normalen pm2-Ablauf oben).
 „Teilen beenden" in fotob0x löscht den Token-Ordner; auf dem Server ist nie
 etwas anderes zu pflegen als diese location-Blöcke.
+
+**Fotos-Übersicht im Portal (2026-08-06):** Kachel „Fotos" (rose, Admin-only,
+per JS wie die Admin-Kachel ein-/ausgeblendet) → `/app/fotos` zeigt die
+geteilten Alben. `GET /api/fotos` (requireAuth + requireAdmin) liest NUR das
+Dateisystem unter `/var/www/fotos` (per Env `FOTOS_DIR` übersteuerbar, fehlt
+das Verzeichnis → leere Liste): Titel aus dem `<title>` der Galerie-index.html,
+Fotoanzahl + erstes Vorschaubild aus `thumb/`, Datum = Ordner-mtime. Die
+Galerien selbst liefert weiterhin nginx aus — die Node-App legt nichts an und
+löscht nichts (Anlegen/Beenden ausschließlich über fotob0x). Der Layout-Stub
+(`tests/helpers/layout-stub-server.js`) fakt `/api/fotos` und liefert für
+`/fotos/*`-Thumbnails ein SVG-Platzhalterbild.
 
 ---
 
