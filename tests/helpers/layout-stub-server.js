@@ -55,6 +55,19 @@ const API = {
     { id: 'user-2', email: 'lena@test.de', name: 'Lena Beispiel', role: 'user', suspended: false, createdAt: '2026-05-10T00:00:00.000Z', _count: { categories: 9, expenses: 4, incomes: 2, reminders: 1 } },
   ] },
   '/api/admin/users/user-2/reset-link': { message: 'Reset-Link erstellt.', token: 'deadbeef'.repeat(8), expiresAt: '2026-07-16T12:00:00.000Z' },
+  '/api/fotos/library': { generatedAt: '2026-08-06T12:00:00.000Z', photoCount: 74, photos: (function() {
+    // 74 Fake-Fotos über 5 Monate (neueste zuerst), IDs wie im echten Mirror
+    const months = ['2026-08', '2026-07', '2026-05', '2025-12', 'unbekannt'];
+    const counts = [22, 18, 15, 12, 7];
+    const photos = [];
+    let id = 5000;
+    months.forEach((m, mi) => {
+      for (let i = 0; i < counts[mi]; i++) {
+        photos.push({ n: (id--) + '.jpg', d: m === 'unbekannt' ? null : m + '-' + String(28 - i).padStart(2, '0') + 'T12:00:00' });
+      }
+    });
+    return photos;
+  })() },
   '/api/fotos': { albums: [
     { token: 'aB3dEfGh1jKlMnOpQrStUvWx', title: 'Sommerurlaub Kroatien 2026', photoCount: 87, sharedAt: '2026-08-06T10:30:00.000Z', thumb: 'IMG_0001.jpg' },
     { token: 'zY9xWvUtSrQpOnMlKjIhGfEd', title: 'Nicoles Geburtstag', photoCount: 23, sharedAt: '2026-07-21T18:05:00.000Z', thumb: 'IMG_0042.jpg' },
@@ -81,6 +94,17 @@ const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/jav
 
 http.createServer((req, res) => {
   const url = req.url.split('?')[0];
+
+  // Private Bibliotheksbilder (auf Prod von der Node-App gestreamt) → Platzhalter
+  if (url.startsWith('/api/fotos/library/img/') || url.startsWith('/api/fotos/library/thumb/')) {
+    const hue = (parseInt(url.replace(/\D/g, ''), 10) * 37) % 360;
+    res.writeHead(200, { 'Content-Type': 'image/svg+xml' });
+    return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400">'
+      + '<rect width="400" height="400" fill="hsl(' + hue + ',30%,25%)"/>'
+      + '<circle cx="140" cy="120" r="34" fill="hsl(' + hue + ',60%,70%)"/>'
+      + '<path d="M0 400 L150 220 L260 320 L330 250 L400 340 L400 400 Z" fill="hsl(' + hue + ',25%,35%)"/>'
+      + '</svg>');
+  }
 
   if (url.startsWith('/api/')) {
     const body = API[url] || {};

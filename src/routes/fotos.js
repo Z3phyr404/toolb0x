@@ -21,6 +21,14 @@ router.use(requireAuth, requireAdmin);
 // Auf dem Server /var/www/fotos; lokal per Env übersteuerbar (Dev/Tests).
 const FOTOS_DIR = process.env.FOTOS_DIR || '/var/www/fotos';
 
+// Privater Bibliotheks-Mirror („Alle Fotos", fotob0x Web-Sync).
+// WICHTIG: Dieses Verzeichnis wird bewusst NICHT von nginx ausgeliefert -
+// die Bilder gibt es nur über die Routen unten, und die verlangen Admin.
+const PRIVAT_DIR = process.env.FOTOS_PRIVAT_DIR || '/var/www/fotos-privat';
+
+// Mirror-Dateinamen sind "<assetId>.jpg" (numerische fotob0x-IDs).
+const PHOTO_NAME_RE = /^\d{1,12}\.jpg$/;
+
 // Galerie-Tokens aus fotob0x sind 24 Zeichen base64url — alles andere
 // (versteckte Dateien, Fremdordner) wird ignoriert.
 const TOKEN_RE = /^[A-Za-z0-9_-]{6,64}$/;
@@ -99,5 +107,61 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
   }
 });
+
+// ============================================================
+// GET /api/fotos/library — Manifest der privaten Bibliothek
+// ============================================================
+// library.json schreibt fotob0x beim Web-Sync (Dateiname + Aufnahme-
+// datum; die Web-Kopien selbst sind bewusst EXIF-frei).
+router.get('/library', async (req, res) => {
+  try {
+    const raw = await fs.readFile(path.join(PRIVAT_DIR, 'library.json'), 'utf8');
+    const manifest = JSON.parse(raw);
+    res.json({
+      generatedAt: typeof manifest.generatedAt === 'string' ? manifest.generatedAt : null,
+      photoCount: Number.isInteger(manifest.photoCount) ? manifest.photoCount : 0,
+      photos: Array.isArray(manifest.photos) ? manifest.photos : [],
+    });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      // Noch nie gesynct → leere Bibliothek, kein Fehler
+      return res.json({ generatedAt: null, photoCount: 0, photos: [] });
+    }
+    console.error('Bibliotheks-Manifest fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// ============================================================
+// GET /api/fotos/library/(img|thumb)/:name — Bild ausliefern
+// ============================================================
+// Streamt genau eine Datei aus dem privaten Mirror. Der Name wird
+// streng geprüft (nur "<zahl>.jpg") und sendFile bekommt ein root -
+// Pfad-Ausbrüche sind damit doppelt ausgeschlossen.
+function servePrivatePhoto(subdir) {
+  return (req, res) => {
+    const name = req.params.name;
+    if (!PHOTO_NAME_RE.test(name)) {
+      return res.status(400).json({ error: 'Ungültiger Bildname.' });
+    }
+    res.sendFile(name, {
+      root: path.join(PRIVAT_DIR, subdir),
+      dotfiles: 'deny',
+      headers: {
+        'Content-Type': 'image/jpeg',
+        // privat: nur der Browser des Admins darf cachen
+        'Cache-Control': 'private, max-age=86400',
+        'X-Robots-Tag': 'noindex, nofollow',
+      },
+    }, (err) => {
+      if (err && !res.headersSent) {
+        res.status(err.statusCode === 404 ? 404 : 500).json({ error: 'Bild nicht gefunden.' });
+      }
+    });
+  };
+}
+
+router.get('/library/img/:name', servePrivatePhoto('img'));
+router.get('/library/thumb/:name', servePrivatePhoto('thumb'));
 
 module.exports = router;

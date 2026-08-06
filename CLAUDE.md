@@ -95,6 +95,8 @@ toolb0x/
 | `/api/share/*` | Secret-Sharing-API (öffentliches Reveal + Owner-CRUD) |
 | `/api/admin/stats` | Admin-Statistiken (Nutzeranzahl, neuester Nutzer) |
 | `/api/fotos` | Geteilte fotob0x-Galerien listen (read-only, requireAdmin) |
+| `/api/fotos/library` | Manifest der privaten Bibliothek („Alle Fotos", requireAdmin) |
+| `/api/fotos/library/img\|thumb/:name` | Privates Bibliotheksbild streamen (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -534,6 +536,19 @@ Galerien selbst liefert weiterhin nginx aus — die Node-App legt nichts an und
 löscht nichts (Anlegen/Beenden ausschließlich über fotob0x). Der Layout-Stub
 (`tests/helpers/layout-stub-server.js`) fakt `/api/fotos` und liefert für
 `/fotos/*`-Thumbnails ein SVG-Platzhalterbild.
+
+**„Alle Fotos" — private Bibliothek (2026-08-06):** fotob0x synct die KOMPLETTE
+Bibliothek als EXIF-freie Web-Kopien nach `/var/www/fotos-privat`
+(`img/<assetId>.jpg`, `thumb/<assetId>.jpg`, `library.json`-Manifest mit
+Aufnahmedaten). Dieses Verzeichnis wird bewusst NICHT von nginx ausgeliefert —
+nur die Node-App streamt daraus, mit requireAdmin: `GET /api/fotos/library`
+(Manifest; fehlt die Datei → leere Liste) und
+`GET /api/fotos/library/img|thumb/:name` (Namens-Whitelist `<zahl>.jpg` +
+sendFile-root, Cache-Control private). Env-Override für Dev: `FOTOS_PRIVAT_DIR`.
+UI: `/app/fotos` hat zwei Ansichten — „Alle Fotos" (Monats-Zeitleiste,
+häppchenweises Nachrendern via IntersectionObserver, Lightbox mit
+Pfeilen/Wischgesten) und „Geteilte Alben". Der Stub fakt das Manifest und
+liefert für `/api/fotos/library/img|thumb/*` bunte SVG-Platzhalter.
 
 ---
 
