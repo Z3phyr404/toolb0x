@@ -262,8 +262,11 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; scroll-behavior:smooth; p
 .item-name { font-size:18px; font-weight:700; margin-top:12px; }
 .item-amount { font-size:16px; color:#ff6b60; font-weight:600; margin-top:4px; }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width:900px) {
+/* ===== RESPONSIVE =====
+   Breakpoint 768px wie in obsidian.css (.ob-mobile-header erscheint dort) -
+   vorher 900px, dadurch gab es zwischen 769 und 900px weder Sidebar noch
+   Mobile-Header: kein Weg zurück zum Portal und kein Abmelden (2026-08-07). */
+@media (max-width:768px) {
   .sidebar { display:none; }
   .kpi-row { grid-template-columns:repeat(2,1fr); }
   .chart-row { grid-template-columns:1fr; }
@@ -274,7 +277,7 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; scroll-behavior:smooth; p
   .mobile-tab.active { color:#2dd4bf; }
   .mobile-tab svg { width:22px; height:22px; }
 }
-@media (min-width:901px) { .mobile-tabs { display:none !important; } }
+@media (min-width:769px) { .mobile-tabs { display:none !important; } }
 @media (max-width:600px) {
   .kpi-row { grid-template-columns:1fr 1fr; }
   .donut-layout { flex-direction:column; }
@@ -369,6 +372,16 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; scroll-behavior:smooth; p
 
   <!-- MAIN -->
   <main>
+    <!-- Mobile-Header (Standard aus obsidian.css): Zurück zum Portal + Abmelden -
+         die Sidebar mit beidem ist mobil versteckt -->
+    <div class="ob-mobile-header">
+      <a href="/portal" class="ob-mobile-back" title="Zur Übersicht">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </a>
+      <h1>Finanz</h1>
+      <button class="ob-btn-logout" id="logoutBtnM">Abmelden</button>
+    </div>
+
     <!-- MONTH SELECTOR -->
     <div class="month-selector" id="monthSelector">
       <button class="month-btn" id="monthPrev">&#8249;</button>
@@ -740,7 +753,7 @@ document.getElementById('sidebarUser').addEventListener('click', function(e) {
 // EVENT DELEGATION
 // ============================================================
 document.addEventListener('click', function(e) {
-  var target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  var target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
   if (!target) return;
 
   // Navigation
@@ -749,7 +762,7 @@ document.addEventListener('click', function(e) {
   }
   if (target.dataset.closeModal) { closeM(target.dataset.closeModal); return; }
   if (target.id === 'authSwitchLink') { toggleAuthMode(); return; }
-  if (target.id === 'logoutBtn') { logout(); return; }
+  if (target.id === 'logoutBtn' || target.id === 'logoutBtnM') { logout(); return; }
   if (target.id === 'monthPrev') { changeMonth(-1); return; }
   if (target.id === 'monthNext') { changeMonth(1); return; }
   if (target.id === 'exportPdfBtn') {
