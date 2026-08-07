@@ -219,6 +219,19 @@ function sanitizeInboxName(raw) {
   return base;
 }
 
+// Gleiche Prüfung für BESTEHENDE Dateien (Status-Liste): nur Namen zeigen,
+// die DELETE auch annehmen und fotob0x auch abholen würde — sonst bekäme
+// z.B. eine per SFTP entstandene "Föhn.jpg" einen ×-Button, der immer
+// 400 liefert.
+function isListableInboxName(name) {
+  return sanitizeInboxName(name) === name;
+}
+
+// Namen, in die gerade ein PUT schreibt: ein gleichzeitiges DELETE würde
+// die Datei unter dem laufenden Stream wegziehen (der PUT meldete dann
+// Erfolg für eine gelöschte Inode) — solange lieber 409 antworten.
+const activeUploads = new Set();
+
 // Kollisionen nie überschreiben: "name.arw" → "name-2.arw" → "name-3.arw" …
 async function reserveInboxPath(name) {
   const ext = path.extname(name);
@@ -244,7 +257,7 @@ router.get('/upload/status', async (req, res) => {
     try {
       const entries = await fs.readdir(INBOX_DIR, { withFileTypes: true });
       for (const entry of entries) {
-        if (!entry.isFile() || entry.name.startsWith('.')) continue;
+        if (!entry.isFile() || !isListableInboxName(entry.name)) continue;
         const info = await fs.stat(path.join(INBOX_DIR, entry.name)).catch(() => null);
         if (info) files.push({ name: entry.name, size: info.size, mtime: info.mtime.toISOString() });
       }
@@ -296,6 +309,7 @@ router.put('/upload/:name', async (req, res) => {
   }
 
   const { target, candidate, handle } = reserved;
+  activeUploads.add(candidate);
   const out = handle.createWriteStream();
   let received = 0;
   let failed = false;
@@ -306,7 +320,13 @@ router.put('/upload/:name', async (req, res) => {
     req.unpipe(out);
     out.destroy();
     await fs.unlink(target).catch(() => {});
+    activeUploads.delete(candidate);
     if (!res.headersSent) res.status(status).json({ error: message });
+    // Der Client sendet ggf. weiter (Flowing-Mode durch den data-Listener) —
+    // die Verbindung ist nach einem Mitten-im-Stream-Abbruch unbrauchbar,
+    // also kappen. NUR wenn der Body noch nicht zu Ende gelesen war: sonst
+    // (z.B. leere Datei) würde das Kappen die Fehlerantwort verschlucken.
+    if (!req.readableEnded) req.destroy();
   };
 
   req.on('data', (chunk) => {
@@ -314,6 +334,9 @@ router.put('/upload/:name', async (req, res) => {
     if (received > INBOX_MAX_BYTES) void abort(413, 'Die Datei ist größer als 1 GB.');
   });
   req.on('aborted', () => void abort(499, 'Der Upload wurde abgebrochen.'));
+  // Ohne diesen Handler crasht ein ECONNRESET nach unpipe() den Prozess
+  // (unpipe entfernt den Error-Listener, den pipe() intern gesetzt hatte).
+  req.on('error', () => void abort(499, 'Der Upload wurde abgebrochen.'));
   out.on('error', (err) => {
     console.error('Posteingang-Schreibfehler:', err.message);
     void abort(500, 'Die Datei konnte nicht gespeichert werden.');
@@ -324,6 +347,7 @@ router.put('/upload/:name', async (req, res) => {
       void abort(400, 'Es sind keine Daten angekommen (leere Datei).');
       return;
     }
+    activeUploads.delete(candidate);
     res.json({ name: candidate, size: received });
   });
 
@@ -335,6 +359,9 @@ router.put('/upload/:name', async (req, res) => {
 router.delete('/upload/:name', async (req, res) => {
   const name = sanitizeInboxName(req.params.name);
   if (!name) return res.status(400).json({ error: 'Ungültiger Dateiname.' });
+  if (activeUploads.has(name)) {
+    return res.status(409).json({ error: 'Diese Datei wird gerade hochgeladen — kurz warten.' });
+  }
   try {
     await fs.unlink(path.join(INBOX_DIR, name));
     res.json({ ok: true });

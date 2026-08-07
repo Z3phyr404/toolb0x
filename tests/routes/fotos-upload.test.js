@@ -128,6 +128,16 @@ describe('GET /api/fotos/upload/status', () => {
     assert.ok(names.includes('DSC00042.ARW'));
     assert.ok(names.includes('DSC00042-2.ARW'));
   });
+
+  it('verschweigt Dateien, die DELETE nie annehmen würde (Umlaute, fremde Endungen)', async () => {
+    fs.writeFileSync(path.join(INBOX, 'Föhn.jpg'), 'x');
+    fs.writeFileSync(path.join(INBOX, 'rest.tmp'), 'x');
+    const res = await request(app).get('/api/fotos/upload/status').set('Cookie', admin.cookie);
+    assert.equal(res.status, 200);
+    const names = res.body.files.map((f) => f.name);
+    assert.ok(!names.includes('Föhn.jpg'));
+    assert.ok(!names.includes('rest.tmp'));
+  });
 });
 
 describe('DELETE /api/fotos/upload/:name', () => {

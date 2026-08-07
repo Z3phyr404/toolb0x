@@ -211,7 +211,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: message });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 Tool-Portal läuft auf http://localhost:${PORT}`);
   console.log(`🏠 Landing:     http://localhost:${PORT}/`);
   console.log(`📊 Portal:      http://localhost:${PORT}/portal`);
@@ -226,3 +226,9 @@ app.listen(PORT, () => {
   console.log(`🔗 Share:        http://localhost:${PORT}/s`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });
+
+// Foto-Uploads (roher Stream, /api/fotos/upload): Nodes Standard-requestTimeout
+// (300 s) würde einen 1-GB-Upload über langsames WLAN abbrechen, BEVOR die
+// 600 s aus nginx (deploy/nginx-fotos.conf) greifen. Wert bewusst über dem
+// nginx-Timeout, damit immer nginx zuerst sauber abbricht.
+server.requestTimeout = 660_000;
