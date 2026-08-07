@@ -55,6 +55,18 @@
 .portal-welcome p { font-size:16px; color:var(--text-2); max-width:520px; line-height:1.5; }
 
 /* ===== ERINNERUNGEN ===== */
+/* Globale Suche */
+.global-search { margin-bottom:24px; }
+.global-search-input { width:100%; padding:13px 18px; border:1px solid var(--border); border-radius:999px; background:var(--panel); color:var(--text); font-family:inherit; font-size:15px; outline:none; transition:border-color .2s; }
+.global-search-input:focus { border-color:var(--brand-link, #ffb347); }
+.global-search-input::placeholder { color:var(--text-3); }
+.global-search-results { margin-top:10px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:8px; max-height:420px; overflow-y:auto; }
+.gsr-group { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-3); padding:10px 12px 4px; }
+.gsr-item { display:flex; justify-content:space-between; gap:10px; padding:8px 12px; border-radius:10px; color:var(--text); text-decoration:none; font-size:14px; }
+.gsr-item:hover { background:rgba(255,255,255,0.05); }
+.gsr-item .sub { color:var(--text-3); font-size:12px; flex-shrink:0; max-width:45%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gsr-empty { padding:12px; color:var(--text-3); font-size:13.5px; }
+
 .reminder-panel { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:22px 24px; margin-bottom:24px; }
 .reminder-panel-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 .reminder-panel-title { display:flex; align-items:center; gap:11px; font-size:16px; font-weight:600; }
@@ -236,6 +248,15 @@
     </div>
 
     <!-- TOOL GRID -->
+    <!-- Globale Suche (2026-08-07): clientseitig über die bestehenden APIs -
+         der Server durchsucht nie verschlüsselte Daten (Zero-Knowledge) -->
+    <div class="global-search" data-reveal data-reveal-index="2">
+      <input type="search" id="globalSearch" class="global-search-input"
+             placeholder="Überall suchen: Passwörter, Notizen, Finanzen, Fotos…"
+             autocomplete="off">
+      <div class="global-search-results" id="globalSearchResults" hidden></div>
+    </div>
+
     <div class="tools-grid">
 
       <!-- FINANZEN -->
@@ -534,6 +555,124 @@ function setAuthFormActive(active) {
     authHideTimer = setTimeout(function () { screen.style.display = 'none'; }, 450);
   }
 }
+
+// ============================================================
+// GLOBALE SUCHE (2026-08-07): clientseitig über die bestehenden
+// APIs - der Server sieht nur die Notiz-Suche (dort entschlüsselt
+// er ohnehin pro Nutzer), alles andere wird im Browser gefiltert.
+// Passwörter: es erscheinen NUR Name/Website, nie das Passwort.
+// ============================================================
+var gsCache = {};
+function gsFetch(name, url) {
+  if (gsCache[name]) return Promise.resolve(gsCache[name]);
+  return fetch(API + url, { credentials: 'include' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (data) { gsCache[name] = data; return data; })
+    .catch(function () { return null; });
+}
+
+function gsMatch(text, q) {
+  return typeof text === 'string' && text.toLowerCase().indexOf(q) !== -1;
+}
+
+async function runGlobalSearch(q) {
+  var box = document.getElementById('globalSearchResults');
+  var groups = [];
+
+  var results = await Promise.all([
+    fetch(API + '/notes/search?q=' + encodeURIComponent(q), { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+    gsFetch('passwords', '/passwords'),
+    gsFetch('servers', '/servers'),
+    gsFetch('finanzen', '/export/json'),
+    gsFetch('fotos', '/fotos/library')
+  ]);
+
+  var notes = results[0], pws = results[1], servers = results[2], fin = results[3], fotos = results[4];
+
+  if (notes && notes.results && notes.results.length) {
+    groups.push({ title: 'Notizen', href: '/app/notizen', items: notes.results.slice(0, 5).map(function (n) {
+      return { label: (n.icon ? n.icon + ' ' : '') + (n.title || 'Ohne Titel'), sub: n.snippet || '' };
+    }) });
+  }
+  if (pws && pws.passwords) {
+    var hits = pws.passwords.filter(function (p) {
+      return gsMatch(p.name, q) || gsMatch(p.website, q) || gsMatch(p.username, q);
+    }).slice(0, 5);
+    if (hits.length) groups.push({ title: 'Passwörter', href: '/app/passwords', items: hits.map(function (p) {
+      return { label: p.name || '(ohne Namen)', sub: p.website || p.username || '' };
+    }) });
+  }
+  if (servers && servers.servers) {
+    var sHits = servers.servers.filter(function (s) { return gsMatch(s.label, q) || gsMatch(s.host, q); }).slice(0, 5);
+    if (sHits.length) groups.push({ title: 'Server', href: '/app/servers', items: sHits.map(function (s) {
+      return { label: s.label, sub: s.host || '' };
+    }) });
+  }
+  if (fin) {
+    // Der DSGVO-Export nutzt deutsche Schlüssel (ausgaben/einnahmen, betrag/monat)
+    var finHits = [];
+    (fin.ausgaben || []).forEach(function (e) {
+      if (gsMatch(e.name, q)) finHits.push({ label: e.name, sub: 'Ausgabe · ' + (e.monat || '') + ' · ' + (e.betrag || '') + ' €' });
+    });
+    (fin.einnahmen || []).forEach(function (e) {
+      if (gsMatch(e.name, q)) finHits.push({ label: e.name, sub: 'Einnahme · ' + (e.monat || '') + ' · ' + (e.betrag || '') + ' €' });
+    });
+    if (finHits.length) groups.push({ title: 'Finanzen', href: '/app/finanzen', items: finHits.slice(0, 5) });
+  }
+  if (fotos && fotos.photos) {
+    var fHits = fotos.photos.filter(function (p) {
+      return gsMatch(p.c, q) || (p.p && p.p.some(function (n) { return gsMatch(n, q); }));
+    }).slice(0, 5);
+    if (fHits.length) groups.push({ title: 'Fotos', href: '/app/fotos', items: fHits.map(function (p) {
+      return { label: p.c || 'Foto', sub: p.d ? p.d.slice(0, 10) : '' };
+    }) });
+  }
+
+  box.textContent = '';
+  box.hidden = false;
+  if (groups.length === 0) {
+    var empty = document.createElement('div');
+    empty.className = 'gsr-empty';
+    empty.textContent = 'Nichts gefunden für „' + q + '".';
+    box.appendChild(empty);
+    return;
+  }
+  groups.forEach(function (group) {
+    var head = document.createElement('div');
+    head.className = 'gsr-group';
+    head.textContent = group.title;
+    box.appendChild(head);
+    group.items.forEach(function (item) {
+      var a = document.createElement('a');
+      a.className = 'gsr-item';
+      a.href = group.href;
+      var label = document.createElement('span');
+      label.textContent = item.label;
+      var sub = document.createElement('span');
+      sub.className = 'sub';
+      sub.textContent = item.sub;
+      a.appendChild(label);
+      a.appendChild(sub);
+      box.appendChild(a);
+    });
+  });
+}
+
+(function initGlobalSearch() {
+  var input = document.getElementById('globalSearch');
+  var box = document.getElementById('globalSearchResults');
+  var timer = null;
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase();
+    clearTimeout(timer);
+    if (q.length < 2) { box.hidden = true; return; }
+    timer = setTimeout(function () { runGlobalSearch(q); }, 300);
+  });
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { input.value = ''; box.hidden = true; }
+  });
+})();
 
 async function logout() {
   SessionTimeout.stop();
