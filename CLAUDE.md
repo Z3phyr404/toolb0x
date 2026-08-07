@@ -354,6 +354,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 - **CORS** whitelist via `CORS_ORIGIN` env var
 - **Rate-Limiting:** Allgemein 600/15min (`RATE_LIMIT_GENERAL`), Login 10/15min, Register 5/h, Reset 10/15min, Profil 15/15min, Passwort & Konto je 5/15min
   - Das allgemeine Limit gilt PRO IP und deckt ALLE `/api/`-Routen ab — hinter einer NAT teilen sich alle Nutzer das Budget. Normale Nutzung ist API-intensiv (Seitenaufruf ~5 Calls), 100 war zu eng (429 ab ~20 Ausgaben in 15 Min).
+  - **Ausnahme Bibliotheks-Bilder (2026-08-07):** `/api/fotos/library/img|thumb/*` ist vom allgemeinen Limiter ausgenommen (skip) und hat ein eigenes Limit (`RATE_LIMIT_LIBRARY_IMAGES`, Default 20000/15min). Grund: „Alle Fotos" lädt tausende Thumbnails als API-Requests — mit dem 600er-Budget war nach einmal Scrollen die GANZE API gesperrt (Totalsperre trotz Anmeldung). Merksatz: **Bild-/Asset-Streams nie gegen das allgemeine API-Budget zählen lassen.**
   - **Jeder sensible Endpunkt braucht eine EIGENE Limiter-Instanz.** Eine geteilte Instanz über mehrere `app.use()` zählt alle Pfade auf denselben Zähler (Profil-Speichern sperrte so die Konto-Löschung).
 - **HPP** — HTTP Parameter Pollution Schutz
 - **Body-Parser** — Max 10kb
