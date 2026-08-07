@@ -266,6 +266,8 @@
       font-size: 1.7rem; cursor: pointer; padding: 4px 12px;
     }
     .lb button:hover { color: #f472b6; }
+    #lbDelete { font-size: 12px; font-family: inherit; border: 1px solid rgba(248,113,113,0.35); border-radius: 8px; padding: 6px 12px; color: rgba(248,113,113,0.9); }
+    #lbDelete:hover { background: rgba(248,113,113,0.12); color: #f87171; }
     .lb .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 2.3rem; }
     .lb .prev { left: 6px; } .lb .next { right: 6px; }
 
@@ -445,7 +447,13 @@
 
 <!-- LIGHTBOX (Alle Fotos) -->
 <div class="lb" id="lb">
-  <div class="lb-bar"><span id="lbInfo"></span><button id="lbClose" type="button" title="Schließen (Esc)">×</button></div>
+  <div class="lb-bar">
+    <span id="lbInfo"></span>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="lbDelete" type="button" title="Dieses Foto auf dem PC in den Papierkorb verschieben (wiederherstellbar; verschwindet nach der nächsten Synchronisierung auch hier)">In den Papierkorb</button>
+      <button id="lbClose" type="button" title="Schließen (Esc)">×</button>
+    </div>
+  </div>
   <div class="lb-stage"><img id="lbImg" alt=""></div>
   <button class="nav prev" id="lbPrev" type="button" title="Vorheriges (←)">‹</button>
   <button class="nav next" id="lbNext" type="button" title="Nächstes (→)">›</button>
@@ -938,6 +946,27 @@
     lbCurrent = -1;
   }
 
+  // In den PC-Papierkorb: markiert das aktuelle Foto zum Löschen (fotob0x
+  // holt die Markierung ab). Lokal sofort ausblenden, damit es sich
+  // unmittelbar richtig anfühlt.
+  function deleteCurrentPhoto() {
+    if (lbCurrent < 0) return;
+    var photo = libraryPhotos[lbCurrent];
+    var id = parseInt(photo.n, 10);
+    if (!id) return;
+    var btn = $('lbDelete');
+    btn.disabled = true;
+    api('/fotos/delete-request', { method: 'POST', body: { ids: [id] } }).then(function() {
+      toast('In den Papierkorb verschoben – erscheint nach der nächsten Synchronisierung nicht mehr.');
+      // Aus der Gesamtliste entfernen, schließen und Ansicht neu aufbauen
+      libraryAll = libraryAll.filter(function(p) { return p.n !== photo.n; });
+      closeLightbox();
+      applyFilters();
+    }).catch(function(err) {
+      toast(err.error || 'Konnte nicht markiert werden.', 'error');
+    }).finally(function() { btn.disabled = false; });
+  }
+
   // ============================================================
   // ALBEN
   // ============================================================
@@ -1231,6 +1260,7 @@
   });
 
   $('lbClose').addEventListener('click', closeLightbox);
+  $('lbDelete').addEventListener('click', deleteCurrentPhoto);
   $('lbPrev').addEventListener('click', function() { openLightbox(lbCurrent - 1); });
   $('lbNext').addEventListener('click', function() { openLightbox(lbCurrent + 1); });
   $('lb').addEventListener('click', function(e) {

@@ -214,6 +214,56 @@ router.get('/library/img/:name', servePrivatePhoto('img'));
 router.get('/library/thumb/:name', servePrivatePhoto('thumb'));
 
 // ============================================================
+// Lösch-Warteschlange (2026-08-07) — online löschen -> PC-Papierkorb
+// ============================================================
+// „Alle Fotos" ist eine schreibgeschützte Kopie; der PC bleibt die Wahrheit.
+// Ein Löschen online legt hier nur einen MARKER an (leere Datei je Asset-ID
+// unter fotos-privat/delete-queue). fotob0x holt die Marker per SFTP ab
+// (wie den Upload-Posteingang, aber umgekehrt), verschiebt die Fotos lokal
+// in den Papierkorb (wiederherstellbar!) und löscht die Marker. Beim
+// nächsten Websync verschwindet das Foto dann auch aus dieser Ansicht.
+const QUEUE_DIR = path.join(PRIVAT_DIR, 'delete-queue');
+
+// POST /api/fotos/delete-request  { ids: [123, 456, ...] }
+router.post('/delete-request', async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
+    const clean = [];
+    for (const id of ids) {
+      const n = Number(id);
+      if (Number.isInteger(n) && n > 0 && n < 1e12) clean.push(String(n));
+      if (clean.length >= 500) break;
+    }
+    if (clean.length === 0) return res.status(400).json({ error: 'Keine gültigen Foto-IDs.' });
+    await fs.mkdir(QUEUE_DIR, { recursive: true });
+    for (const id of clean) {
+      // wx: nur anlegen, doppelte Anfragen sind harmlos (schon markiert).
+      await fs.writeFile(path.join(QUEUE_DIR, id), '', { flag: 'wx' }).catch((e) => {
+        if (e.code !== 'EEXIST') throw e;
+      });
+    }
+    res.json({ queued: clean.length });
+  } catch (error) {
+    console.error('Lösch-Warteschlange fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// GET /api/fotos/delete-request — offene Anzahl (für die UI)
+router.get('/delete-request', async (req, res) => {
+  try {
+    const entries = await fs.readdir(QUEUE_DIR).catch((e) => {
+      if (e.code === 'ENOENT') return [];
+      throw e;
+    });
+    res.json({ pending: entries.filter((n) => /^\d{1,12}$/.test(n)).length });
+  } catch (error) {
+    console.error('Warteschlangen-Status fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// ============================================================
 // Upload-Posteingang — Fotos von iPad/Mac sichern (2026-08-07)
 // ============================================================
 // Der Upload läuft als ROHER Body-Stream (PUT, application/octet-stream,
