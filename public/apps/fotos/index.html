@@ -859,8 +859,15 @@
     renderAlbumSelect();
     renderSidebarAlbums();
     // Suchfeld nur zeigen, wenn es Bildunterschriften gibt (fotob0x KI-Paket 5)
+    // Das Suchfeld findet Beschreibungen UND Personen - es zeigt sich,
+    // sobald es irgendetwas Durchsuchbares gibt (vorher war es ohne
+    // Beschreibungen unsichtbar, obwohl Personen-Suche funktionierte).
     var hasCaptions = libraryAll.some(function(p) { return !!p.c; });
-    $('librarySearch').hidden = !hasCaptions;
+    var hasSearchable = hasCaptions || libraryPersons.length > 0;
+    $('librarySearch').hidden = !hasSearchable;
+    $('librarySearch').placeholder = hasCaptions
+      ? 'Beschreibung oder Person durchsuchen…'
+      : 'Person durchsuchen…';
     // Zeitraum-Filter sind immer nützlich - die Zeile zeigt sich, sobald
     // überhaupt Fotos da sind.
     $('filterRow').hidden = libraryAll.length === 0;
@@ -891,6 +898,12 @@
       libraryAlbums = data.albums || [];
       activePerson = null;
       activeAlbumIndex = null;
+      // Von der globalen Portal-Suche mitgebracht (?suche=…)
+      var fromPortal = new URLSearchParams(location.search).get('suche');
+      if (fromPortal) {
+        activeQuery = fromPortal.trim();
+        $('librarySearch').value = activeQuery;
+      }
       applyFilters();
     }).catch(function(err) {
       toast(err.error || 'Die Bibliothek konnte nicht geladen werden.', 'error');

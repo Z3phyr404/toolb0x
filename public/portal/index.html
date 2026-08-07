@@ -621,12 +621,19 @@ async function runGlobalSearch(q) {
     if (finHits.length) groups.push({ title: 'Finanzen', href: '/app/finanzen', items: finHits.slice(0, 5) });
   }
   if (fotos && fotos.photos) {
-    var fHits = fotos.photos.filter(function (p) {
+    var fAll = fotos.photos.filter(function (p) {
       return gsMatch(p.c, q) || (p.p && p.p.some(function (n) { return gsMatch(n, q); }));
-    }).slice(0, 5);
-    if (fHits.length) groups.push({ title: 'Fotos', href: '/app/fotos', items: fHits.map(function (p) {
-      return { label: p.c || 'Foto', sub: p.d ? p.d.slice(0, 10) : '' };
-    }) });
+    });
+    if (fAll.length) {
+      // Sprechende Labels: Beschreibung, sonst Personen + Datum; der Klick
+      // nimmt die Suche mit in die Fotos-App (?suche=…).
+      var items = fAll.slice(0, 5).map(function (p) {
+        var label = p.c || ((p.p || []).join(', ') || 'Foto') + (p.d ? ' – ' + p.d.slice(0, 10) : '');
+        return { label: label, sub: p.d ? p.d.slice(0, 10) : '' };
+      });
+      if (fAll.length > 5) items.push({ label: 'Alle ' + fAll.length + ' Treffer in der Fotos-App ansehen…', sub: '' });
+      groups.push({ title: 'Fotos', href: '/app/fotos?suche=' + encodeURIComponent(q), items: items });
+    }
   }
 
   box.textContent = '';
