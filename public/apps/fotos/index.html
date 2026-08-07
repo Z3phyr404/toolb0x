@@ -175,6 +175,26 @@
     .filter-search:focus { border-color: rgba(244,114,182,0.45); }
     .filter-search::placeholder { color: rgba(238,241,246,0.4); }
 
+    /* ===== ALBEN IN DER SIDEBAR (Desktop) ===== */
+    .sb-albums { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
+    .sb-albums-label {
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+      text-transform: uppercase; color: rgba(238,241,246,0.4); padding: 0 12px 6px;
+    }
+    .sb-album-list { overflow-y: auto; min-height: 0; padding-bottom: 8px; }
+    .sb-album-list button {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      width: 100%; padding: 7px 12px; border: none; background: none; text-align: left;
+      color: rgba(238,241,246,0.65); font-family: inherit; font-size: 13.5px;
+      border-radius: 10px; cursor: pointer; transition: color 0.15s, background 0.15s;
+    }
+    .sb-album-list button:hover { color: #eef1f6; background: rgba(255,255,255,0.05); }
+    .sb-album-list button.active { color: var(--sb-accent); background: var(--sb-accent-bg); }
+    .sb-album-list button .n { flex-shrink: 0; font-size: 11px; color: rgba(238,241,246,0.4); }
+    .sb-album-list button span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Mobil übernimmt das Dropdown in der Filterzeile; auf dem Desktop wäre es doppelt */
+    @media (min-width: 769px) { .album-select { display: none; } }
+
     .person-chips {
       display: flex; flex-wrap: wrap; gap: 8px;
     }
@@ -321,6 +341,13 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Hochladen
     </button>
+
+    <!-- Alben aus dem fotob0x-Manifest: Klick filtert "Alle Fotos" (Desktop;
+         mobil übernimmt das Dropdown in der Filterzeile) -->
+    <div class="sb-albums" id="sbAlbums" hidden>
+      <div class="sb-albums-label">Alben</div>
+      <div class="sb-album-list" id="sbAlbumList"></div>
+    </div>
     <div class="ob-sidebar-user">
       <div class="ob-sidebar-avatar" id="userAvatar">?</div>
       <div class="ob-sidebar-user-info">
@@ -758,6 +785,38 @@
     select.classList.toggle('active', activeAlbumIndex !== null);
   }
 
+  /** Alben-Liste in der Sidebar (Desktop-Pendant zum Dropdown). */
+  function renderSidebarAlbums() {
+    var box = $('sbAlbums');
+    box.hidden = libraryAlbums.length === 0;
+    var list = $('sbAlbumList');
+    list.textContent = '';
+    if (libraryAlbums.length === 0) return;
+    var mk = function(label, count, idx) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      var name = document.createElement('span');
+      name.textContent = label;
+      btn.appendChild(name);
+      if (count !== null) {
+        var n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = count;
+        btn.appendChild(n);
+      }
+      btn.className = activeAlbumIndex === idx ? 'active' : '';
+      btn.title = idx === null ? 'Album-Filter aufheben' : 'Nur Fotos aus „' + label + '" anzeigen';
+      btn.addEventListener('click', function() {
+        activeAlbumIndex = (activeAlbumIndex === idx) ? null : idx;
+        showView('library');
+        applyFilters();
+      });
+      list.appendChild(btn);
+    };
+    mk('Alle Fotos', null, null);
+    libraryAlbums.forEach(function(album, idx) { mk(album.n, album.ids.length, idx); });
+  }
+
   /** Wendet Album-, Personen- und Text-Filter auf die Gesamtliste an. */
   function applyFilters() {
     var photos = libraryAll;
@@ -780,6 +839,7 @@
     libraryPhotos = photos;
     renderPersonChips();
     renderAlbumSelect();
+    renderSidebarAlbums();
     // Suchfeld nur zeigen, wenn es Bildunterschriften gibt (fotob0x KI-Paket 5)
     var hasCaptions = libraryAll.some(function(p) { return !!p.c; });
     $('librarySearch').hidden = !hasCaptions;
