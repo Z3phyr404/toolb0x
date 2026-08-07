@@ -63,6 +63,11 @@ const API = {
       { n: 'Wochenendtrip an den Königssee', s: '2026-08-20T09:00:00', e: '2026-08-23T20:00:00', ids: [4995, 4994, 4993, 4992] },
       { n: 'Grillabend im Garten', s: '2026-07-16T15:00:00', e: '2026-07-16T21:00:00', ids: [4967, 4966, 4965] },
     ],
+    // Alben (2026-08-07) für die Album-Auswahl in "Alle Fotos"
+    albums: [
+      { n: 'Beste Aufnahmen 2026', ids: [5000, 4998, 4990, 4975, 4960] },
+      { n: 'Königssee', ids: [4995, 4994, 4993, 4992, 4991] },
+    ],
     photos: (function() {
     // 74 Fake-Fotos über 5 Monate (neueste zuerst), IDs wie im echten Mirror;
     // einige mit benannten Personen für den Personen-Filter

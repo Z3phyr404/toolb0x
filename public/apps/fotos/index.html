@@ -139,10 +139,31 @@
       color: #f472b6;
     }
 
-    /* ===== PERSONEN-FILTER ===== */
+    /* ===== FILTER (Album-Auswahl + Personen-Chips) ===== */
+    .filter-row {
+      display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px;
+      margin-bottom: 20px;
+    }
+    .album-select {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: rgba(238,241,246,0.85);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      max-width: 100%;
+    }
+    .album-select:hover, .album-select:focus { border-color: rgba(244,114,182,0.45); outline: none; }
+    .album-select.active {
+      background: rgba(244,114,182,0.15);
+      border-color: rgba(244,114,182,0.5);
+      color: #f472b6;
+    }
+    .album-select option { background: #1c1f27; color: #eef1f6; }
+
     .person-chips {
       display: flex; flex-wrap: wrap; gap: 8px;
-      margin-bottom: 20px;
     }
     .person-chips button {
       border: 1px solid rgba(255,255,255,0.14);
@@ -308,6 +329,13 @@
       <button class="ob-btn-logout" id="logoutBtnM">Abmelden</button>
     </div>
 
+    <!-- Mobile: Ansichten-Umschalter (die Sidebar ist hier versteckt) -->
+    <div class="ob-mobile-tabs">
+      <button type="button" id="tabLibrary" class="active">Alle Fotos</button>
+      <button type="button" id="tabAlbums">Geteilte Alben</button>
+      <button type="button" id="tabUpload">Hochladen</button>
+    </div>
+
     <div class="ob-toolbar" data-reveal data-reveal-index="0">
       <div>
         <div class="section-label" id="viewLabel">// BIBLIOTHEK</div>
@@ -317,7 +345,12 @@
 
     <!-- ALLE FOTOS (privat, Zeitleiste) -->
     <div id="viewLibrary">
-      <div class="person-chips" id="personChips" hidden></div>
+      <div class="filter-row" id="filterRow" hidden>
+        <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
+          <option value="">Alle Alben</option>
+        </select>
+        <div class="person-chips" id="personChips" hidden></div>
+      </div>
       <div id="timeline"></div>
       <div id="timelineSentinel"></div>
       <div class="empty-state" id="libraryEmpty" hidden>
@@ -472,9 +505,13 @@
     $('viewLibrary').hidden = view !== 'library';
     $('viewAlbums').hidden = view !== 'albums';
     $('viewUpload').hidden = view !== 'upload';
+    // Sidebar-Navigation und Mobile-Tabs spiegeln denselben Zustand.
     $('navLibrary').classList.toggle('active', view === 'library');
     $('navAlbums').classList.toggle('active', view === 'albums');
     $('navUpload').classList.toggle('active', view === 'upload');
+    $('tabLibrary').classList.toggle('active', view === 'library');
+    $('tabAlbums').classList.toggle('active', view === 'albums');
+    $('tabUpload').classList.toggle('active', view === 'upload');
     $('viewLabel').textContent =
       view === 'library' ? '// BIBLIOTHEK' : view === 'albums' ? '// GALERIEN' : '// POSTEINGANG';
     $('viewTitle').textContent =
@@ -495,7 +532,9 @@
   var libraryAll = [];      // komplettes Manifest [{n, d, p?}], neueste zuerst
   var libraryPersons = [];  // benannte Personen (aus fotob0x, Manifest-Feld "persons")
   var libraryEvents = [];   // Ereignisse (aus fotob0x, Manifest-Feld "events"), neueste zuerst
+  var libraryAlbums = [];   // Alben (aus fotob0x, Manifest-Feld "albums": {n, ids})
   var activePerson = null;  // aktiver Personen-Filter (Name) oder null
+  var activeAlbumIndex = null; // Index in libraryAlbums oder null (= alle Alben)
   var libraryPhotos = [];   // aktuell sichtbare Fotos, NACH der Gruppierung in
                              // Anzeige-Reihenfolge neu aufgebaut (Lightbox-Ordnung!)
   var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
@@ -684,10 +723,40 @@
 
   function setPersonFilter(name) {
     activePerson = name;
-    libraryPhotos = name
-      ? libraryAll.filter(function(p) { return p.p && p.p.indexOf(name) !== -1; })
-      : libraryAll;
+    applyFilters();
+  }
+
+  // ---- Album-Auswahl (2026-08-07): kombiniert sich mit dem Personen-Filter ----
+
+  function renderAlbumSelect() {
+    var select = $('albumSelect');
+    select.hidden = libraryAlbums.length === 0;
+    while (select.options.length > 1) select.remove(1);
+    libraryAlbums.forEach(function(album, idx) {
+      var option = document.createElement('option');
+      option.value = String(idx);
+      option.textContent = album.n + ' (' + album.ids.length + ')';
+      select.appendChild(option);
+    });
+    select.value = activeAlbumIndex === null ? '' : String(activeAlbumIndex);
+    select.classList.toggle('active', activeAlbumIndex !== null);
+  }
+
+  /** Wendet Album- UND Personen-Filter auf die Gesamtliste an. */
+  function applyFilters() {
+    var photos = libraryAll;
+    if (activeAlbumIndex !== null && libraryAlbums[activeAlbumIndex]) {
+      var idSet = {};
+      libraryAlbums[activeAlbumIndex].ids.forEach(function(id) { idSet[id] = true; });
+      photos = photos.filter(function(p) { return idSet[parseInt(p.n, 10)]; });
+    }
+    if (activePerson) {
+      photos = photos.filter(function(p) { return p.p && p.p.indexOf(activePerson) !== -1; });
+    }
+    libraryPhotos = photos;
     renderPersonChips();
+    renderAlbumSelect();
+    $('filterRow').hidden = libraryAlbums.length === 0 && libraryPersons.length === 0;
     rebuildTimeline();
   }
 
@@ -712,10 +781,10 @@
       libraryAll = data.photos || [];
       libraryPersons = data.persons || [];
       libraryEvents = data.events || [];
+      libraryAlbums = data.albums || [];
       activePerson = null;
-      libraryPhotos = libraryAll;
-      renderPersonChips();
-      rebuildTimeline();
+      activeAlbumIndex = null;
+      applyFilters();
     }).catch(function(err) {
       toast(err.error || 'Die Bibliothek konnte nicht geladen werden.', 'error');
       $('libraryEmpty').hidden = false;
@@ -1023,6 +1092,13 @@
   $('navLibrary').addEventListener('click', function() { showView('library'); });
   $('navAlbums').addEventListener('click', function() { showView('albums'); });
   $('navUpload').addEventListener('click', function() { showView('upload'); });
+  $('tabLibrary').addEventListener('click', function() { showView('library'); });
+  $('tabAlbums').addEventListener('click', function() { showView('albums'); });
+  $('tabUpload').addEventListener('click', function() { showView('upload'); });
+  $('albumSelect').addEventListener('change', function() {
+    activeAlbumIndex = this.value === '' ? null : parseInt(this.value, 10);
+    applyFilters();
+  });
 
   $('lbClose').addEventListener('click', closeLightbox);
   $('lbPrev').addEventListener('click', function() { openLightbox(lbCurrent - 1); });

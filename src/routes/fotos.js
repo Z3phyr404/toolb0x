@@ -115,6 +115,23 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Alben (fotob0x, 2026-08-07): {n, ids}-Objekte für die Album-Auswahl in
+// "Alle Fotos" - gleiche billige Validierung wie bei den Events, Cap bei 200.
+function sanitizeAlbums(albums) {
+  if (!Array.isArray(albums)) return [];
+  const out = [];
+  for (const album of albums) {
+    if (out.length >= 200) break;
+    if (!album || typeof album !== 'object') continue;
+    if (typeof album.n !== 'string' || album.n.length === 0) continue;
+    if (!Array.isArray(album.ids)) continue;
+    const ids = album.ids.filter((id) => typeof id === 'number' && Number.isFinite(id));
+    if (ids.length === 0) continue;
+    out.push({ n: album.n, ids });
+  }
+  return out;
+}
+
 // Events (fotob0x Etappe 6, "Ereignisse") kommen als eigenes Manifest-Feld -
 // billige Validierung statt Schema-Lib, weil wir dem Client nur simple
 // {n, s, e, ids}-Objekte weiterreichen (nie mehr als 500, sonst Cap).
@@ -150,12 +167,14 @@ router.get('/library', async (req, res) => {
       persons: Array.isArray(manifest.persons) ? manifest.persons : [],
       // Ereignisse (fotob0x Etappe 6) für die Event-Gruppierung in "Alle Fotos"
       events: sanitizeEvents(manifest.events),
+      // Alben (2026-08-07) für die Album-Auswahl in "Alle Fotos"
+      albums: sanitizeAlbums(manifest.albums),
       photos: Array.isArray(manifest.photos) ? manifest.photos : [],
     });
   } catch (error) {
     if (error.code === 'ENOENT') {
       // Noch nie gesynct → leere Bibliothek, kein Fehler
-      return res.json({ generatedAt: null, photoCount: 0, persons: [], events: [], photos: [] });
+      return res.json({ generatedAt: null, photoCount: 0, persons: [], events: [], albums: [], photos: [] });
     }
     console.error('Bibliotheks-Manifest fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });

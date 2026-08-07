@@ -374,11 +374,40 @@ h2, .h2 {
 
 /* Mobile-Header: nur sichtbar, wenn die Sidebar versteckt ist */
 .ob-mobile-header { display: none; }
+/* Mobile-Tabs: Ersatz für die versteckte Sidebar-Navigation (unter dem
+   Mobile-Header einbauen; Buttons spiegeln die .ob-nav-btn der Sidebar).
+   Ohne so eine Leiste sind Apps mit mehreren Ansichten mobil nicht
+   navigierbar - die Fotos-App war das erste Opfer (2026-08-07). */
+.ob-mobile-tabs { display: none; }
 @media (max-width: 768px) {
   .ob-sidebar { display: none; }
   .ob-mobile-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
   .ob-mobile-header h1 { font-size: 20px; font-weight: 700; }
   .ob-mobile-header .ob-btn-logout { margin-left: auto; }
+  .ob-mobile-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ob-mobile-tabs button {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-2);
+    font-size: 13.5px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .ob-mobile-tabs button.active {
+    color: var(--sb-accent, var(--text));
+    border-color: var(--sb-accent-border, var(--border));
+    background: var(--sb-accent-bg, rgba(255,255,255,0.08));
+  }
   .ob-mobile-back {
     display: flex;
     align-items: center;
