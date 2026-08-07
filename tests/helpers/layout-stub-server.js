@@ -80,6 +80,10 @@ const API = {
     });
     return photos;
   })() },
+  '/api/fotos/upload/status': { ready: true, freeBytes: 62 * 1024 * 1024 * 1024, files: [
+    { name: 'DSC00123.ARW', size: 42 * 1024 * 1024, mtime: '2026-08-07T09:12:00.000Z' },
+    { name: 'IMG_2210.jpg', size: 3.4 * 1024 * 1024, mtime: '2026-08-07T09:10:00.000Z' },
+  ] },
   '/api/fotos': { albums: [
     { token: 'aB3dEfGh1jKlMnOpQrStUvWx', title: 'Sommerurlaub Kroatien 2026', photoCount: 87, sharedAt: '2026-08-06T10:30:00.000Z', thumb: 'IMG_0001.jpg' },
     { token: 'zY9xWvUtSrQpOnMlKjIhGfEd', title: 'Nicoles Geburtstag', photoCount: 23, sharedAt: '2026-07-21T18:05:00.000Z', thumb: 'IMG_0042.jpg' },

@@ -97,6 +97,8 @@ toolb0x/
 | `/api/fotos` | Geteilte fotob0x-Galerien listen (read-only, requireAdmin) |
 | `/api/fotos/library` | Manifest der privaten Bibliothek („Alle Fotos", requireAdmin) |
 | `/api/fotos/library/img\|thumb/:name` | Privates Bibliotheksbild streamen (requireAdmin) |
+| `/api/fotos/upload/status` | Upload-Posteingang: Dateien + freier Speicher (requireAdmin) |
+| `/api/fotos/upload/:name` | PUT = Datei als roher Stream hochladen, DELETE = entfernen (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -559,6 +561,26 @@ Lightbox (Pfeilen/Wischgesten) laufen unverändert über die flache, aus den
 Gruppen neu zusammengesetzte Fotoliste. Der Stub fakt Manifest (inkl. zwei
 Beispiel-Events) und liefert für `/api/fotos/library/img|thumb/*` bunte
 SVG-Platzhalter.
+
+**Upload-Posteingang „Hochladen" (2026-08-07):** Dritter Reiter in `/app/fotos` —
+Fotos von iPad/Mac „sichern", während der Windows-Rechner (fotob0x) die einzige
+Wahrheit bleibt. Ablauf: Browser lädt jede Datei als EINEN rohen PUT-Stream nach
+`PUT /api/fotos/upload/:name` (bewusst KEIN multipart/multer: kein neues Paket,
+kein RAM-Puffern; der globale 10kb-JSON-Parser greift bei
+`application/octet-stream` nicht). Ziel: `/var/www/fotos-inbox` (Env
+`FOTOS_INBOX_DIR`), Namens-Whitelist `[A-Za-z0-9._-]` + Endungs-Whitelist
+(jpg/jpeg/png/heic/heif/arw/mp4 — nur was fotob0x scannen kann), Kollisionen
+bekommen `-2`-Suffixe (exklusives `wx`-open, nie überschreiben), max. 1 GB/Datei.
+fotob0x holt den Posteingang per SFTP ab (alle 30 Min), importiert in die
+Bibliothek und leert ihn NACH fehlerfreiem Import — die Node-App löscht nur auf
+expliziten Nutzer-Klick (DELETE = Upload zurücknehmen). nginx: eigener
+location-Block `^~ /api/fotos/upload/` in `deploy/nginx-fotos.conf` mit
+`client_max_body_size 1g` + `proxy_request_buffering off` — der Rest der API
+bleibt beim 1-MB-Standard. EINMALIGE Server-Einrichtung (Node läuft als
+michael): `sudo mkdir -p /var/www/fotos-inbox && sudo chown michael:michael
+/var/www/fotos-inbox`, danach `nginx -t && systemctl reload nginx` für den
+neuen location-Block. Tests: `tests/routes/fotos-upload.test.js`; der
+Layout-Stub fakt `/api/fotos/upload/status`.
 
 ---
 
