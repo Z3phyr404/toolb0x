@@ -270,6 +270,9 @@ router.post('/:id/stats', sshLimiter, async (req, res) => {
       var dfResult = await runServerSSH(server, req.encryptionKey, STORAGE_DF, 30000);
       var d = parseStorageDf(dfResult.stdout);
       return res.json({
+        // storage: die UI zeigt dann NUR die Disk (CPU/RAM/Load gibt es
+        // auf einer Storage Box nicht - eingeschränkte Shell).
+        storage: true,
         cpu: 0,
         ram: { total: 0, used: 0 },
         disk: { total: d.total, used: d.used, free: d.free, percent: d.percent },
