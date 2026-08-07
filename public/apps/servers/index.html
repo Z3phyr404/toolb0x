@@ -522,6 +522,13 @@
       <input class="form-input" id="fLabel" placeholder="z.B. Hetzner VPS">
     </div>
     <div class="form-group">
+      <label class="form-label">Typ</label>
+      <select class="form-input" id="fType" title="Storage Box: nur Erreichbarkeit + Speicherbelegung (df) - kein Update/Neustart/Dienste">
+        <option value="linux">Linux-Server</option>
+        <option value="storage">Hetzner Storage Box</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Host / IP</label>
       <input class="form-input" id="fHost" placeholder="z.B. 116.203.xx.xx oder toolb0x.eu">
     </div>
@@ -722,6 +729,7 @@
       port: $('fPort').value || '22',
       username: $('fUsername').value.trim(),
       authType: currentAuthType,
+      serverType: $('fType').value,
       password: currentAuthType === 'password' ? $('fPassword').value : '',
       privateKey: currentAuthType === 'key' ? $('fPrivateKey').value : '',
       passphrase: currentAuthType === 'key' ? $('fPassphrase').value : '',
@@ -1111,6 +1119,7 @@
     $('fPrivateKey').value = '';
     $('fPassphrase').value = '';
     setAuthType(server.authType || 'password');
+    $('fType').value = server.serverType || 'linux';
     $('formError').classList.remove('show');
     $('serverModal').classList.add('open');
   };

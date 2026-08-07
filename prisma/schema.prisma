@@ -279,6 +279,8 @@ model Server {
   port       String  @default("22") // VERSCHLÜSSELT (String weil verschlüsselt)
   username   String  // VERSCHLÜSSELT
   authType   String  @default("password") // "password" | "key" — NICHT verschlüsselt
+  // "linux" | "storage" (Hetzner Storage Box: nur df, kein Update/Restart)
+  serverType String  @default("linux")
   password   String  @default("") // VERSCHLÜSSELT
   privateKey String  @default("") @db.Text // VERSCHLÜSSELT
   passphrase String  @default("") // VERSCHLÜSSELT

@@ -34,6 +34,23 @@ const COMMANDS = {
   services: "systemctl list-units --type=service --state=running --no-pager --no-legend | awk '{print $1}' | sed 's/\\.service$//'",
 };
 
+// Hetzner Storage Box (serverType "storage"): eingeschränkte Shell,
+// verlässlich verfügbar ist df — mehr braucht die Anzeige auch nicht.
+const STORAGE_DF = 'df -h';
+
+/** df-h-Ausgabe der Storage Box -> {total, used, free, percent}. */
+function parseStorageDf(stdout) {
+  var lines = stdout.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+  var line = lines[lines.length - 1] || '';
+  var cols = line.split(/\s+/);
+  return {
+    total: cols[1] || '0',
+    used: cols[2] || '0',
+    free: cols[3] || '0',
+    percent: cols[4] || '0%',
+  };
+}
+
 const sshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
@@ -48,6 +65,7 @@ function decryptServerSafe(entry, key) {
     port: entry.port ? decrypt(entry.port, key) : '22',
     username: entry.username ? decrypt(entry.username, key) : '',
     authType: entry.authType,
+    serverType: entry.serverType || 'linux',
     notes: entry.notes ? decrypt(entry.notes, key) : '',
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
@@ -129,6 +147,7 @@ router.post('/', async (req, res) => {
         port: encrypt(String(req.body.port || '22'), key),
         username: encrypt(req.body.username.trim(), key),
         authType: req.body.authType || 'password',
+        serverType: req.body.serverType === 'storage' ? 'storage' : 'linux',
         password: encrypt(req.body.password || '', key),
         privateKey: encrypt(req.body.privateKey || '', key),
         passphrase: encrypt(req.body.passphrase || '', key),
@@ -164,6 +183,7 @@ router.put('/:id', async (req, res) => {
         port: encrypt(String(req.body.port || '22'), key),
         username: encrypt(req.body.username.trim(), key),
         authType: req.body.authType || 'password',
+        serverType: req.body.serverType === 'storage' ? 'storage' : 'linux',
         password: encrypt(req.body.password || '', key),
         privateKey: encrypt(req.body.privateKey || '', key),
         passphrase: encrypt(req.body.passphrase || '', key),
@@ -205,6 +225,10 @@ router.post('/:id/test', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') {
+      await runServerSSH(server, req.encryptionKey, STORAGE_DF, 10000);
+      return res.json({ success: true, hostname: 'Storage Box' });
+    }
     var result = await runServerSSH(server, req.encryptionKey, COMMANDS.test, 10000);
     var lines = result.stdout.split('\n');
     res.json({ success: true, hostname: lines[1] || lines[0] });
@@ -219,6 +243,10 @@ router.post('/:id/status', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') {
+      await runServerSSH(server, req.encryptionKey, STORAGE_DF, 30000);
+      return res.json({ online: true, hostname: 'Storage Box', uptime: '', os: 'Hetzner Storage Box' });
+    }
     var result = await runServerSSH(server, req.encryptionKey, COMMANDS.status, 30000);
     var lines = result.stdout.split('\n');
     res.json({
@@ -238,6 +266,18 @@ router.post('/:id/stats', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') {
+      var dfResult = await runServerSSH(server, req.encryptionKey, STORAGE_DF, 30000);
+      var d = parseStorageDf(dfResult.stdout);
+      return res.json({
+        cpu: 0,
+        ram: { total: 0, used: 0 },
+        disk: { total: d.total, used: d.used, free: d.free, percent: d.percent },
+        load: { l1: '0', l5: '0', l15: '0' },
+        network: { rx: 0, tx: 0 },
+        uptime: 0,
+      });
+    }
     var result = await runServerSSH(server, req.encryptionKey, COMMANDS.stats, 30000);
     var parts = result.stdout.split('---SEP---');
 
@@ -283,6 +323,9 @@ router.post('/:id/update', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') {
+      return res.status(400).json({ error: 'Auf einer Storage Box gibt es keine System-Updates.' });
+    }
     var result = await runServerSSH(server, req.encryptionKey, COMMANDS.update, 300000);
     res.json({ success: result.code === 0, output: result.stdout, stderr: result.stderr });
   } catch (error) {
@@ -296,6 +339,9 @@ router.post('/:id/restart', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') {
+      return res.status(400).json({ error: 'Eine Storage Box lässt sich nicht neu starten.' });
+    }
     try {
       await runServerSSH(server, req.encryptionKey, COMMANDS.restart, 10000);
     } catch (error) {
@@ -317,6 +363,7 @@ router.post('/:id/services', sshLimiter, async (req, res) => {
     var server = await findServer(req.params.id, req.userId);
     if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
 
+    if (server.serverType === 'storage') return res.json({ services: [] });
     var result = await runServerSSH(server, req.encryptionKey, COMMANDS.services, 30000);
     var services = result.stdout.split('\n').filter(function (s) { return s.trim().length > 0; });
     res.json({ services: services });
