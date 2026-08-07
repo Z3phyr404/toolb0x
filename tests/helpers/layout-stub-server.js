@@ -80,6 +80,10 @@ const API = {
         const entry = { n: (id--) + '.jpg', d: m === 'unbekannt' ? null : m + '-' + String(28 - i).padStart(2, '0') + 'T12:00:00' };
         if (i % 4 === 0) entry.p = ['Michael'];
         else if (i % 4 === 1) entry.p = ['Lena', 'Michael'];
+        // KI-Bildunterschriften (fotob0x Paket 5) für die Textsuche
+        if (i % 3 === 0) entry.c = ['Sonnenuntergang über einem ruhigen Bergsee',
+          'Zwei Wanderer rasten auf einem Felsvorsprung',
+          'Festlich gedeckter Tisch im Garten'][i % 3 === 0 ? (i / 3) % 3 : 0];
         photos.push(entry);
       }
     });

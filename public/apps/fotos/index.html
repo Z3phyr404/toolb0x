@@ -162,6 +162,19 @@
     }
     .album-select option { background: #1c1f27; color: #eef1f6; }
 
+    .filter-search {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: rgba(238,241,246,0.85);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-family: inherit; font-size: 13px;
+      outline: none;
+      width: 220px; max-width: 100%;
+    }
+    .filter-search:focus { border-color: rgba(244,114,182,0.45); }
+    .filter-search::placeholder { color: rgba(238,241,246,0.4); }
+
     .person-chips {
       display: flex; flex-wrap: wrap; gap: 8px;
     }
@@ -346,6 +359,8 @@
     <!-- ALLE FOTOS (privat, Zeitleiste) -->
     <div id="viewLibrary">
       <div class="filter-row" id="filterRow" hidden>
+        <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
+               title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
         <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
           <option value="">Alle Alben</option>
         </select>
@@ -535,6 +550,7 @@
   var libraryAlbums = [];   // Alben (aus fotob0x, Manifest-Feld "albums": {n, ids})
   var activePerson = null;  // aktiver Personen-Filter (Name) oder null
   var activeAlbumIndex = null; // Index in libraryAlbums oder null (= alle Alben)
+  var activeQuery = '';     // Textsuche über Bildunterschriften (Manifest-Feld c)
   var libraryPhotos = [];   // aktuell sichtbare Fotos, NACH der Gruppierung in
                              // Anzeige-Reihenfolge neu aufgebaut (Lightbox-Ordnung!)
   var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
@@ -742,7 +758,7 @@
     select.classList.toggle('active', activeAlbumIndex !== null);
   }
 
-  /** Wendet Album- UND Personen-Filter auf die Gesamtliste an. */
+  /** Wendet Album-, Personen- und Text-Filter auf die Gesamtliste an. */
   function applyFilters() {
     var photos = libraryAll;
     if (activeAlbumIndex !== null && libraryAlbums[activeAlbumIndex]) {
@@ -753,10 +769,22 @@
     if (activePerson) {
       photos = photos.filter(function(p) { return p.p && p.p.indexOf(activePerson) !== -1; });
     }
+    if (activeQuery) {
+      var q = activeQuery.toLowerCase();
+      photos = photos.filter(function(p) {
+        if (p.c && p.c.toLowerCase().indexOf(q) !== -1) return true;
+        if (p.p && p.p.some(function(name) { return name.toLowerCase().indexOf(q) !== -1; })) return true;
+        return false;
+      });
+    }
     libraryPhotos = photos;
     renderPersonChips();
     renderAlbumSelect();
-    $('filterRow').hidden = libraryAlbums.length === 0 && libraryPersons.length === 0;
+    // Suchfeld nur zeigen, wenn es Bildunterschriften gibt (fotob0x KI-Paket 5)
+    var hasCaptions = libraryAll.some(function(p) { return !!p.c; });
+    $('librarySearch').hidden = !hasCaptions;
+    $('filterRow').hidden =
+      libraryAlbums.length === 0 && libraryPersons.length === 0 && !hasCaptions;
     rebuildTimeline();
   }
 
@@ -1098,6 +1126,14 @@
   $('albumSelect').addEventListener('change', function() {
     activeAlbumIndex = this.value === '' ? null : parseInt(this.value, 10);
     applyFilters();
+  });
+  var searchDebounce = null;
+  $('librarySearch').addEventListener('input', function() {
+    var value = this.value.trim();
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(function() {
+      if (value !== activeQuery) { activeQuery = value; applyFilters(); }
+    }, 250);
   });
 
   $('lbClose').addEventListener('click', closeLightbox);
