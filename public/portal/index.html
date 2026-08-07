@@ -507,11 +507,39 @@ async function handleAuth(e) {
   }
 }
 
+// ============================================================
+// PASSWORT-MANAGER-FIX (2026-08-07): Das Login-Formular liegt dauerhaft
+// im DOM und wurde nach der Anmeldung nur transparent geschaltet
+// (opacity:0) - Passwort-Manager sahen weiterhin ein Login-Formular und
+// boten das Ausfüllen an, obwohl man angemeldet ist. Angemeldet werden
+// die Felder deshalb DEAKTIVIERT (deaktivierte Felder ignorieren
+// Passwort-Manager) und der Screen nach der Ausblend-Transition ganz
+// aus dem Renderfluss genommen (display:none).
+// ============================================================
+var AUTH_FIELD_IDS = ['authName', 'authEmail', 'authRecovery', 'authPassword'];
+var authHideTimer = null;
+function setAuthFormActive(active) {
+  var screen = document.getElementById('authScreen');
+  AUTH_FIELD_IDS.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = !active;
+  });
+  if (authHideTimer) { clearTimeout(authHideTimer); authHideTimer = null; }
+  if (active) {
+    screen.style.display = '';
+    void screen.offsetHeight; // Reflow, damit die Einblend-Transition greift
+    screen.classList.remove('hidden');
+  } else {
+    screen.classList.add('hidden');
+    authHideTimer = setTimeout(function () { screen.style.display = 'none'; }, 450);
+  }
+}
+
 async function logout() {
   SessionTimeout.stop();
   await fetch(API + '/auth/logout', { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() } }).catch(() => {});
   document.getElementById('portal').classList.remove('active');
-  document.getElementById('authScreen').classList.remove('hidden');
+  setAuthFormActive(true);
 }
 
 async function checkAuth() {
@@ -531,7 +559,7 @@ async function checkAuth() {
     if (!res.ok) throw new Error();
     const { user } = await res.json();
 
-    document.getElementById('authScreen').classList.add('hidden');
+    setAuthFormActive(false);
     document.getElementById('portal').classList.add('active');
     document.getElementById('portalUserName').textContent = user.name;
     document.getElementById('portalGreeting').textContent = user.name.split(' ')[0];
@@ -554,7 +582,7 @@ async function checkAuth() {
     // Session-Timeout starten
     SessionTimeout.start(function () {
       document.getElementById('portal').classList.remove('active');
-      document.getElementById('authScreen').classList.remove('hidden');
+      setAuthFormActive(true);
       toast('Sitzung abgelaufen — bitte erneut anmelden.', 'error');
     });
 
@@ -566,7 +594,7 @@ async function checkAuth() {
     initGlow(scope);
     initReveal(scope);
   } catch {
-    document.getElementById('authScreen').classList.remove('hidden');
+    setAuthFormActive(true);
     document.getElementById('portal').classList.remove('active');
   } finally {
     hideLoading();

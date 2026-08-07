@@ -15,26 +15,6 @@
 ::-webkit-scrollbar { width:10px; height:10px; }
 ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:8px; }
 
-/* ===== AUTH SCREEN ===== */
-.auth-screen { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; transition:opacity 0.4s,transform 0.4s; }
-.auth-screen.hidden { opacity:0; pointer-events:none; transform:scale(1.02); }
-.auth-card { width:100%; max-width:420px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-card); padding:48px 40px 40px; text-align:center; }
-.auth-logo { font-size:32px; font-weight:700; letter-spacing:-0.03em; margin-bottom:4px; display:flex; align-items:center; justify-content:center; gap:12px; }
-.auth-logo-mark { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#2dd4bf,#0d9488); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 20px rgba(45,212,191,0.35); }
-.auth-logo-mark-inner { width:12px; height:12px; border:2px solid #04211f; border-radius:3px; }
-.auth-subtitle { font-size:14px; color:var(--text-2); margin-bottom:32px; }
-.auth-form { display:flex; flex-direction:column; gap:14px; }
-.auth-input { width:100%; padding:14px 16px; border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-btn); background:rgba(255,255,255,0.04); font-family:inherit; font-size:15px; color:var(--text); outline:none; transition:border-color 0.2s,background 0.2s; }
-.auth-input:focus { border-color:rgba(45,212,191,0.6); background:rgba(255,255,255,0.07); }
-.auth-input::placeholder { color:var(--text-3); }
-.auth-btn { width:100%; padding:14px; border:none; border-radius:var(--radius-btn); background:linear-gradient(135deg,#2dd4bf,#0d9488); color:#04211f; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:opacity 0.2s,transform 0.1s; margin-top:4px; box-shadow:0 6px 20px rgba(45,212,191,0.3); }
-.auth-btn:hover { transform:translateY(-1px); box-shadow:0 8px 26px rgba(45,212,191,0.42); }
-.auth-btn:active { transform:scale(0.98); }
-.auth-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
-.auth-switch { margin-top:20px; font-size:13px; color:var(--text-2); }
-.auth-switch a { color:#2dd4bf; cursor:pointer; text-decoration:none; font-weight:500; }
-.auth-error { background:rgba(255,59,48,0.1); border:1px solid rgba(255,59,48,0.2); color:var(--error-text); font-size:13px; padding:10px 14px; border-radius:var(--radius-btn); display:none; }
-.auth-error.show { display:block; }
 
 /* ===== APP LAYOUT ===== */
 html, body { height:100%; overflow:hidden; }
@@ -299,27 +279,10 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; scroll-behavior:smooth; p
 <!-- ===== LOADING ===== -->
 <div class="ob-loading" id="loadingOverlay"><div class="ob-spinner"></div></div>
 
-<!-- ===== AUTH SCREEN ===== -->
-<div class="auth-screen" id="authScreen">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="auth-logo-mark"><div class="auth-logo-mark-inner"></div></div>
-      <span class="jitter">Finanz</span>
-    </div>
-    <div class="auth-subtitle" id="authSubtitle">Melde dich an, um fortzufahren</div>
-    <div class="auth-error" id="authError"></div>
-    <form class="auth-form" id="authForm">
-      <input class="auth-input" id="authName" type="text" placeholder="Name" autocomplete="name" style="display:none">
-      <input class="auth-input" id="authEmail" type="email" placeholder="E-Mail" autocomplete="email" required>
-      <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password" required>
-      <button class="auth-btn" type="submit" id="authBtn">Anmelden</button>
-    </form>
-    <div class="auth-switch">
-      <span id="authSwitchText">Noch kein Konto?</span>
-      <a id="authSwitchLink">Registrieren</a>
-    </div>
-  </div>
-</div>
+<!-- Kein eigener Auth-Screen mehr (entfernt 2026-08-07): Das Portal ist der
+     einzige Auth-Einstiegspunkt (CLAUDE.md) - initApp() leitet ohne Session
+     dorthin um. Das versteckte Login-Formular hier hat außerdem
+     Passwort-Manager getriggert, obwohl man längst angemeldet war. -->
 
 <!-- ===== APP ===== -->
 <div class="app" id="app">
@@ -682,7 +645,6 @@ let editCatId = null;
 let editReminderId = null;
 let reminders = [];
 let selectedColor = PALETTE[0];
-let isLoginMode = true;
 let pendingDelType = null;
 let pendingDelId = null;
 let searchQuery = { expenses: '', income: '', categories: '' };
@@ -753,7 +715,7 @@ document.getElementById('sidebarUser').addEventListener('click', function(e) {
 // EVENT DELEGATION
 // ============================================================
 document.addEventListener('click', function(e) {
-  var target = e.target.closest('[data-page], [data-close-modal], #authSwitchLink, #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  var target = e.target.closest('[data-page], [data-close-modal], #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
   if (!target) return;
 
   // Navigation
@@ -761,7 +723,6 @@ document.addEventListener('click', function(e) {
     go(target.dataset.page); return;
   }
   if (target.dataset.closeModal) { closeM(target.dataset.closeModal); return; }
-  if (target.id === 'authSwitchLink') { toggleAuthMode(); return; }
   if (target.id === 'logoutBtn' || target.id === 'logoutBtnM') { logout(); return; }
   if (target.id === 'monthPrev') { changeMonth(-1); return; }
   if (target.id === 'monthNext') { changeMonth(1); return; }
@@ -805,47 +766,9 @@ document.addEventListener('click', function(e) {
 });
 
 // ============================================================
-// AUTH
+// AUTH - kein eigenes Formular mehr: Login läuft NUR übers Portal
+// (initApp leitet ohne Session dorthin um, siehe CLAUDE.md)
 // ============================================================
-function toggleAuthMode() {
-  isLoginMode = !isLoginMode;
-  document.getElementById('authName').style.display = isLoginMode ? 'none' : '';
-  document.getElementById('authSubtitle').textContent = isLoginMode ? 'Melde dich an, um fortzufahren' : 'Erstelle ein neues Konto';
-  document.getElementById('authBtn').textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
-  document.getElementById('authSwitchText').textContent = isLoginMode ? 'Noch kein Konto?' : 'Bereits registriert?';
-  document.getElementById('authSwitchLink').textContent = isLoginMode ? 'Registrieren' : 'Anmelden';
-  document.getElementById('authPassword').autocomplete = isLoginMode ? 'current-password' : 'new-password';
-  document.getElementById('authError').classList.remove('show');
-}
-
-document.getElementById('authForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  var errEl = document.getElementById('authError');
-  errEl.classList.remove('show');
-  var email = document.getElementById('authEmail').value.trim();
-  var password = document.getElementById('authPassword').value;
-  var name = document.getElementById('authName').value.trim();
-  var btn = document.getElementById('authBtn');
-  btn.disabled = true; btn.textContent = 'Laden...';
-  try {
-    if (isLoginMode) {
-      await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: email, password: password }) });
-    } else {
-      if (!name) throw { errors: ['Bitte gib deinen Namen ein.'] };
-      await api('/auth/register', { method: 'POST', body: JSON.stringify({ email: email, password: password, name: name }) });
-    }
-    SessionTimeout.markActive();
-    await initApp();
-  } catch(err) {
-    var msg = err.errors ? err.errors.join('<br>') : (err.error || 'Ein Fehler ist aufgetreten.');
-    errEl.textContent = msg;
-    errEl.classList.add('show');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = isLoginMode ? 'Anmelden' : 'Registrieren';
-  }
-});
-
 async function logout() {
   SessionTimeout.stop();
   try { await api('/auth/logout', { method: 'POST' }); } catch(e) {}
@@ -864,7 +787,6 @@ async function initApp() {
     }
     var res = await api('/auth/me');
     currentUser = res.user;
-    document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('app').classList.add('active');
     document.getElementById('userName').textContent = res.user.name;
     document.getElementById('userEmail').textContent = res.user.email;
@@ -1738,7 +1660,7 @@ function renderCats() {
 // ============ KEYBOARD ============
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(function(m) { m.classList.remove('open'); });
-  if (e.key === 'Enter' && !e.target.closest('.auth-form') && e.target.id !== 'fExpTags') {
+  if (e.key === 'Enter' && e.target.id !== 'fExpTags') {
     if (document.getElementById('mExpense').classList.contains('open')) saveExpense();
     else if (document.getElementById('mIncome').classList.contains('open')) saveIncome();
     else if (document.getElementById('mCat').classList.contains('open')) saveCat();
