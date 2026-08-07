@@ -73,8 +73,27 @@ function setupSecurity(app) {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Zu viele Anfragen. Bitte warte einen Moment.' },
+    // Bilder der privaten Bibliothek ("Alle Fotos") NICHT mitzählen: die
+    // Ansicht lädt tausende Thumbnails über /api/fotos/library/img|thumb —
+    // mit dem 600er-Budget war nach einmal Scrollen die GANZE API gesperrt
+    // (Michael, 2026-08-07: "Zu viele Anfragen" + kaputte Bilder). Die
+    // Bild-Routen haben unten ein eigenes, großzügiges Limit und sind
+    // ohnehin requireAdmin-geschützt.
+    skip: (req) => req.path.startsWith('/fotos/library/img/') || req.path.startsWith('/fotos/library/thumb/'),
   });
   app.use('/api/', generalLimiter);
+
+  // Eigenes Limit für die Bibliotheks-Bilder: großzügig genug für flottes
+  // Scrollen durch 5.000+ Fotos, aber nicht unbegrenzt (Schutzfunktion bleibt).
+  const libraryImageLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_LIBRARY_IMAGES) || 20000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Zu viele Bild-Anfragen. Bitte warte einen Moment.' },
+  });
+  app.use('/api/fotos/library/img/', libraryImageLimiter);
+  app.use('/api/fotos/library/thumb/', libraryImageLimiter);
 
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
