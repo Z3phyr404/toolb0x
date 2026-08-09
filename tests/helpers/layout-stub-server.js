@@ -84,7 +84,25 @@ const API = {
         if (i % 3 === 0) entry.c = ['Sonnenuntergang über einem ruhigen Bergsee',
           'Zwei Wanderer rasten auf einem Felsvorsprung',
           'Festlich gedeckter Tisch im Garten'][i % 3 === 0 ? (i / 3) % 3 : 0];
+        // Optionale Metadaten (2026-08-09): r/t/cam/fl/iso — teils weggelassen,
+        // wie in echten Manifesten (Feature-Detection in der App testbar)
+        if (i % 2 === 0) entry.r = (i % 5) + 1;
+        if (i % 3 === 1) entry.t = i % 2 ? ['Urlaub'] : ['Familie', 'Urlaub'];
+        if (i % 5 !== 4) entry.cam = i % 2 ? 'Sony ILCE-7M4' : 'iPhone 15 Pro';
+        if (i % 2) {
+          entry.fl = [14, 24, 35, 50, 85, 135, 200, 400][i % 8];
+          entry.iso = [100, 200, 400, 800, 1600, 3200, 6400, 12800][i % 8];
+        }
         photos.push(entry);
+      }
+    });
+    // „An diesem Tag": Fotos vom heutigen Kalendertag früherer Jahre
+    // (dynamisch, damit die Rückblick-Leiste an jedem Tag testbar ist)
+    const now = new Date();
+    const mmdd = String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    [now.getFullYear() - 1, now.getFullYear() - 3].forEach((y, yi) => {
+      for (let i = 0; i < 3 - yi; i++) {
+        photos.push({ n: (id--) + '.jpg', d: y + '-' + mmdd + 'T1' + i + ':00:00', cam: 'Sony ILCE-7M4', r: 3 });
       }
     });
     return photos;

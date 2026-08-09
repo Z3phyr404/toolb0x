@@ -144,7 +144,7 @@
       display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px;
       margin-bottom: 20px;
     }
-    .album-select {
+    .album-select, .filter-select {
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.04);
       color: rgba(238,241,246,0.85);
@@ -154,13 +154,14 @@
       cursor: pointer;
       max-width: 100%;
     }
-    .album-select:hover, .album-select:focus { border-color: rgba(244,114,182,0.45); outline: none; }
-    .album-select.active {
+    .album-select:hover, .album-select:focus,
+    .filter-select:hover, .filter-select:focus { border-color: rgba(244,114,182,0.45); outline: none; }
+    .album-select.active, .filter-select.active {
       background: rgba(244,114,182,0.15);
       border-color: rgba(244,114,182,0.5);
       color: #f472b6;
     }
-    .album-select option { background: #1c1f27; color: #eef1f6; }
+    .album-select option, .filter-select option { background: #1c1f27; color: #eef1f6; }
 
     .filter-search {
       border: 1px solid rgba(255,255,255,0.14);
@@ -281,6 +282,117 @@
     .empty-state h2 { font-size: 18px; color: rgba(238,241,246,0.8); margin-bottom: 8px; }
     .empty-state p { font-size: 14px; max-width: 420px; margin: 0 auto; line-height: 1.55; }
 
+    /* ===== „AN DIESEM TAG" (Rückblick-Leiste, 2026-08-09) ===== */
+    .otd-bar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-bottom: 18px; padding: 10px 14px;
+      border: 1px solid rgba(244,114,182,0.25);
+      background: rgba(244,114,182,0.06);
+      border-radius: 14px;
+    }
+    .otd-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px; letter-spacing: 0.08em;
+      color: rgba(244,114,182,0.9);
+    }
+    .otd-chip {
+      border: 1px solid rgba(255,255,255,0.14);
+      background: transparent;
+      color: rgba(238,241,246,0.75);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .otd-chip:hover { border-color: rgba(244,114,182,0.45); color: #f472b6; }
+    .otd-chip.active {
+      background: rgba(244,114,182,0.15);
+      border-color: rgba(244,114,182,0.5);
+      color: #f472b6;
+    }
+    .otd-close {
+      margin-left: auto; background: none; border: none;
+      color: rgba(238,241,246,0.4);
+      font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px;
+    }
+    .otd-close:hover { color: #f472b6; }
+
+    /* ===== DIASHOW (Vollbild, sanfte Überblendung, 2026-08-09) ===== */
+    .ss-start {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 16px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: rgba(238,241,246,0.85);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .ss-start:hover {
+      border-color: rgba(244,114,182,0.5); color: #f472b6;
+      background: rgba(244,114,182,0.08);
+    }
+    .ss { position: fixed; inset: 0; background: #05060a; display: none; z-index: 80; }
+    .ss.open { display: block; }
+    .ss img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: contain; opacity: 0;
+      transition: opacity 0.7s ease; /* die sanfte Überblendung */
+    }
+    .ss img.show { opacity: 1; }
+    .ss-hud {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; pointer-events: none;
+      color: rgba(238,241,246,0.75);
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.55));
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .ss.paused .ss-hud, .ss:hover .ss-hud { opacity: 1; }
+
+    /* ===== STATISTIK (schlichte horizontale Balkenlisten, 2026-08-09) =====
+       Eine Farbreihe (Akzent #f472b6), Beschriftung/Werte in den normalen
+       Text-Tönen, Wert rechts am Balken — bewusst kein Chart-Framework. */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px; align-items: start;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.035);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: var(--radius-card, 18px);
+      padding: 18px 20px;
+    }
+    .stat-card h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+    .stat-sub { font-size: 12px; color: rgba(238,241,246,0.45); margin-bottom: 12px; }
+    .stat-row {
+      display: grid; grid-template-columns: minmax(76px, auto) 1fr;
+      align-items: center; gap: 10px; padding: 3px 0;
+    }
+    .stat-row .lbl {
+      font-size: 12.5px; color: rgba(238,241,246,0.75);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stat-row .bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .stat-row .bar {
+      height: 10px; flex-shrink: 0;
+      /* flaches Ende an der Basislinie, rundes Ende am Wert */
+      border-radius: 2px 4px 4px 2px;
+      background: #f472b6;
+    }
+    .stat-row .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px; color: rgba(238,241,246,0.6); white-space: nowrap;
+    }
+    .stat-hint {
+      grid-column: 1 / -1;
+      font-size: 13px; color: rgba(238,241,246,0.5); line-height: 1.55;
+      padding: 4px 2px;
+    }
+
     /* Upload-Posteingang (2026-08-07) */
     .up-drop {
       border: 1.5px dashed rgba(244,114,182,0.4); border-radius: 14px;
@@ -345,6 +457,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Hochladen
     </button>
+    <button class="ob-nav-btn" type="button" id="navStats" title="Auswertungen deiner Bibliothek: Fotos je Jahr und Monat, Kameras, Brennweiten, ISO, Top-Fototage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+      Statistik
+    </button>
 
     <!-- Alben aus dem fotob0x-Manifest: Klick filtert "Alle Fotos" (Desktop;
          mobil übernimmt das Dropdown in der Filterzeile) -->
@@ -378,6 +494,7 @@
       <button type="button" id="tabLibrary" class="active">Alle Fotos</button>
       <button type="button" id="tabAlbums">Geteilte Alben</button>
       <button type="button" id="tabUpload">Hochladen</button>
+      <button type="button" id="tabStats">Statistik</button>
     </div>
 
     <div class="ob-toolbar" data-reveal data-reveal-index="0">
@@ -385,15 +502,33 @@
         <div class="section-label" id="viewLabel">// BIBLIOTHEK</div>
         <h1 class="jitter" id="viewTitle">Alle Fotos</h1>
       </div>
+      <button type="button" id="ssStart" class="ss-start" hidden
+              title="Vollbild-Diashow der aktuell gefilterten Fotos — Leertaste/Klick = Pause, Pfeiltasten = blättern, Esc = beenden">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Diashow
+      </button>
     </div>
 
     <!-- ALLE FOTOS (privat, Zeitleiste) -->
     <div id="viewLibrary">
+      <!-- „An diesem Tag": Fotos vom heutigen Kalendertag früherer Jahre -->
+      <div class="otd-bar" id="otdBar" hidden></div>
       <div class="filter-row" id="filterRow" hidden>
         <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
                title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
         <input type="date" id="filterFrom" class="filter-search filter-date" title="Aufnahmedatum ab diesem Tag">
         <input type="date" id="filterTo" class="filter-search filter-date" title="Aufnahmedatum bis zu diesem Tag">
+        <select id="starSelect" class="filter-select" title="Nur Fotos mit dieser Mindestbewertung aus fotob0x anzeigen" hidden>
+          <option value="0">Alle Bewertungen</option>
+          <option value="1">★ und mehr</option>
+          <option value="2">★★ und mehr</option>
+          <option value="3">★★★ und mehr</option>
+          <option value="4">★★★★ und mehr</option>
+          <option value="5">★★★★★</option>
+        </select>
+        <select id="tagSelect" class="filter-select" title="Nur Fotos mit diesem Tag aus fotob0x anzeigen" hidden>
+          <option value="">Alle Tags</option>
+        </select>
         <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
           <option value="">Alle Alben</option>
         </select>
@@ -418,6 +553,18 @@
         <h2>Keine geteilten Alben</h2>
         <p>Alben teilst du in der Desktop-App fotob0x (Album öffnen → „Teilen").
            Geteilte Galerien erscheinen dann automatisch hier.</p>
+      </div>
+    </div>
+
+    <!-- STATISTIK (clientseitig aus dem Manifest, 2026-08-09) -->
+    <div id="viewStats" hidden>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="empty-state" id="statsEmpty" hidden>
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+        <h2>Noch keine Daten für die Statistik</h2>
+        <p>Starte in der Desktop-App fotob0x den Web-Sync
+           (Einstellungen → „Alle Fotos online (privat)").
+           Die Auswertungen erscheinen dann hier.</p>
       </div>
     </div>
 
@@ -457,6 +604,13 @@
   <div class="lb-stage"><img id="lbImg" alt=""></div>
   <button class="nav prev" id="lbPrev" type="button" title="Vorheriges (←)">‹</button>
   <button class="nav next" id="lbNext" type="button" title="Nächstes (→)">›</button>
+</div>
+
+<!-- DIASHOW (Vollbild, zwei Bildebenen für die Überblendung) -->
+<div class="ss" id="ss" title="Klick = Pause/Weiter">
+  <img id="ssImgA" alt="">
+  <img id="ssImgB" alt="">
+  <div class="ss-hud" id="ssHud"></div>
 </div>
 
 <div class="ob-toast-box" id="toasts"></div>
@@ -559,18 +713,24 @@
     $('viewLibrary').hidden = view !== 'library';
     $('viewAlbums').hidden = view !== 'albums';
     $('viewUpload').hidden = view !== 'upload';
+    $('viewStats').hidden = view !== 'stats';
     // Sidebar-Navigation und Mobile-Tabs spiegeln denselben Zustand.
-    $('navLibrary').classList.toggle('active', view === 'library');
-    $('navAlbums').classList.toggle('active', view === 'albums');
-    $('navUpload').classList.toggle('active', view === 'upload');
-    $('tabLibrary').classList.toggle('active', view === 'library');
-    $('tabAlbums').classList.toggle('active', view === 'albums');
-    $('tabUpload').classList.toggle('active', view === 'upload');
-    $('viewLabel').textContent =
-      view === 'library' ? '// BIBLIOTHEK' : view === 'albums' ? '// GALERIEN' : '// POSTEINGANG';
-    $('viewTitle').textContent =
-      view === 'library' ? 'Alle Fotos' : view === 'albums' ? 'Geteilte Alben' : 'Hochladen';
+    ['Library', 'Albums', 'Upload', 'Stats'].forEach(function(name) {
+      var active = view === name.toLowerCase();
+      $('nav' + name).classList.toggle('active', active);
+      $('tab' + name).classList.toggle('active', active);
+    });
+    var labels = {
+      library: ['// BIBLIOTHEK', 'Alle Fotos'],
+      albums: ['// GALERIEN', 'Geteilte Alben'],
+      upload: ['// POSTEINGANG', 'Hochladen'],
+      stats: ['// AUSWERTUNG', 'Statistik'],
+    };
+    $('viewLabel').textContent = labels[view][0];
+    $('viewTitle').textContent = labels[view][1];
+    updateSlideshowButton();
     if (view === 'upload') refreshInbox();
+    if (view === 'stats') renderStats();
   }
 
   // ============================================================
@@ -592,6 +752,9 @@
   var activeQuery = '';     // Textsuche über Bildunterschriften (Manifest-Feld c)
   var activeFrom = '';      // Zeitraum-Filter (ISO-Datum) auf Manifest-Feld d
   var activeTo = '';
+  var activeMinStars = 0;   // Mindestbewertung 1-5 (Manifest-Feld r), 0 = aus
+  var activeTag = null;     // aktiver Tag-Filter (Manifest-Feld t) oder null
+  var activeOtdYear = null; // „An diesem Tag": nur Fotos dieses Jahres (heutiger Monat+Tag)
   var libraryPhotos = [];   // aktuell sichtbare Fotos, NACH der Gruppierung in
                              // Anzeige-Reihenfolge neu aufgebaut (Lightbox-Ordnung!)
   var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
@@ -831,6 +994,106 @@
     libraryAlbums.forEach(function(album, idx) { mk(album.n, album.ids.length, idx); });
   }
 
+  // ---- Sterne-/Tag-Filter (2026-08-09, Manifest-Felder r und t) ----
+  // Feature-Detection: die Bedienelemente zeigen sich nur, wenn das Manifest
+  // die Daten überhaupt liefert (alte Manifeste ohne r/t funktionieren weiter).
+
+  function renderStarSelect() {
+    var select = $('starSelect');
+    var hasRatings = libraryAll.some(function(p) { return p.r > 0; });
+    select.hidden = !hasRatings;
+    if (!hasRatings) { activeMinStars = 0; return; }
+    select.value = String(activeMinStars);
+    select.classList.toggle('active', activeMinStars > 0);
+  }
+
+  function renderTagSelect() {
+    var select = $('tagSelect');
+    var counts = {};
+    libraryAll.forEach(function(p) {
+      (p.t || []).forEach(function(tag) { counts[tag] = (counts[tag] || 0) + 1; });
+    });
+    var tags = Object.keys(counts).sort(function(a, b) { return a.localeCompare(b, 'de'); });
+    select.hidden = tags.length === 0;
+    while (select.options.length > 1) select.remove(1);
+    if (tags.length === 0) { activeTag = null; return; }
+    tags.forEach(function(tag) {
+      var option = document.createElement('option');
+      option.value = tag;
+      option.textContent = tag + ' (' + counts[tag] + ')';
+      select.appendChild(option);
+    });
+    select.value = activeTag || '';
+    select.classList.toggle('active', !!activeTag);
+  }
+
+  // ---- „An diesem Tag" (2026-08-09): heutiger Kalendertag früherer Jahre ----
+
+  function todayMonthDay() {
+    var now = new Date();
+    return String(now.getMonth() + 1).padStart(2, '0') + '-' +
+           String(now.getDate()).padStart(2, '0');
+  }
+
+  function renderOtdBar() {
+    var bar = $('otdBar');
+    bar.textContent = '';
+    // Einmal weggeklickt bleibt die Leiste für diese Sitzung ausgeblendet.
+    if (sessionStorage.getItem('fotos_otd_hidden') === '1') { bar.hidden = true; return; }
+    var md = todayMonthDay();
+    var nowYear = new Date().getFullYear();
+    var byYear = {};
+    libraryAll.forEach(function(p) {
+      if (!p.d || p.d.slice(5, 10) !== md) return;
+      var y = p.d.slice(0, 4);
+      if (parseInt(y, 10) >= nowYear) return; // nur frühere Jahre sind ein Rückblick
+      byYear[y] = (byYear[y] || 0) + 1;
+    });
+    var years = Object.keys(byYear).sort().reverse();
+    if (years.length === 0) { bar.hidden = true; return; }
+    bar.hidden = false;
+
+    var label = document.createElement('span');
+    label.className = 'otd-label';
+    label.textContent = '📅 AN DIESEM TAG';
+    label.title = 'Fotos vom heutigen Kalendertag aus früheren Jahren';
+    bar.appendChild(label);
+
+    var today = new Date();
+    years.forEach(function(y) {
+      var diff = nowYear - parseInt(y, 10);
+      var n = byYear[y];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'otd-chip' + (activeOtdYear === y ? ' active' : '');
+      btn.textContent = 'vor ' + diff + (diff === 1 ? ' Jahr' : ' Jahren') + ' · ' + n;
+      btn.title = 'Nur die ' + n + ' Foto(s) vom ' + today.getDate() + '. ' +
+        MONTH_NAMES[today.getMonth()] + ' ' + y + ' anzeigen (erneut klicken hebt den Filter auf)';
+      btn.addEventListener('click', function() {
+        activeOtdYear = activeOtdYear === y ? null : y;
+        applyFilters();
+      });
+      bar.appendChild(btn);
+    });
+
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'otd-close';
+    close.title = 'Rückblick-Leiste ausblenden (erscheint beim nächsten Besuch wieder)';
+    close.textContent = '×';
+    close.addEventListener('click', function() {
+      sessionStorage.setItem('fotos_otd_hidden', '1');
+      activeOtdYear = null;
+      applyFilters();
+    });
+    bar.appendChild(close);
+  }
+
+  /** Diashow-Knopf nur zeigen, wenn „Alle Fotos" sichtbar ist und Fotos da sind. */
+  function updateSlideshowButton() {
+    $('ssStart').hidden = $('viewLibrary').hidden || libraryPhotos.length === 0;
+  }
+
   /** Wendet Album-, Personen- und Text-Filter auf die Gesamtliste an. */
   function applyFilters() {
     var photos = libraryAll;
@@ -841,6 +1104,18 @@
     }
     if (activePerson) {
       photos = photos.filter(function(p) { return p.p && p.p.indexOf(activePerson) !== -1; });
+    }
+    if (activeMinStars > 0) {
+      photos = photos.filter(function(p) { return (p.r || 0) >= activeMinStars; });
+    }
+    if (activeTag) {
+      photos = photos.filter(function(p) { return p.t && p.t.indexOf(activeTag) !== -1; });
+    }
+    if (activeOtdYear) {
+      var otdMd = todayMonthDay();
+      photos = photos.filter(function(p) {
+        return p.d && p.d.slice(0, 4) === activeOtdYear && p.d.slice(5, 10) === otdMd;
+      });
     }
     if (activeQuery) {
       var q = activeQuery.toLowerCase();
@@ -866,6 +1141,9 @@
     renderPersonChips();
     renderAlbumSelect();
     renderSidebarAlbums();
+    renderStarSelect();
+    renderTagSelect();
+    renderOtdBar();
     // Suchfeld nur zeigen, wenn es Bildunterschriften gibt (fotob0x KI-Paket 5)
     // Das Suchfeld findet Beschreibungen UND Personen - es zeigt sich,
     // sobald es irgendetwas Durchsuchbares gibt (vorher war es ohne
@@ -880,6 +1158,7 @@
     // überhaupt Fotos da sind.
     $('filterRow').hidden = libraryAll.length === 0;
     rebuildTimeline();
+    updateSlideshowButton();
   }
 
   function rebuildTimeline() {
@@ -906,6 +1185,9 @@
       libraryAlbums = data.albums || [];
       activePerson = null;
       activeAlbumIndex = null;
+      activeMinStars = 0;
+      activeTag = null;
+      activeOtdYear = null;
       // Von der globalen Portal-Suche mitgebracht (?suche=…)
       var fromPortal = new URLSearchParams(location.search).get('suche');
       if (fromPortal) {
@@ -965,6 +1247,291 @@
     }).catch(function(err) {
       toast(err.error || 'Konnte nicht markiert werden.', 'error');
     }).finally(function() { btn.disabled = false; });
+  }
+
+  // ============================================================
+  // DIASHOW (Vollbild, 2026-08-09)
+  // ============================================================
+  // Spielt die AKTUELL GEFILTERTE Liste (libraryPhotos, Anzeige-Reihenfolge)
+  // in Vollbild ab. Zwei übereinanderliegende <img> blenden per CSS-Opacity
+  // (~700 ms) weich ineinander über; das nächste Bild wird vorgeladen.
+  // Leertaste/Klick = Pause, Pfeiltasten = blättern, Esc bzw. Verlassen des
+  // Vollbilds = Ende. Volle Bilder über die bestehenden img-URLs.
+
+  var SS_INTERVAL_MS = 4000; // Standzeit je Bild (zzgl. ~700 ms Überblendung)
+  var ssTimer = null;
+  var ssIndex = -1;
+  var ssPaused = false;
+  var ssActiveImg = 'b';  // welches der beiden <img> gerade sichtbar ist
+  var ssLoadSeq = 0;      // entwertet veraltete onload-Callbacks (schnelles Blättern)
+
+  function ssOpen() { return $('ss').classList.contains('open'); }
+
+  function ssUrl(i) {
+    return '/api/fotos/library/img/' + encodeURIComponent(libraryPhotos[i].n);
+  }
+
+  function ssUpdateHud() {
+    var photo = libraryPhotos[ssIndex];
+    var date = photo && photo.d ? photo.d.slice(0, 10).split('-').reverse().join('.') : '';
+    $('ssHud').textContent = (ssIndex + 1) + ' / ' + libraryPhotos.length +
+      (date ? ' · ' + date : '') + (ssPaused ? ' · PAUSE (Leertaste oder Klick zum Fortsetzen)' : '');
+  }
+
+  function ssShow(i) {
+    if (libraryPhotos.length === 0) return;
+    ssIndex = ((i % libraryPhotos.length) + libraryPhotos.length) % libraryPhotos.length;
+    var url = ssUrl(ssIndex);
+    var seq = ++ssLoadSeq;
+    // Erst überblenden, wenn das Bild fertig geladen ist - sonst blendete
+    // man kurz ins Schwarze.
+    var loader = new Image();
+    loader.onload = function() {
+      if (seq !== ssLoadSeq || !ssOpen()) return;
+      var incoming = ssActiveImg === 'a' ? $('ssImgB') : $('ssImgA');
+      var outgoing = ssActiveImg === 'a' ? $('ssImgA') : $('ssImgB');
+      incoming.src = url;
+      incoming.classList.add('show');
+      outgoing.classList.remove('show');
+      ssActiveImg = ssActiveImg === 'a' ? 'b' : 'a';
+      ssUpdateHud();
+      // Nächstes Bild vorladen, damit die nächste Überblendung ohne Pause läuft.
+      if (libraryPhotos.length > 1) {
+        (new Image()).src = ssUrl((ssIndex + 1) % libraryPhotos.length);
+      }
+    };
+    loader.src = url;
+  }
+
+  function ssSchedule() {
+    clearTimeout(ssTimer);
+    ssTimer = null;
+    if (ssPaused || !ssOpen()) return;
+    ssTimer = setTimeout(function() {
+      ssShow(ssIndex + 1);
+      ssSchedule();
+    }, SS_INTERVAL_MS);
+  }
+
+  function startSlideshow() {
+    if (libraryPhotos.length === 0) return;
+    var ss = $('ss');
+    ss.classList.add('open');
+    ss.classList.remove('paused');
+    ssPaused = false;
+    ssActiveImg = 'b';
+    $('ssImgA').classList.remove('show');
+    $('ssImgB').classList.remove('show');
+    ssShow(0);
+    ssSchedule();
+    // Vollbild anfordern; scheitert das (z.B. iPhone-Safari), läuft die
+    // Diashow einfach als bildschirmfüllendes Overlay weiter.
+    if (ss.requestFullscreen) ss.requestFullscreen().catch(function() {});
+  }
+
+  function stopSlideshow() {
+    if (!ssOpen()) return;
+    clearTimeout(ssTimer);
+    ssTimer = null;
+    ssIndex = -1;
+    ssLoadSeq++;
+    $('ss').classList.remove('open');
+    $('ssImgA').src = '';
+    $('ssImgB').src = '';
+    if (document.fullscreenElement) document.exitFullscreen().catch(function() {});
+  }
+
+  function ssTogglePause() {
+    ssPaused = !ssPaused;
+    $('ss').classList.toggle('paused', ssPaused);
+    ssUpdateHud();
+    ssSchedule();
+  }
+
+  // ============================================================
+  // STATISTIK (clientseitig aus dem Manifest, 2026-08-09)
+  // ============================================================
+  // Schlichte horizontale Balkenlisten in EINER Farbreihe (Akzent) -
+  // bewusst kein Chart-Framework. Kamera/Brennweite/ISO (Manifest-Felder
+  // cam/fl/iso) sind optional: Karten erscheinen nur mit Daten, sonst
+  // gibt es den Hinweis auf den nächsten Websync.
+
+  // Brennweiten-Klassen (Obergrenze inklusive) und ISO-Stufen wie in fotob0x
+  var FL_CLASSES = [
+    { label: 'bis 16 mm', max: 16 },
+    { label: '17–24 mm', max: 24 },
+    { label: '25–35 mm', max: 35 },
+    { label: '36–50 mm', max: 50 },
+    { label: '51–85 mm', max: 85 },
+    { label: '86–135 mm', max: 135 },
+    { label: '136–200 mm', max: 200 },
+    { label: 'über 200 mm', max: Infinity },
+  ];
+  var ISO_CLASSES = [
+    { label: 'bis 100', max: 100 },
+    { label: '101–200', max: 200 },
+    { label: '201–400', max: 400 },
+    { label: '401–800', max: 800 },
+    { label: '801–1600', max: 1600 },
+    { label: '1601–3200', max: 3200 },
+    { label: '3201–6400', max: 6400 },
+    { label: 'über 6400', max: Infinity },
+  ];
+
+  function classIndex(classes, value) {
+    for (var i = 0; i < classes.length; i++) {
+      if (value <= classes[i].max) return i;
+    }
+    return classes.length - 1;
+  }
+
+  /**
+   * Eine Statistik-Karte: Titel, optionaler Untertitel, Balkenzeilen.
+   * rows = [{label, value, tooltip?}] - Balkenlänge relativ zum Maximum,
+   * Wert rechts am Balken, alles in den normalen Text-Tönen.
+   */
+  function makeStatCard(title, sub, rows) {
+    var card = document.createElement('div');
+    card.className = 'stat-card';
+    var h = document.createElement('h2');
+    h.textContent = title;
+    card.appendChild(h);
+    if (sub) {
+      var s = document.createElement('div');
+      s.className = 'stat-sub';
+      s.textContent = sub;
+      card.appendChild(s);
+    }
+    var max = 0;
+    rows.forEach(function(r) { if (r.value > max) max = r.value; });
+    rows.forEach(function(r) {
+      var row = document.createElement('div');
+      row.className = 'stat-row';
+      row.title = r.tooltip ||
+        (r.label + ': ' + r.value + (r.value === 1 ? ' Foto' : ' Fotos'));
+      var lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = r.label;
+      row.appendChild(lbl);
+      var wrap = document.createElement('div');
+      wrap.className = 'bar-wrap';
+      var bar = document.createElement('span');
+      bar.className = 'bar';
+      // 52px sind für den Wert rechts reserviert - so läuft der längste
+      // Balken nie unter der Zahl hindurch.
+      var frac = max > 0 ? r.value / max : 0;
+      bar.style.width = 'calc((100% - 52px) * ' + frac.toFixed(4) + ')';
+      if (r.value > 0) bar.style.minWidth = '2px';
+      wrap.appendChild(bar);
+      var val = document.createElement('span');
+      val.className = 'val';
+      val.textContent = String(r.value);
+      wrap.appendChild(val);
+      row.appendChild(wrap);
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  function renderStats() {
+    var grid = $('statsGrid');
+    grid.textContent = '';
+    $('statsEmpty').hidden = libraryAll.length > 0;
+    if (libraryAll.length === 0) return;
+
+    var years = {};
+    var months = [];
+    for (var i = 0; i < 12; i++) months.push(0);
+    var cams = {};
+    var flCounts = FL_CLASSES.map(function() { return 0; });
+    var isoCounts = ISO_CLASSES.map(function() { return 0; });
+    var days = {};
+    var noDate = 0;
+    var hasCam = false, hasFl = false, hasIso = false;
+
+    libraryAll.forEach(function(p) {
+      if (p.d && p.d.length >= 10) {
+        years[p.d.slice(0, 4)] = (years[p.d.slice(0, 4)] || 0) + 1;
+        var m = parseInt(p.d.slice(5, 7), 10);
+        if (m >= 1 && m <= 12) months[m - 1]++;
+        days[p.d.slice(0, 10)] = (days[p.d.slice(0, 10)] || 0) + 1;
+      } else {
+        noDate++;
+      }
+      if (p.cam) { cams[p.cam] = (cams[p.cam] || 0) + 1; hasCam = true; }
+      if (p.fl > 0) { flCounts[classIndex(FL_CLASSES, p.fl)]++; hasFl = true; }
+      if (p.iso > 0) { isoCounts[classIndex(ISO_CLASSES, p.iso)]++; hasIso = true; }
+    });
+
+    // Fotos je Jahr (neueste zuerst, wie die Zeitleiste)
+    var yearRows = Object.keys(years).sort().reverse().map(function(y) {
+      return { label: y, value: years[y] };
+    });
+    if (noDate > 0) yearRows.push({ label: 'Ohne Datum', value: noDate });
+    grid.appendChild(makeStatCard('Fotos je Jahr', null, yearRows));
+
+    // Fotos je Monat (alle Jahre zusammengefasst)
+    grid.appendChild(makeStatCard('Fotos je Monat', 'alle Jahre zusammengefasst',
+      months.map(function(n, mi) { return { label: MONTH_NAMES[mi], value: n }; })));
+
+    // Top-10-Fototage
+    var topDays = Object.keys(days)
+      .sort(function(a, b) { return days[b] - days[a] || a.localeCompare(b); })
+      .slice(0, 10)
+      .map(function(day) {
+        return {
+          label: day.split('-').reverse().join('.'),
+          value: days[day],
+          tooltip: days[day] + ' Fotos am ' + day.split('-').reverse().join('.'),
+        };
+      });
+    if (topDays.length > 0) {
+      grid.appendChild(makeStatCard('Top-10-Fototage', 'die Tage mit den meisten Aufnahmen', topDays));
+    }
+
+    // Kameras (absteigend; lange Listen auf 12 + Sammelzeile eindampfen)
+    if (hasCam) {
+      var camNames = Object.keys(cams).sort(function(a, b) { return cams[b] - cams[a]; });
+      var camRows = camNames.slice(0, 12).map(function(name) {
+        return { label: name, value: cams[name] };
+      });
+      if (camNames.length > 12) {
+        var rest = 0;
+        camNames.slice(12).forEach(function(name) { rest += cams[name]; });
+        camRows.push({
+          label: 'Weitere (' + (camNames.length - 12) + ')',
+          value: rest,
+          tooltip: rest + ' Fotos mit ' + (camNames.length - 12) + ' weiteren Kameras',
+        });
+      }
+      grid.appendChild(makeStatCard('Kameras', null, camRows));
+    }
+
+    // Brennweiten-Klassen (feste Skala, damit die Verteilung lesbar bleibt)
+    if (hasFl) {
+      grid.appendChild(makeStatCard('Brennweiten', 'Kleinbild-Brennweite in mm',
+        FL_CLASSES.map(function(c, ci) { return { label: c.label, value: flCounts[ci] }; })));
+    }
+
+    // ISO-Stufen
+    if (hasIso) {
+      grid.appendChild(makeStatCard('ISO-Stufen', null,
+        ISO_CLASSES.map(function(c, ci) { return { label: c.label, value: isoCounts[ci] }; })));
+    }
+
+    // Alte Manifeste ohne cam/fl/iso: sagen, wie die Daten hierher kommen.
+    if (!hasCam || !hasFl || !hasIso) {
+      var missing = [];
+      if (!hasCam) missing.push('Kameras');
+      if (!hasFl) missing.push('Brennweiten');
+      if (!hasIso) missing.push('ISO-Stufen');
+      var hint = document.createElement('div');
+      hint.className = 'stat-hint';
+      hint.textContent = missing.join(', ') +
+        (missing.length === 1 ? ' erscheint' : ' erscheinen') +
+        ' nach dem nächsten Web-Sync aus fotob0x (die Desktop-App liefert die Daten mit dem aktualisierten Manifest).';
+      grid.appendChild(hint);
+    }
   }
 
   // ============================================================
@@ -1241,12 +1808,28 @@
   $('navLibrary').addEventListener('click', function() { showView('library'); });
   $('navAlbums').addEventListener('click', function() { showView('albums'); });
   $('navUpload').addEventListener('click', function() { showView('upload'); });
+  $('navStats').addEventListener('click', function() { showView('stats'); });
   $('tabLibrary').addEventListener('click', function() { showView('library'); });
   $('tabAlbums').addEventListener('click', function() { showView('albums'); });
   $('tabUpload').addEventListener('click', function() { showView('upload'); });
+  $('tabStats').addEventListener('click', function() { showView('stats'); });
   $('albumSelect').addEventListener('change', function() {
     activeAlbumIndex = this.value === '' ? null : parseInt(this.value, 10);
     applyFilters();
+  });
+  $('starSelect').addEventListener('change', function() {
+    activeMinStars = parseInt(this.value, 10) || 0;
+    applyFilters();
+  });
+  $('tagSelect').addEventListener('change', function() {
+    activeTag = this.value === '' ? null : this.value;
+    applyFilters();
+  });
+  $('ssStart').addEventListener('click', startSlideshow);
+  $('ss').addEventListener('click', ssTogglePause); // Klick = Pause/Weiter
+  document.addEventListener('fullscreenchange', function() {
+    // Vollbild verlassen (Esc, Systemgeste) beendet die Diashow.
+    if (!document.fullscreenElement && ssOpen()) stopSlideshow();
   });
   $('filterFrom').addEventListener('change', function() { activeFrom = this.value; applyFilters(); });
   $('filterTo').addEventListener('change', function() { activeTo = this.value; applyFilters(); });
@@ -1267,6 +1850,14 @@
     if (e.target === $('lb') || e.target.classList.contains('lb-stage')) closeLightbox();
   });
   document.addEventListener('keydown', function(e) {
+    // Diashow hat Vorrang: Leertaste = Pause, Pfeile = blättern, Esc = Ende.
+    if (ssOpen()) {
+      if (e.key === 'Escape') stopSlideshow();
+      else if (e.key === ' ') { e.preventDefault(); ssTogglePause(); }
+      else if (e.key === 'ArrowLeft') { ssShow(ssIndex - 1); ssSchedule(); }
+      else if (e.key === 'ArrowRight') { ssShow(ssIndex + 1); ssSchedule(); }
+      return;
+    }
     if (lbCurrent < 0) return;
     if (e.key === 'Escape') closeLightbox();
     else if (e.key === 'ArrowLeft') openLightbox(lbCurrent - 1);
