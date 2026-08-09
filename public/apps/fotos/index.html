@@ -205,10 +205,21 @@
 
     /* ===== ALBEN IN DER SIDEBAR (Desktop) ===== */
     .sb-albums { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
-    .sb-albums-label {
+    /* Klickbare Abschnitts-Überschrift (2026-08-09): klappt die Liste ein/aus
+       wie in der fotob0x-Desktop-App, Zustand überlebt in localStorage.
+       Generisch gehalten — künftige Sidebar-Abschnitte nutzen dieselben Klassen. */
+    .sb-section-head {
+      display: flex; align-items: center; gap: 6px;
+      width: 100%; border: none; background: none; cursor: pointer; text-align: left;
       font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
       text-transform: uppercase; color: rgba(238,241,246,0.4); padding: 0 12px 6px;
+      transition: color 0.15s;
     }
+    .sb-section-head:hover { color: rgba(238,241,246,0.75); }
+    .sb-section-head .chev { flex-shrink: 0; transition: transform 0.2s; }
+    .sb-section.collapsed .chev { transform: rotate(-90deg); }
+    .sb-section.collapsed .sb-section-body { display: none; }
+    .sb-albums.collapsed { flex: 0 0 auto; } /* eingeklappt keinen Restplatz beanspruchen */
     .sb-album-list { overflow-y: auto; min-height: 0; padding-bottom: 8px; }
     .sb-album-list button {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -226,7 +237,7 @@
     .person-chips {
       display: flex; flex-wrap: wrap; gap: 8px;
     }
-    .person-chips button {
+    .person-chips button, .tag-quick button {
       border: 1px solid rgba(255,255,255,0.14);
       background: transparent;
       color: rgba(238,241,246,0.75);
@@ -236,11 +247,64 @@
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
-    .person-chips button:hover { border-color: rgba(244,114,182,0.45); color: #f472b6; }
-    .person-chips button.active {
+    .person-chips button:hover, .tag-quick button:hover { border-color: rgba(244,114,182,0.45); color: #f472b6; }
+    .person-chips button.active, .tag-quick button.active {
       background: rgba(244,114,182,0.15);
       border-color: rgba(244,114,182,0.5);
       color: #f472b6;
+    }
+
+    /* ===== TAG-FILTER (skalierbar, 2026-08-09) =====
+       Wenige Tags (≤ 15): einfache Chip-Liste aller Tags. Viele Tags:
+       kompaktes Eingabefeld mit Vorschlagsliste, gewählte Tags als
+       entfernbare Chips daneben, die 10 häufigsten Tags als Schnell-Chips
+       darunter. Mehrere Tags = UND-Verknüpfung. */
+    .tag-filter { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+    .tag-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag-input-wrap { position: relative; }
+    .tag-input { width: 180px; }
+    .tag-suggest {
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+      min-width: 220px; max-width: 320px; max-height: 260px; overflow-y: auto;
+      background: #1c1f27; border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px; padding: 6px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.45);
+    }
+    .tag-suggest button {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      width: 100%; border: none; background: none; text-align: left; cursor: pointer;
+      color: rgba(238,241,246,0.8); font-family: inherit; font-size: 13px;
+      padding: 6px 10px; border-radius: 8px;
+    }
+    .tag-suggest button span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* .hover = per Pfeiltasten markierter Vorschlag (Enter wählt ihn) */
+    .tag-suggest button:hover, .tag-suggest button.hover {
+      background: rgba(244,114,182,0.15); color: #f472b6;
+    }
+    .tag-suggest button .n { flex-shrink: 0; font-size: 11px; color: rgba(238,241,246,0.4); }
+    .tag-suggest .none { padding: 6px 10px; font-size: 12.5px; color: rgba(238,241,246,0.45); }
+    .tag-chips, .tag-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag-chip { /* gewählter Tag — das × entfernt ihn wieder */
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(244,114,182,0.15);
+      border: 1px solid rgba(244,114,182,0.5);
+      color: #f472b6;
+      border-radius: 999px;
+      padding: 4px 6px 4px 12px;
+      font-size: 12.5px; font-weight: 600;
+      max-width: 100%;
+    }
+    .tag-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+    .tag-chip button {
+      background: none; border: none; cursor: pointer;
+      color: rgba(244,114,182,0.8);
+      font-size: 14px; line-height: 1; padding: 1px 4px;
+    }
+    .tag-chip button:hover { color: #fff; }
+    .tag-quick-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.08em;
+      color: rgba(238,241,246,0.4);
     }
 
     /* ===== ALLE FOTOS (Events + Monats-Fallback) ===== */
@@ -489,9 +553,13 @@
 
     <!-- Alben aus dem fotob0x-Manifest: Klick filtert "Alle Fotos" (Desktop;
          mobil übernimmt das Dropdown in der Filterzeile) -->
-    <div class="sb-albums" id="sbAlbums" hidden>
-      <div class="sb-albums-label">Alben</div>
-      <div class="sb-album-list" id="sbAlbumList"></div>
+    <div class="sb-albums sb-section" id="sbAlbums" hidden>
+      <button type="button" class="sb-section-head" id="sbAlbumsHead" aria-expanded="true"
+              title="Alben ein- oder ausklappen (bleibt gemerkt)">
+        <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        Alben
+      </button>
+      <div class="sb-album-list sb-section-body" id="sbAlbumList"></div>
     </div>
     <div class="ob-sidebar-user">
       <div class="ob-sidebar-avatar" id="userAvatar">?</div>
@@ -559,9 +627,20 @@
           <option value="4">★★★★ und mehr</option>
           <option value="5">★★★★★</option>
         </select>
-        <select id="tagSelect" class="filter-select" title="Nur Fotos mit diesem Tag aus fotob0x anzeigen" hidden>
-          <option value="">Alle Tags</option>
-        </select>
+        <!-- Tag-Filter (2026-08-09, skalierbar): erscheint nur, wenn das
+             Manifest Tags liefert. Bei ≤ 15 Tags eine einfache Chip-Liste,
+             sonst Eingabefeld mit Vorschlagsliste + Schnell-Chips. -->
+        <div class="tag-filter" id="tagFilter" hidden>
+          <div class="tag-filter-row">
+            <div class="tag-input-wrap" id="tagInputWrap">
+              <input type="search" id="tagInput" class="filter-search tag-input" placeholder="Tag filtern…" autocomplete="off"
+                     title="Tippen filtert deine Tags aus fotob0x — Enter oder Klick wählt einen Tag; mehrere Tags grenzen weiter ein (UND-Verknüpfung)">
+              <div class="tag-suggest" id="tagSuggest" hidden></div>
+            </div>
+            <div class="tag-chips" id="tagChips"></div>
+          </div>
+          <div class="tag-quick" id="tagQuick"></div>
+        </div>
         <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
           <option value="">Alle Alben</option>
         </select>
@@ -787,7 +866,7 @@
   var activeFrom = '';      // Zeitraum-Filter (ISO-Datum) auf Manifest-Feld d
   var activeTo = '';
   var activeMinStars = 0;   // Mindestbewertung 1-5 (Manifest-Feld r), 0 = aus
-  var activeTag = null;     // aktiver Tag-Filter (Manifest-Feld t) oder null
+  var activeTags = [];      // aktive Tag-Filter (Manifest-Feld t) — mehrere = UND-Verknüpfung
   var activeOtdYear = null; // „An diesem Tag": nur Fotos dieses Jahres (heutiger Monat+Tag)
   var aiAvailable = false;  // Server hat Suchvektoren (GET /fotos/search/status)
   var aiSearching = false;  // eine KI-Suche läuft gerade (Feld gesperrt)
@@ -1049,6 +1128,28 @@
     libraryAlbums.forEach(function(album, idx) { mk(album.n, album.ids.length, idx); });
   }
 
+  // ---- Ein-/ausklappbare Sidebar-Abschnitte (2026-08-09) ----
+  // Wie in der fotob0x-Desktop-App: Klick auf die Abschnitts-Überschrift
+  // klappt die Liste ein/aus, der Zustand überlebt in localStorage.
+  // Generisch gehalten — kommt später ein weiterer Abschnitt in die
+  // Sidebar, genügt ein weiterer Aufruf mit eigenem Storage-Schlüssel.
+  function initSbSection(sectionId, headId, storageKey) {
+    var section = $(sectionId);
+    var head = $(headId);
+    function apply(collapsed) {
+      section.classList.toggle('collapsed', collapsed);
+      head.setAttribute('aria-expanded', String(!collapsed));
+    }
+    var stored = null;
+    try { stored = localStorage.getItem(storageKey); } catch (e) { /* z.B. Safari privat */ }
+    apply(stored === '1');
+    head.addEventListener('click', function() {
+      var collapsed = !section.classList.contains('collapsed');
+      apply(collapsed);
+      try { localStorage.setItem(storageKey, collapsed ? '1' : '0'); } catch (e) { /* dann eben nicht gemerkt */ }
+    });
+  }
+
   // ---- Sterne-/Tag-Filter (2026-08-09, Manifest-Felder r und t) ----
   // Feature-Detection: die Bedienelemente zeigen sich nur, wenn das Manifest
   // die Daten überhaupt liefert (alte Manifeste ohne r/t funktionieren weiter).
@@ -1062,24 +1163,167 @@
     select.classList.toggle('active', activeMinStars > 0);
   }
 
-  function renderTagSelect() {
-    var select = $('tagSelect');
+  // ---- Tag-Filter (2026-08-09, skalierbar) ----
+  // Bei ≤ TAG_SIMPLE_MAX Tags reicht die einfache Chip-Liste aller Tags.
+  // Bei mehr (hunderte Tags aus fotob0x) gibt es ein Eingabefeld mit
+  // Vorschlagsliste, die gewählten Tags als entfernbare Chips daneben und
+  // die TAG_QUICK_COUNT häufigsten Tags als Schnell-Chips darunter.
+  // Mehrere gewählte Tags = UND-Verknüpfung (siehe applyFilters).
+
+  var TAG_SIMPLE_MAX = 15;   // bis hierhin: einfache Chip-Liste aller Tags
+  var TAG_QUICK_COUNT = 10;  // so viele Schnell-Chips (häufigste zuerst)
+  var TAG_SUGGEST_MAX = 12;  // Vorschlagsliste kompakt halten
+
+  /** Häufigkeit jedes Tags aus dem Manifest zählen: {tag: Anzahl Fotos}. */
+  function tagCounts() {
     var counts = {};
     libraryAll.forEach(function(p) {
       (p.t || []).forEach(function(tag) { counts[tag] = (counts[tag] || 0) + 1; });
     });
-    var tags = Object.keys(counts).sort(function(a, b) { return a.localeCompare(b, 'de'); });
-    select.hidden = tags.length === 0;
-    while (select.options.length > 1) select.remove(1);
-    if (tags.length === 0) { activeTag = null; return; }
-    tags.forEach(function(tag) {
-      var option = document.createElement('option');
-      option.value = tag;
-      option.textContent = tag + ' (' + counts[tag] + ')';
-      select.appendChild(option);
+    return counts;
+  }
+
+  /** Tag an- oder abwählen; leert das Eingabefeld und filtert neu. */
+  function toggleTag(tag) {
+    var i = activeTags.indexOf(tag);
+    if (i === -1) activeTags.push(tag);
+    else activeTags.splice(i, 1);
+    $('tagInput').value = '';
+    hideTagSuggest();
+    applyFilters();
+  }
+
+  /** Umschalt-Chip (Schnell-Chips + einfache Liste): aktiv = Tag gewählt. */
+  function makeTagToggleChip(tag, count) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = tag + ' (' + count + ')';
+    btn.className = activeTags.indexOf(tag) !== -1 ? 'active' : '';
+    btn.title = 'Nur Fotos mit dem Tag „' + tag + '" anzeigen (erneut klicken hebt die Auswahl auf)';
+    btn.addEventListener('click', function() { toggleTag(tag); });
+    return btn;
+  }
+
+  var tagSuggestItems = [];  // aktuell vorgeschlagene Tags (Reihenfolge der Liste)
+  var tagSuggestBtns = [];   // zugehörige Buttons (für die Pfeiltasten-Markierung)
+  var tagSuggestIndex = -1;  // per Pfeiltasten markierter Vorschlag (Enter wählt ihn)
+
+  function hideTagSuggest() {
+    $('tagSuggest').hidden = true;
+    tagSuggestItems = [];
+    tagSuggestBtns = [];
+    tagSuggestIndex = -1;
+  }
+
+  function markTagSuggest(index) {
+    tagSuggestIndex = index;
+    tagSuggestBtns.forEach(function(btn, i) {
+      btn.classList.toggle('hover', i === index);
     });
-    select.value = activeTag || '';
-    select.classList.toggle('active', !!activeTag);
+  }
+
+  /** Vorschlagsliste unterm Eingabefeld: Manifest-Tags, case-insensitiv
+      gefiltert nach der Eingabe; Treffer am Wortanfang zuerst. */
+  function renderTagSuggest() {
+    var box = $('tagSuggest');
+    var q = $('tagInput').value.trim().toLowerCase();
+    var counts = tagCounts();
+    var tags = Object.keys(counts).filter(function(tag) {
+      return activeTags.indexOf(tag) === -1 &&
+             (!q || tag.toLowerCase().indexOf(q) !== -1);
+    });
+    tags.sort(function(a, b) {
+      var pa = q && a.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+      var pb = q && b.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+      return pa - pb || a.localeCompare(b, 'de');
+    });
+    tags = tags.slice(0, TAG_SUGGEST_MAX);
+
+    box.textContent = '';
+    tagSuggestItems = tags;
+    tagSuggestBtns = [];
+    if (tags.length === 0) {
+      var none = document.createElement('div');
+      none.className = 'none';
+      none.textContent = q ? 'Kein Tag passt zu „' + q + '“' : 'Alle Tags sind bereits gewählt';
+      box.appendChild(none);
+    }
+    tags.forEach(function(tag) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      var name = document.createElement('span');
+      name.textContent = tag;
+      btn.appendChild(name);
+      var n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = counts[tag];
+      btn.appendChild(n);
+      btn.title = 'Tag „' + tag + '" wählen (' + counts[tag] + (counts[tag] === 1 ? ' Foto' : ' Fotos') + ')';
+      // mousedown abfangen, damit der Klick dem Eingabefeld nicht den Fokus
+      // nimmt (blur würde die Liste sonst vor dem click-Event schließen)
+      btn.addEventListener('mousedown', function(e) { e.preventDefault(); });
+      btn.addEventListener('click', function() { toggleTag(tag); });
+      tagSuggestBtns.push(btn);
+      box.appendChild(btn);
+    });
+    markTagSuggest(tags.length > 0 ? 0 : -1);
+    box.hidden = false;
+  }
+
+  function renderTagFilter() {
+    var box = $('tagFilter');
+    var counts = tagCounts();
+    var tags = Object.keys(counts);
+    // Feature-Detection wie bisher: ohne Tags im Manifest bleibt alles unsichtbar.
+    box.hidden = tags.length === 0;
+    if (tags.length === 0) { activeTags = []; return; }
+
+    var simple = tags.length <= TAG_SIMPLE_MAX;
+    $('tagInputWrap').hidden = simple;
+    if (simple) hideTagSuggest();
+
+    // Gewählte Tags als entfernbare Chips neben dem Eingabefeld — in der
+    // einfachen Liste zeigt der aktive Umschalt-Chip den Zustand selbst.
+    var chips = $('tagChips');
+    chips.textContent = '';
+    if (!simple) {
+      activeTags.forEach(function(tag) {
+        var chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.title = 'Aktiver Tag-Filter „' + tag + '" — das × entfernt ihn wieder';
+        var label = document.createElement('span');
+        label.textContent = tag;
+        chip.appendChild(label);
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.title = 'Tag „' + tag + '" entfernen';
+        x.addEventListener('click', function() { toggleTag(tag); });
+        chip.appendChild(x);
+        chips.appendChild(chip);
+      });
+    }
+
+    // Darunter: einfache Liste = ALLE Tags (alphabetisch); sonst die
+    // häufigsten Tags als Schnell-Chips (Häufigkeit aus dem Manifest).
+    var quick = $('tagQuick');
+    quick.textContent = '';
+    var quickTags;
+    if (simple) {
+      quickTags = tags.sort(function(a, b) { return a.localeCompare(b, 'de'); });
+    } else {
+      quickTags = tags.sort(function(a, b) {
+        return counts[b] - counts[a] || a.localeCompare(b, 'de');
+      }).slice(0, TAG_QUICK_COUNT);
+      var lbl = document.createElement('span');
+      lbl.className = 'tag-quick-label';
+      lbl.textContent = 'HÄUFIGE TAGS';
+      lbl.title = 'Die ' + quickTags.length + ' häufigsten Tags deiner Bibliothek';
+      quick.appendChild(lbl);
+    }
+    quickTags.forEach(function(tag) {
+      quick.appendChild(makeTagToggleChip(tag, counts[tag]));
+    });
   }
 
   // ---- „An diesem Tag" (2026-08-09): heutiger Kalendertag früherer Jahre ----
@@ -1225,8 +1469,11 @@
     if (activeMinStars > 0) {
       photos = photos.filter(function(p) { return (p.r || 0) >= activeMinStars; });
     }
-    if (activeTag) {
-      photos = photos.filter(function(p) { return p.t && p.t.indexOf(activeTag) !== -1; });
+    if (activeTags.length > 0) {
+      // Mehrere Tags = UND: das Foto muss JEDEN gewählten Tag tragen.
+      photos = photos.filter(function(p) {
+        return p.t && activeTags.every(function(tag) { return p.t.indexOf(tag) !== -1; });
+      });
     }
     if (activeOtdYear) {
       var otdMd = todayMonthDay();
@@ -1271,7 +1518,7 @@
     renderAlbumSelect();
     renderSidebarAlbums();
     renderStarSelect();
-    renderTagSelect();
+    renderTagFilter();
     renderOtdBar();
     // Suchfeld nur zeigen, wenn es Bildunterschriften gibt (fotob0x KI-Paket 5)
     // Das Suchfeld findet Beschreibungen UND Personen - es zeigt sich,
@@ -1315,7 +1562,7 @@
       activePerson = null;
       activeAlbumIndex = null;
       activeMinStars = 0;
-      activeTag = null;
+      activeTags = [];
       activeOtdYear = null;
       aiActive = null;
       // Von der globalen Portal-Suche mitgebracht (?suche=…)
@@ -1951,9 +2198,26 @@
     activeMinStars = parseInt(this.value, 10) || 0;
     applyFilters();
   });
-  $('tagSelect').addEventListener('change', function() {
-    activeTag = this.value === '' ? null : this.value;
-    applyFilters();
+  // Tag-Filter: Tippen zeigt Vorschläge, Pfeiltasten markieren, Enter wählt,
+  // Esc schließt. Blur schließt verzögert, damit ein Klick auf einen
+  // Vorschlag noch durchkommt (dessen mousedown verhindert den Blur ohnehin).
+  $('tagInput').addEventListener('input', renderTagSuggest);
+  $('tagInput').addEventListener('focus', renderTagSuggest);
+  $('tagInput').addEventListener('blur', function() { setTimeout(hideTagSuggest, 150); });
+  $('tagInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { hideTagSuggest(); return; }
+    if ($('tagSuggest').hidden) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (tagSuggestItems.length === 0) return;
+      var step = e.key === 'ArrowDown' ? 1 : -1;
+      markTagSuggest((tagSuggestIndex + step + tagSuggestItems.length) % tagSuggestItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (tagSuggestIndex >= 0 && tagSuggestItems[tagSuggestIndex]) {
+        toggleTag(tagSuggestItems[tagSuggestIndex]);
+      }
+    }
   });
   $('ssStart').addEventListener('click', startSlideshow);
   $('ss').addEventListener('click', ssTogglePause); // Klick = Pause/Weiter
@@ -2011,6 +2275,9 @@
     else if (dx < -50) openLightbox(lbCurrent + 1);
     lbTouchX = null;
   }, { passive: true });
+
+  // Alben-Abschnitt in der Sidebar ein-/ausklappbar (Zustand bleibt gemerkt)
+  initSbSection('sbAlbums', 'sbAlbumsHead', 'fotos_sb_alben_zu');
 
   // Glow-Interaktion sofort, Reveal erst nach dem ersten Rendern (renderAlbums)
   initGlow($('pageRoot'));

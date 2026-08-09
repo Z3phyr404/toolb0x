@@ -75,6 +75,17 @@ const API = {
     const counts = [22, 18, 15, 12, 7];
     const photos = [];
     let id = 5000;
+    // Großer Tag-Pool (2026-08-09): simuliert den Hunderte-Tags-Fall aus
+    // fotob0x, damit der skalierbare Tag-Filter (Eingabefeld + Vorschläge +
+    // Schnell-Chips statt einfacher Chip-Liste, Schwelle > 15 Tags) im
+    // Layout-Stub sichtbar und testbar ist.
+    const TAG_POOL = (() => {
+      const pool = ['Urlaub', 'Familie', 'Natur', 'Berge', 'See', 'Strand', 'Stadt', 'Nacht',
+        'Essen', 'Tiere', 'Blumen', 'Winter', 'Sommer', 'Herbst', 'Regen', 'Schnee',
+        'Sport', 'Konzert', 'Hochzeit', 'Geburtstag'];
+      for (let i = 1; i <= 100; i++) pool.push('Stichwort ' + String(i).padStart(3, '0'));
+      return pool;
+    })();
     months.forEach((m, mi) => {
       for (let i = 0; i < counts[mi]; i++) {
         const entry = { n: (id--) + '.jpg', d: m === 'unbekannt' ? null : m + '-' + String(28 - i).padStart(2, '0') + 'T12:00:00' };
@@ -87,7 +98,13 @@ const API = {
         // Optionale Metadaten (2026-08-09): r/t/cam/fl/iso — teils weggelassen,
         // wie in echten Manifesten (Feature-Detection in der App testbar)
         if (i % 2 === 0) entry.r = (i % 5) + 1;
-        if (i % 3 === 1) entry.t = i % 2 ? ['Urlaub'] : ['Familie', 'Urlaub'];
+        if (i % 3 !== 2) {
+          const nid = parseInt(entry.n, 10);
+          const t = [TAG_POOL[(nid * 7) % TAG_POOL.length], TAG_POOL[(nid * 13) % TAG_POOL.length]];
+          if (i % 2) t.push('Urlaub');
+          else if (i % 4 === 0) t.push('Familie');
+          entry.t = [...new Set(t)];
+        }
         if (i % 5 !== 4) entry.cam = i % 2 ? 'Sony ILCE-7M4' : 'iPhone 15 Pro';
         if (i % 2) {
           entry.fl = [14, 24, 35, 50, 85, 135, 200, 400][i % 8];
