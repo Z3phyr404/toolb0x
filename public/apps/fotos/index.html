@@ -178,6 +178,31 @@
     .filter-date { width: auto; color-scheme: dark; }
     .filter-date.active { border-color: rgba(244,114,182,0.5); color: #f472b6; }
 
+    /* ===== KI-SUCHE (semantisch, 2026-08-09) ===== */
+    .ai-search { width: 250px; }
+    /* Solange die Suche läuft: gedimmt + Warte-Cursor als Ladeindikator */
+    .ai-search.busy { opacity: 0.55; cursor: progress; }
+    .ai-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(244,114,182,0.15);
+      border: 1px solid rgba(244,114,182,0.5);
+      color: #f472b6;
+      border-radius: 999px;
+      padding: 5px 8px 5px 14px;
+      font-size: 13px; font-weight: 600;
+      max-width: 100%;
+    }
+    .ai-chip span {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 320px;
+    }
+    .ai-chip button {
+      background: none; border: none; cursor: pointer;
+      color: rgba(244,114,182,0.8);
+      font-size: 15px; line-height: 1; padding: 2px 5px;
+    }
+    .ai-chip button:hover { color: #fff; }
+
     /* ===== ALBEN IN DER SIDEBAR (Desktop) ===== */
     .sb-albums { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
     .sb-albums-label {
@@ -514,6 +539,14 @@
       <!-- „An diesem Tag": Fotos vom heutigen Kalendertag früherer Jahre -->
       <div class="otd-bar" id="otdBar" hidden></div>
       <div class="filter-row" id="filterRow" hidden>
+        <!-- KI-Suche (semantisch, wie in fotob0x): erscheint nur, wenn der
+             Server Suchvektoren hat (GET /api/fotos/search/status) -->
+        <input type="search" id="aiSearch" class="filter-search ai-search" placeholder="🔍 KI-Suche, z.B. „sonnenuntergang am see“…"
+               title="Semantische KI-Suche: beschreibe in Worten, was auf dem Foto zu sehen ist (Deutsch oder Englisch) — Enter startet die Suche" hidden>
+        <div class="ai-chip" id="aiChip" hidden>
+          <span id="aiChipLabel"></span>
+          <button type="button" id="aiChipClear" title="KI-Suche aufheben — wieder alle Fotos anzeigen">×</button>
+        </div>
         <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
                title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
         <input type="date" id="filterFrom" class="filter-search filter-date" title="Aufnahmedatum ab diesem Tag">
@@ -700,6 +733,7 @@
 
       loadLibrary();
       loadAlbums();
+      probeAiSearch();
     }).catch(function() {
       window.location.href = '/portal';
     });
@@ -755,6 +789,9 @@
   var activeMinStars = 0;   // Mindestbewertung 1-5 (Manifest-Feld r), 0 = aus
   var activeTag = null;     // aktiver Tag-Filter (Manifest-Feld t) oder null
   var activeOtdYear = null; // „An diesem Tag": nur Fotos dieses Jahres (heutiger Monat+Tag)
+  var aiAvailable = false;  // Server hat Suchvektoren (GET /fotos/search/status)
+  var aiSearching = false;  // eine KI-Suche läuft gerade (Feld gesperrt)
+  var aiActive = null;      // { q, rank: {assetId: Platz}, count } oder null
   var libraryPhotos = [];   // aktuell sichtbare Fotos, NACH der Gruppierung in
                              // Anzeige-Reihenfolge neu aufgebaut (Lightbox-Ordnung!)
   var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
@@ -810,6 +847,23 @@
     var sourcePhotos = libraryPhotos;
     libraryGroups = [];
     if (sourcePhotos.length === 0) { libraryPhotos = []; return; }
+
+    // KI-Suche aktiv: EINE Gruppe in Score-Reihenfolge (sourcePhotos ist in
+    // applyFilters bereits nach Ähnlichkeit sortiert worden) — die Zeitleisten-
+    // Gruppierung würde die Rangfolge sonst wieder zerreißen.
+    if (aiActive) {
+      var aiGroup = {
+        type: 'ai',
+        title: 'KI-Suche: „' + aiActive.q + '“',
+        rangeLabel: 'nach Ähnlichkeit sortiert',
+        photos: sourcePhotos,
+        sortKey: '',
+        indices: sourcePhotos.map(function(p, i) { return i; }),
+      };
+      libraryPhotos = sourcePhotos;
+      libraryGroups = [aiGroup];
+      return;
+    }
 
     // 1) Asset-ID -> Event-Index (erster Treffer in libraryEvents gewinnt)
     var idToEventIndex = {};
@@ -878,16 +932,17 @@
     while (renderedGroups < libraryGroups.length && added < CHUNK_PHOTOS) {
       var group = libraryGroups[renderedGroups++];
       var block = document.createElement('div');
-      block.className = 'month-block' + (group.type === 'event' ? ' event-block' : '');
+      // KI-Suchtreffer nutzen die abgesetzte Event-Optik gleich mit.
+      block.className = 'month-block' + (group.type !== 'month' ? ' event-block' : '');
 
       var title = document.createElement('div');
       title.className = 'month-title';
-      title.textContent = (group.type === 'event' ? '📅 ' : '') + group.title;
+      title.textContent = (group.type === 'event' ? '📅 ' : group.type === 'ai' ? '🔍 ' : '') + group.title;
       var count = document.createElement('span');
       count.className = 'month-count';
       var n = group.indices.length;
       var countText = n + (n === 1 ? ' Foto' : ' Fotos');
-      count.textContent = (group.type === 'event' && group.rangeLabel)
+      count.textContent = (group.type !== 'month' && group.rangeLabel)
         ? (group.rangeLabel + ' · ' + countText)
         : countText;
       title.appendChild(count);
@@ -1089,6 +1144,68 @@
     bar.appendChild(close);
   }
 
+  // ---- KI-Suche (2026-08-09): semantische Suche wie in fotob0x ----
+  // Der Server rankt die SigLIP2-Vektoren aus dem Websync gegen den
+  // eingebetteten Suchtext (POST /fotos/search) und liefert Asset-IDs in
+  // Score-Reihenfolge. Das Feld erscheint nur, wenn Vektoren vorliegen.
+
+  function probeAiSearch() {
+    api('/fotos/search/status').then(function(data) {
+      aiAvailable = !!data.available;
+      $('aiSearch').hidden = !aiAvailable;
+    }).catch(function() {
+      // Status nicht erreichbar → Feld bleibt einfach versteckt.
+    });
+  }
+
+  function renderAiChip() {
+    var chip = $('aiChip');
+    if (aiSearching) {
+      chip.hidden = false;
+      $('aiChipLabel').textContent = 'KI-Suche läuft…';
+      $('aiChipClear').hidden = true;
+      return;
+    }
+    chip.hidden = !aiActive;
+    $('aiChipClear').hidden = false;
+    if (aiActive) {
+      $('aiChipLabel').textContent = '🔍 „' + aiActive.q + '“ · ' + aiActive.count + ' Treffer';
+      chip.title = 'KI-Suche nach „' + aiActive.q + '“ — Fotos nach Ähnlichkeit sortiert';
+    }
+  }
+
+  function runAiSearch(q) {
+    if (aiSearching) return;
+    aiSearching = true;
+    var input = $('aiSearch');
+    input.disabled = true;
+    input.classList.add('busy');
+    renderAiChip();
+    api('/fotos/search', { method: 'POST', body: { q: q } }).then(function(data) {
+      var ids = data.ids || [];
+      var rank = {};
+      ids.forEach(function(id, i) { rank[id] = i; });
+      aiActive = { q: q, rank: rank, count: ids.length };
+      if (ids.length === 0) {
+        toast('Die KI-Suche hat nichts Passendes gefunden.', 'error');
+      }
+    }).catch(function(err) {
+      // z.B. 503 solange das Modell (einmalig) lädt — freundlich melden.
+      toast(err.error || 'Die KI-Suche ist fehlgeschlagen.', 'error');
+    }).finally(function() {
+      aiSearching = false;
+      input.disabled = false;
+      input.classList.remove('busy');
+      applyFilters();
+    });
+  }
+
+  function clearAiSearch() {
+    aiActive = null;
+    $('aiSearch').value = '';
+    applyFilters();
+  }
+
   /** Diashow-Knopf nur zeigen, wenn „Alle Fotos" sichtbar ist und Fotos da sind. */
   function updateSlideshowButton() {
     $('ssStart').hidden = $('viewLibrary').hidden || libraryPhotos.length === 0;
@@ -1135,9 +1252,21 @@
         return true;
       });
     }
+    // KI-Suche: nur die Treffer behalten und nach Ähnlichkeit sortieren
+    // (kombiniert sich mit allen Filtern oben; buildGroups rendert dann
+    // eine einzelne Treffer-Gruppe statt der Zeitleiste).
+    if (aiActive) {
+      photos = photos.filter(function(p) {
+        return aiActive.rank[parseInt(p.n, 10)] !== undefined;
+      });
+      photos = photos.slice().sort(function(a, b) {
+        return aiActive.rank[parseInt(a.n, 10)] - aiActive.rank[parseInt(b.n, 10)];
+      });
+    }
     $('filterFrom').classList.toggle('active', !!activeFrom);
     $('filterTo').classList.toggle('active', !!activeTo);
     libraryPhotos = photos;
+    renderAiChip();
     renderPersonChips();
     renderAlbumSelect();
     renderSidebarAlbums();
@@ -1188,6 +1317,7 @@
       activeMinStars = 0;
       activeTag = null;
       activeOtdYear = null;
+      aiActive = null;
       // Von der globalen Portal-Suche mitgebracht (?suche=…)
       var fromPortal = new URLSearchParams(location.search).get('suche');
       if (fromPortal) {
@@ -1833,6 +1963,15 @@
   });
   $('filterFrom').addEventListener('change', function() { activeFrom = this.value; applyFilters(); });
   $('filterTo').addEventListener('change', function() { activeTo = this.value; applyFilters(); });
+  // KI-Suche: Enter startet, leeres Feld + Enter (oder Chip-×) hebt sie auf.
+  $('aiSearch').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var q = this.value.trim();
+    if (!q) { clearAiSearch(); return; }
+    runAiSearch(q);
+  });
+  $('aiChipClear').addEventListener('click', clearAiSearch);
   var searchDebounce = null;
   $('librarySearch').addEventListener('input', function() {
     var value = this.value.trim();

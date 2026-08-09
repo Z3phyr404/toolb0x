@@ -99,6 +99,8 @@ toolb0x/
 | `/api/fotos/library/img\|thumb/:name` | Privates Bibliotheksbild streamen (requireAdmin) |
 | `/api/fotos/upload/status` | Upload-Posteingang: Dateien + freier Speicher (requireAdmin) |
 | `/api/fotos/upload/:name` | PUT = Datei als roher Stream hochladen, DELETE = entfernen (requireAdmin) |
+| `/api/fotos/search/status` | KI-Suche: liegen Suchvektoren vor? (requireAdmin) |
+| `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -582,6 +584,35 @@ michael): `sudo mkdir -p /var/www/fotos-inbox && sudo chown michael:michael
 /var/www/fotos-inbox`, danach `nginx -t && systemctl reload nginx` für den
 neuen location-Block. Tests: `tests/routes/fotos-upload.test.js`; der
 Layout-Stub fakt `/api/fotos/upload/status`.
+
+**KI-Suche in „Alle Fotos" (2026-08-09):** Semantische Suche mit derselben
+Qualität wie in fotob0x — OHNE API-Schlüssel, alles lokal auf dem VPS.
+fotob0x exportiert beim Web-Sync die SigLIP2-Bildvektoren nach
+`/var/www/fotos-privat/search/` (`index.json` mit `{model, dims, count, ids,
+scales}` + `vectors.bin`, Int8-quantisiert, vor der Quantisierung
+L2-normalisiert → Kosinus ≈ Skalarprodukt/Scale). Der Server bettet nur den
+SUCHTEXT ein: `src/utils/fotoEmbedder.js` lädt beim ERSTEN Suchaufruf (lazy,
+danach im RAM) Tokenizer + Text-Tower des Modells aus `index.json.model`
+(q8) sowie den Übersetzer `Xenova/opus-mt-de-en` — NIE den Vision-Tower
+(4-GB-VPS!). Pipeline exakt wie fotob0x ai.ts: kleinschreiben, de→en als
+ZUSATZ-Variante, je Variante Mittel aus „q" und „a photo of q"
+(renormalisiert); `src/utils/fotoSearch.js` rankt (bester Wert je Foto) und
+beschneidet per relativer Schwelle 0.55 (`trimToRelevant`). Routen in
+`fotos.js`: `GET /api/fotos/search/status` (UI zeigt das Suchfeld nur bei
+`available: true`), `POST /api/fotos/search { q }` → `{ ids, scores }`;
+ohne Index → 404, während des (einmaligen) Modell-Downloads → 503 mit
+deutschem Hinweis. Eigener Rate-Limiter (`RATE_LIMIT_FOTO_SEARCH`, Default
+120/15min) in security.js. Modell-Cache: `FOTOS_MODELS_DIR` (Default
+`/var/www/toolbox/models`), Platz ~0,5 GB (standard-Modell) bis ~1,5 GB
+(high) + ~110 MB Übersetzer; RAM zur Laufzeit ~0,3–0,7 GB. EINMALIGE
+Server-Schritte: `npm install` (neue Dependency `@huggingface/transformers`)
+und `sudo mkdir -p /var/www/toolbox/models && sudo chown michael:michael
+/var/www/toolbox/models`. UI: Suchfeld „KI-Suche" in der Filterzeile von
+„Alle Fotos" (Enter startet), Treffer als EINE nach Ähnlichkeit sortierte
+Gruppe mit entfernbarem Chip; kombiniert sich mit allen anderen Filtern.
+Tests: `tests/routes/fotos-search.test.js` (Encoder gestubbt via
+require.cache — nie ein echter Modell-Download); der Layout-Stub fakt
+Status + Suche.
 
 ---
 

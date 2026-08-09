@@ -13,6 +13,10 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { loadSearchIndex, rankPhotos, trimToRelevant } = require('../utils/fotoSearch');
+// Encoder bewusst als eigenes Modul: Tests stubben es über require.cache,
+// damit nie ein echtes Modell heruntergeladen wird.
+const fotoEmbedder = require('../utils/fotoEmbedder');
 
 const router = express.Router();
 
@@ -212,6 +216,99 @@ function servePrivatePhoto(subdir) {
 
 router.get('/library/img/:name', servePrivatePhoto('img'));
 router.get('/library/thumb/:name', servePrivatePhoto('thumb'));
+
+// ============================================================
+// KI-Suche in „Alle Fotos" (2026-08-09) — semantisch wie in fotob0x
+// ============================================================
+// fotob0x lädt beim Web-Sync die SigLIP2-Bildvektoren nach
+// <fotos-privat>/search/ hoch (index.json + vectors.bin, Int8-quantisiert).
+// Hier läuft nur noch der TEXT-Teil derselben Pipeline: Anfrage einbetten
+// (fotoEmbedder: Kleinschreibung, de->en-Zusatzvariante, Prompt-Ensemble)
+// und gegen die Vektoren ranken (fotoSearch: bester Wert je Foto, relative
+// Schwelle 0.55 wie trimToRelevant in fotob0x ai.ts).
+// Eigener Rate-Limiter in security.js — jede Suche kostet echte CPU-Inferenz.
+
+// Obergrenze wie MAX_QUERY_LENGTH in fotob0x ai.ts.
+const SEARCH_MAX_QUERY_LENGTH = 300;
+
+// So lange darf eine Suchanfrage auf das (noch) ladende Modell warten.
+// Liegen die Modelldateien schon auf der Platte, reicht das locker; beim
+// allerersten Aufruf (Download von Hugging Face, Minuten!) antworten wir
+// stattdessen 503 — der Download läuft im Hintergrund weiter.
+const SEARCH_MODEL_WAIT_MS = 25_000;
+
+// GET /api/fotos/search/status — gibt es Suchvektoren? (Die UI blendet das
+// Suchfeld nur ein, wenn ja.) modelReady sagt zusätzlich, ob der Text-Tower
+// schon im RAM ist — rein informativ, die UI braucht nur `available`.
+router.get('/search/status', async (req, res) => {
+  try {
+    const index = await loadSearchIndex(PRIVAT_DIR);
+    res.json({
+      available: !!index,
+      count: index ? index.count : 0,
+      model: index ? index.model : null,
+      modelReady: index ? fotoEmbedder.isReady(index.model) : false,
+    });
+  } catch (error) {
+    console.error('KI-Suche-Status fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// POST /api/fotos/search  { q: "sonnenuntergang am see" }
+// Antwort: { ids: [assetId, …], scores: [0.31, …] } — absteigend nach Score.
+router.post('/search', async (req, res) => {
+  try {
+    const raw = req.body && req.body.q;
+    if (typeof raw !== 'string' || raw.trim().length === 0) {
+      return res.status(400).json({ error: 'Bitte einen Suchtext eingeben.' });
+    }
+    const query = raw.trim();
+    if (query.length > SEARCH_MAX_QUERY_LENGTH) {
+      return res.status(400).json({
+        error: `Der Suchtext ist zu lang (maximal ${SEARCH_MAX_QUERY_LENGTH} Zeichen).`,
+      });
+    }
+
+    const index = await loadSearchIndex(PRIVAT_DIR);
+    if (!index) {
+      return res.status(404).json({
+        error: 'Die App hat noch keine Suchvektoren hochgeladen — einmal Websync laufen lassen.',
+      });
+    }
+
+    let variants;
+    try {
+      variants = await fotoEmbedder.embedQueryVariants(query, index.model, {
+        maxWaitMs: SEARCH_MODEL_WAIT_MS,
+      });
+    } catch (err) {
+      if (err && err.code === 'MODEL_LOADING') {
+        return res.status(503).json({
+          error: 'Das KI-Modell wird gerade geladen (beim ersten Mal einige Minuten) — bitte gleich noch einmal versuchen.',
+        });
+      }
+      throw err;
+    }
+
+    // Passt der Text-Tower nicht zu den Vektoren (sollte nie passieren,
+    // beide kommen aus index.json), lieber laut scheitern als Unsinn ranken.
+    if (variants.some((v) => v.length !== index.dims)) {
+      console.error(`KI-Suche: Vektorlänge passt nicht (Modell ${index.model}, erwartet ${index.dims}).`);
+      return res.status(500).json({ error: 'Der Suchindex passt nicht zum KI-Modell — bitte in fotob0x den Websync erneut laufen lassen.' });
+    }
+
+    const results = trimToRelevant(rankPhotos(index, variants));
+    res.json({
+      ids: results.map((r) => r.id),
+      // 4 Nachkommastellen reichen der UI und halten die Antwort klein.
+      scores: results.map((r) => Math.round(r.score * 10000) / 10000),
+    });
+  } catch (error) {
+    console.error('KI-Suche fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Die KI-Suche ist fehlgeschlagen. Bitte später erneut versuchen.' });
+  }
+});
 
 // ============================================================
 // Lösch-Warteschlange (2026-08-07) — online löschen -> PC-Papierkorb

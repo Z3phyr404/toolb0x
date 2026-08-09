@@ -95,6 +95,20 @@ function setupSecurity(app) {
   app.use('/api/fotos/library/img/', libraryImageLimiter);
   app.use('/api/fotos/library/thumb/', libraryImageLimiter);
 
+  // KI-Fotosuche (2026-08-09): jede Suche kostet echte CPU-Inferenz auf dem
+  // VPS (Text-Embedding + Übersetzung) — eigenes, enges Budget, damit ein
+  // Suchgewitter weder den Server noch das allgemeine API-Budget leert.
+  // Zählt auch /api/fotos/search/status mit (1 Aufruf pro Seitenaufruf) —
+  // bei 120/15min völlig unkritisch.
+  const fotoSearchLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_FOTO_SEARCH) || 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Zu viele Suchanfragen. Bitte warte einen Moment.' },
+  });
+  app.use('/api/fotos/search', fotoSearchLimiter);
+
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: parseInt(process.env.RATE_LIMIT_LOGIN) || 10,
