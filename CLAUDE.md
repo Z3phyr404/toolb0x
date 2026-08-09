@@ -614,6 +614,31 @@ Tests: `tests/routes/fotos-search.test.js` (Encoder gestubbt via
 require.cache — nie ein echter Modell-Download); der Layout-Stub fakt
 Status + Suche.
 
+**Aufgeräumter Filterbereich in „Alle Fotos" (2026-08-09):** Die Filter
+stehen jetzt in klar getrennten Zeilen (`.filter-row` ist eine Spalte aus
+`.filter-line`-Zeilen, alle Bedienelemente gleich hoch über `--filter-h`):
+(1) Suchfelder (KI-Suche + Textsuche), (2) Zeitraum/Bewertung/mobile
+Dropdowns, (3) Tag-Eingabe + gewählte Tags, (4) Tag-Schnellwahl. Labels
+(„Zeitraum", „Häufige Tags") tragen die zurückhaltende `.filter-label`
+(Mono, 11px, uppercase) wie die Sidebar-Überschriften. Die **Personen-Chips
+sind aus dem Hauptbereich in die Sidebar gewandert**: eigener ein-/
+ausklappbarer Abschnitt „Personen" (`initSbSection('sbPersons',
+'sbPersonsHead', 'fotos_sb_personen_zu')`) mit Fotozahlen je Person,
+darunter dasselbe generische `.sb-section`/`.sb-section-body`-Muster wie
+die Alben. Mobil (Sidebar versteckt) übernimmt `#personSelect` in der
+Filterzeile — analog zu `#albumSelect`; beide sind per Media-Query ab
+769px ausgeblendet.
+
+> **Fallstrick `hidden` (kostete den Aufräum-Bug):** Eine eigene CSS-Regel
+> wie `.otd-bar { display: flex }` schlägt das `display:none`, das der
+> Browser für `[hidden]` mitbringt (Autoren-CSS > UA-CSS) — die Elemente
+> stehen dann trotz `element.hidden = true` als leere Kästen in der Seite.
+> Genau so entstanden die leere „An diesem Tag"-Leiste über die volle
+> Breite und der nackte ×-Knopf des KI-Such-Chips. Jede Seite, die
+> `hidden` per JS umschaltet UND `display` auf denselben Klassen setzt,
+> braucht deshalb `[hidden] { display: none !important; }` (in
+> `public/apps/fotos/index.html` gesetzt).
+
 ---
 
 ## Wichtige Designentscheidungen

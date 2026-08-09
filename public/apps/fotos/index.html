@@ -13,6 +13,14 @@
 
     html, body { height:100%; overflow:hidden; }
 
+    /* Das hidden-Attribut muss IMMER gewinnen (2026-08-09).
+       Fallstrick: eine eigene Regel wie `.otd-bar { display: flex }` schlägt
+       das `display:none` des Browser-Stylesheets für [hidden] — die Elemente
+       standen dann trotz `hidden` als leere Kästen in der Seite (die leere
+       Rückblick-Leiste über die volle Breite und der nackte ×-Knopf der
+       KI-Suche kamen genau daher). */
+    [hidden] { display: none !important; }
+
     .ob-page {
       position: relative;
       height: 100vh;
@@ -139,43 +147,62 @@
       color: #f472b6;
     }
 
-    /* ===== FILTER (Album-Auswahl + Personen-Chips) ===== */
+    /* ===== FILTER (Suche, Zeitraum, Bewertung, Tags) =====
+       Die Filter stehen in klar getrennten Zeilen (.filter-line) statt in
+       einem gemeinsamen Umbruch-Fluss: Alle Bedienelemente sind gleich hoch
+       (--filter-h) und liegen dadurch sauber auf einer Linie. */
     .filter-row {
-      display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px;
+      --filter-h: 34px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 10px;
       margin-bottom: 20px;
     }
-    .album-select, .filter-select {
+    .filter-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    /* Zurückhaltende Beschriftung — derselbe Stil wie die Abschnitts-
+       Überschriften in der Sidebar, damit nichts hervorsticht. */
+    .filter-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: rgba(238,241,246,0.4);
+      flex-shrink: 0;
+    }
+    .filter-dash { font-size: 12.5px; color: rgba(238,241,246,0.5); }
+
+    .album-select, .person-select, .filter-select {
+      height: var(--filter-h, 34px); box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.04);
       color: rgba(238,241,246,0.85);
       border-radius: 999px;
-      padding: 6px 12px;
+      padding: 0 12px;
       font-family: inherit; font-size: 13px; font-weight: 600;
       cursor: pointer;
       max-width: 100%;
     }
     .album-select:hover, .album-select:focus,
+    .person-select:hover, .person-select:focus,
     .filter-select:hover, .filter-select:focus { border-color: rgba(244,114,182,0.45); outline: none; }
-    .album-select.active, .filter-select.active {
+    .album-select.active, .person-select.active, .filter-select.active {
       background: rgba(244,114,182,0.15);
       border-color: rgba(244,114,182,0.5);
       color: #f472b6;
     }
-    .album-select option, .filter-select option { background: #1c1f27; color: #eef1f6; }
+    .album-select option, .person-select option,
+    .filter-select option { background: #1c1f27; color: #eef1f6; }
 
     .filter-search {
+      height: var(--filter-h, 34px); box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.04);
       color: rgba(238,241,246,0.85);
       border-radius: 999px;
-      padding: 6px 14px;
+      padding: 0 14px;
       font-family: inherit; font-size: 13px;
       outline: none;
       width: 220px; max-width: 100%;
     }
     .filter-search:focus { border-color: rgba(244,114,182,0.45); }
     .filter-search::placeholder { color: rgba(238,241,246,0.4); }
-    .filter-date { width: auto; color-scheme: dark; }
+    .filter-date { width: auto; padding: 0 10px; color-scheme: dark; }
     .filter-date.active { border-color: rgba(244,114,182,0.5); color: #f472b6; }
 
     /* ===== KI-SUCHE (semantisch, 2026-08-09) ===== */
@@ -184,11 +211,12 @@
     .ai-search.busy { opacity: 0.55; cursor: progress; }
     .ai-chip {
       display: inline-flex; align-items: center; gap: 8px;
+      height: var(--filter-h, 34px); box-sizing: border-box;
       background: rgba(244,114,182,0.15);
       border: 1px solid rgba(244,114,182,0.5);
       color: #f472b6;
       border-radius: 999px;
-      padding: 5px 8px 5px 14px;
+      padding: 0 8px 0 14px;
       font-size: 13px; font-weight: 600;
       max-width: 100%;
     }
@@ -203,8 +231,8 @@
     }
     .ai-chip button:hover { color: #fff; }
 
-    /* ===== ALBEN IN DER SIDEBAR (Desktop) ===== */
-    .sb-albums { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
+    /* ===== SIDEBAR-ABSCHNITTE: ALBEN + PERSONEN (Desktop) ===== */
+    .sb-section { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: 16px; }
     /* Klickbare Abschnitts-Überschrift (2026-08-09): klappt die Liste ein/aus
        wie in der fotob0x-Desktop-App, Zustand überlebt in localStorage.
        Generisch gehalten — künftige Sidebar-Abschnitte nutzen dieselben Klassen. */
@@ -219,36 +247,36 @@
     .sb-section-head .chev { flex-shrink: 0; transition: transform 0.2s; }
     .sb-section.collapsed .chev { transform: rotate(-90deg); }
     .sb-section.collapsed .sb-section-body { display: none; }
-    .sb-albums.collapsed { flex: 0 0 auto; } /* eingeklappt keinen Restplatz beanspruchen */
-    .sb-album-list { overflow-y: auto; min-height: 0; padding-bottom: 8px; }
-    .sb-album-list button {
+    .sb-section.collapsed { flex: 0 0 auto; } /* eingeklappt keinen Restplatz beanspruchen */
+    .sb-section-body { overflow-y: auto; min-height: 0; padding-bottom: 8px; }
+    .sb-section-body button {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       width: 100%; padding: 7px 12px; border: none; background: none; text-align: left;
       color: rgba(238,241,246,0.65); font-family: inherit; font-size: 13.5px;
       border-radius: 10px; cursor: pointer; transition: color 0.15s, background 0.15s;
     }
-    .sb-album-list button:hover { color: #eef1f6; background: rgba(255,255,255,0.05); }
-    .sb-album-list button.active { color: var(--sb-accent); background: var(--sb-accent-bg); }
-    .sb-album-list button .n { flex-shrink: 0; font-size: 11px; color: rgba(238,241,246,0.4); }
-    .sb-album-list button span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* Mobil übernimmt das Dropdown in der Filterzeile; auf dem Desktop wäre es doppelt */
-    @media (min-width: 769px) { .album-select { display: none; } }
+    .sb-section-body button:hover { color: #eef1f6; background: rgba(255,255,255,0.05); }
+    .sb-section-body button.active { color: var(--sb-accent); background: var(--sb-accent-bg); }
+    .sb-section-body button .n { flex-shrink: 0; font-size: 11px; color: rgba(238,241,246,0.4); }
+    .sb-section-body button span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Mobil übernehmen die Dropdowns in der Filterzeile (die Sidebar ist dort
+       versteckt); auf dem Desktop wären sie doppelt. */
+    @media (min-width: 769px) { .album-select, .person-select { display: none; } }
 
-    .person-chips {
-      display: flex; flex-wrap: wrap; gap: 8px;
-    }
-    .person-chips button, .tag-quick button {
+    .tag-quick button {
+      height: 30px; box-sizing: border-box;
+      display: inline-flex; align-items: center;
       border: 1px solid rgba(255,255,255,0.14);
       background: transparent;
       color: rgba(238,241,246,0.75);
       border-radius: 999px;
-      padding: 6px 14px;
+      padding: 0 14px;
       font-family: inherit; font-size: 13px; font-weight: 600;
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
-    .person-chips button:hover, .tag-quick button:hover { border-color: rgba(244,114,182,0.45); color: #f472b6; }
-    .person-chips button.active, .tag-quick button.active {
+    .tag-quick button:hover { border-color: rgba(244,114,182,0.45); color: #f472b6; }
+    .tag-quick button.active {
       background: rgba(244,114,182,0.15);
       border-color: rgba(244,114,182,0.5);
       color: #f472b6;
@@ -259,8 +287,7 @@
        kompaktes Eingabefeld mit Vorschlagsliste, gewählte Tags als
        entfernbare Chips daneben, die 10 häufigsten Tags als Schnell-Chips
        darunter. Mehrere Tags = UND-Verknüpfung. */
-    .tag-filter { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
-    .tag-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag-filter { display: flex; flex-direction: column; gap: 10px; max-width: 100%; }
     .tag-input-wrap { position: relative; }
     .tag-input { width: 180px; }
     .tag-suggest {
@@ -286,11 +313,12 @@
     .tag-chips, .tag-quick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .tag-chip { /* gewählter Tag — das × entfernt ihn wieder */
       display: inline-flex; align-items: center; gap: 6px;
+      height: 30px; box-sizing: border-box;
       background: rgba(244,114,182,0.15);
       border: 1px solid rgba(244,114,182,0.5);
       color: #f472b6;
       border-radius: 999px;
-      padding: 4px 6px 4px 12px;
+      padding: 0 6px 0 12px;
       font-size: 12.5px; font-weight: 600;
       max-width: 100%;
     }
@@ -301,11 +329,6 @@
       font-size: 14px; line-height: 1; padding: 1px 4px;
     }
     .tag-chip button:hover { color: #fff; }
-    .tag-quick-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px; letter-spacing: 0.08em;
-      color: rgba(238,241,246,0.4);
-    }
 
     /* ===== ALLE FOTOS (Events + Monats-Fallback) ===== */
     .month-block { margin-bottom: 28px; }
@@ -553,13 +576,24 @@
 
     <!-- Alben aus dem fotob0x-Manifest: Klick filtert "Alle Fotos" (Desktop;
          mobil übernimmt das Dropdown in der Filterzeile) -->
-    <div class="sb-albums sb-section" id="sbAlbums" hidden>
+    <div class="sb-section" id="sbAlbums" hidden>
       <button type="button" class="sb-section-head" id="sbAlbumsHead" aria-expanded="true"
               title="Alben ein- oder ausklappen (bleibt gemerkt)">
         <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         Alben
       </button>
-      <div class="sb-album-list sb-section-body" id="sbAlbumList"></div>
+      <div class="sb-section-body" id="sbAlbumList"></div>
+    </div>
+
+    <!-- Personen aus dem fotob0x-Manifest: Klick filtert "Alle Fotos" auf
+         diese Person (Desktop; mobil übernimmt das Dropdown in der Filterzeile) -->
+    <div class="sb-section" id="sbPersons" hidden>
+      <button type="button" class="sb-section-head" id="sbPersonsHead" aria-expanded="true"
+              title="Personen ein- oder ausklappen (bleibt gemerkt)">
+        <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        Personen
+      </button>
+      <div class="sb-section-body" id="sbPersonList"></div>
     </div>
     <div class="ob-sidebar-user">
       <div class="ob-sidebar-avatar" id="userAvatar">?</div>
@@ -607,31 +641,46 @@
       <!-- „An diesem Tag": Fotos vom heutigen Kalendertag früherer Jahre -->
       <div class="otd-bar" id="otdBar" hidden></div>
       <div class="filter-row" id="filterRow" hidden>
-        <!-- KI-Suche (semantisch, wie in fotob0x): erscheint nur, wenn der
-             Server Suchvektoren hat (GET /api/fotos/search/status) -->
-        <input type="search" id="aiSearch" class="filter-search ai-search" placeholder="🔍 KI-Suche, z.B. „sonnenuntergang am see“…"
-               title="Semantische KI-Suche: beschreibe in Worten, was auf dem Foto zu sehen ist (Deutsch oder Englisch) — Enter startet die Suche" hidden>
-        <div class="ai-chip" id="aiChip" hidden>
-          <span id="aiChipLabel"></span>
-          <button type="button" id="aiChipClear" title="KI-Suche aufheben — wieder alle Fotos anzeigen">×</button>
+        <!-- Zeile 1: Suchfelder -->
+        <div class="filter-line" id="filterLineSearch">
+          <!-- KI-Suche (semantisch, wie in fotob0x): erscheint nur, wenn der
+               Server Suchvektoren hat (GET /api/fotos/search/status) -->
+          <input type="search" id="aiSearch" class="filter-search ai-search" placeholder="🔍 KI-Suche, z.B. „sonnenuntergang am see“…"
+                 title="Semantische KI-Suche: beschreibe in Worten, was auf dem Foto zu sehen ist (Deutsch oder Englisch) — Enter startet die Suche" hidden>
+          <div class="ai-chip" id="aiChip" hidden>
+            <span id="aiChipLabel"></span>
+            <button type="button" id="aiChipClear" title="KI-Suche aufheben — wieder alle Fotos anzeigen">×</button>
+          </div>
+          <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
+                 title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
         </div>
-        <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
-               title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
-        <input type="date" id="filterFrom" class="filter-search filter-date" title="Aufnahmedatum ab diesem Tag">
-        <input type="date" id="filterTo" class="filter-search filter-date" title="Aufnahmedatum bis zu diesem Tag">
-        <select id="starSelect" class="filter-select" title="Nur Fotos mit dieser Mindestbewertung aus fotob0x anzeigen" hidden>
-          <option value="0">Alle Bewertungen</option>
-          <option value="1">★ und mehr</option>
-          <option value="2">★★ und mehr</option>
-          <option value="3">★★★ und mehr</option>
-          <option value="4">★★★★ und mehr</option>
-          <option value="5">★★★★★</option>
-        </select>
-        <!-- Tag-Filter (2026-08-09, skalierbar): erscheint nur, wenn das
-             Manifest Tags liefert. Bei ≤ 15 Tags eine einfache Chip-Liste,
+        <!-- Zeile 2: Zeitraum, Bewertung und (nur mobil) Album-/Personen-Auswahl -->
+        <div class="filter-line">
+          <span class="filter-label">Zeitraum</span>
+          <input type="date" id="filterFrom" class="filter-search filter-date" title="Aufnahmedatum ab diesem Tag">
+          <span class="filter-dash">bis</span>
+          <input type="date" id="filterTo" class="filter-search filter-date" title="Aufnahmedatum bis zu diesem Tag">
+          <select id="starSelect" class="filter-select" title="Nur Fotos mit dieser Mindestbewertung aus fotob0x anzeigen" hidden>
+            <option value="0">Alle Bewertungen</option>
+            <option value="1">★ und mehr</option>
+            <option value="2">★★ und mehr</option>
+            <option value="3">★★★ und mehr</option>
+            <option value="4">★★★★ und mehr</option>
+            <option value="5">★★★★★</option>
+          </select>
+          <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
+            <option value="">Alle Alben</option>
+          </select>
+          <select id="personSelect" class="person-select" title="Nur Fotos mit dieser Person anzeigen" hidden>
+            <option value="">Alle Personen</option>
+          </select>
+        </div>
+        <!-- Zeile 3/4: Tag-Filter (2026-08-09, skalierbar): erscheint nur, wenn
+             das Manifest Tags liefert. Bei ≤ 15 Tags eine einfache Chip-Liste,
              sonst Eingabefeld mit Vorschlagsliste + Schnell-Chips. -->
         <div class="tag-filter" id="tagFilter" hidden>
-          <div class="tag-filter-row">
+          <div class="filter-line tag-filter-row" id="tagFilterRow">
+            <span class="filter-label">Tag suchen</span>
             <div class="tag-input-wrap" id="tagInputWrap">
               <input type="search" id="tagInput" class="filter-search tag-input" placeholder="Tag filtern…" autocomplete="off"
                      title="Tippen filtert deine Tags aus fotob0x — Enter oder Klick wählt einen Tag; mehrere Tags grenzen weiter ein (UND-Verknüpfung)">
@@ -639,12 +688,8 @@
             </div>
             <div class="tag-chips" id="tagChips"></div>
           </div>
-          <div class="tag-quick" id="tagQuick"></div>
+          <div class="filter-line tag-quick" id="tagQuick"></div>
         </div>
-        <select id="albumSelect" class="album-select" title="Nur Fotos eines Albums anzeigen" hidden>
-          <option value="">Alle Alben</option>
-        </select>
-        <div class="person-chips" id="personChips" hidden></div>
       </div>
       <div id="timeline"></div>
       <div id="timelineSentinel"></div>
@@ -1051,32 +1096,72 @@
     }
   }
 
-  function renderPersonChips() {
-    var box = $('personChips');
-    box.textContent = '';
+  // ---- Personen-Filter (2026-08-09 in die Sidebar umgezogen) ----
+  // Früher lagen die Namen als Chip-Leiste im Hauptbereich und machten die
+  // Filterzeile unruhig. Jetzt: eigener ein-/ausklappbarer Sidebar-Abschnitt
+  // „Personen" wie bei den Alben; mobil (Sidebar versteckt) das Dropdown.
+
+  /** Fotos je Person zählen — liefert die Zahlen neben den Namen. */
+  function personCounts() {
+    var counts = {};
+    libraryAll.forEach(function(photo) {
+      (photo.p || []).forEach(function(name) { counts[name] = (counts[name] || 0) + 1; });
+    });
+    return counts;
+  }
+
+  /** Personen-Abschnitt in der Sidebar (Desktop-Pendant zum Dropdown). */
+  function renderSidebarPersons() {
+    var box = $('sbPersons');
     box.hidden = libraryPersons.length === 0;
+    var list = $('sbPersonList');
+    list.textContent = '';
     if (libraryPersons.length === 0) return;
-    var all = document.createElement('button');
-    all.type = 'button';
-    all.textContent = 'Alle';
-    all.className = activePerson === null ? 'active' : '';
-    all.addEventListener('click', function() { setPersonFilter(null); });
-    box.appendChild(all);
-    libraryPersons.forEach(function(name) {
+    var counts = personCounts();
+    var mk = function(label, count, name) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = name;
+      var text = document.createElement('span');
+      text.textContent = label;
+      btn.appendChild(text);
+      if (count !== null) {
+        var n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = count;
+        btn.appendChild(n);
+      }
       btn.className = activePerson === name ? 'active' : '';
-      btn.title = 'Nur Fotos mit ' + name + ' anzeigen';
+      btn.title = name === null
+        ? 'Personen-Filter aufheben — wieder alle Fotos anzeigen'
+        : 'Nur Fotos mit ' + name + ' anzeigen (erneut klicken hebt den Filter auf)';
       btn.addEventListener('click', function() {
         setPersonFilter(activePerson === name ? null : name);
       });
-      box.appendChild(btn);
+      list.appendChild(btn);
+    };
+    mk('Alle Personen', null, null);
+    libraryPersons.forEach(function(name) { mk(name, counts[name] || 0, name); });
+  }
+
+  /** Personen-Auswahl in der Filterzeile — nur mobil sichtbar (CSS). */
+  function renderPersonSelect() {
+    var select = $('personSelect');
+    select.hidden = libraryPersons.length === 0;
+    while (select.options.length > 1) select.remove(1);
+    var counts = personCounts();
+    libraryPersons.forEach(function(name) {
+      var option = document.createElement('option');
+      option.value = name;
+      option.textContent = name + ' (' + (counts[name] || 0) + ')';
+      select.appendChild(option);
     });
+    select.value = activePerson === null ? '' : activePerson;
+    select.classList.toggle('active', activePerson !== null);
   }
 
   function setPersonFilter(name) {
     activePerson = name;
+    showView('library'); // Klick in der Sidebar wirkt auch aus anderen Ansichten
     applyFilters();
   }
 
@@ -1280,6 +1365,8 @@
 
     var simple = tags.length <= TAG_SIMPLE_MAX;
     $('tagInputWrap').hidden = simple;
+    // Einfache Liste: nichts zu tippen, nichts zu entfernen → ganze Zeile weg
+    $('tagFilterRow').hidden = simple;
     if (simple) hideTagSuggest();
 
     // Gewählte Tags als entfernbare Chips neben dem Eingabefeld — in der
@@ -1309,18 +1396,20 @@
     var quick = $('tagQuick');
     quick.textContent = '';
     var quickTags;
+    var lbl = document.createElement('span');
+    lbl.className = 'filter-label'; // gleicher zurückhaltende Stil wie „Zeitraum"
     if (simple) {
       quickTags = tags.sort(function(a, b) { return a.localeCompare(b, 'de'); });
+      lbl.textContent = 'Tags';
+      lbl.title = 'Alle Tags deiner Bibliothek — Klick grenzt die Fotos ein';
     } else {
       quickTags = tags.sort(function(a, b) {
         return counts[b] - counts[a] || a.localeCompare(b, 'de');
       }).slice(0, TAG_QUICK_COUNT);
-      var lbl = document.createElement('span');
-      lbl.className = 'tag-quick-label';
-      lbl.textContent = 'HÄUFIGE TAGS';
+      lbl.textContent = 'Häufige Tags';
       lbl.title = 'Die ' + quickTags.length + ' häufigsten Tags deiner Bibliothek';
-      quick.appendChild(lbl);
     }
+    quick.appendChild(lbl);
     quickTags.forEach(function(tag) {
       quick.appendChild(makeTagToggleChip(tag, counts[tag]));
     });
@@ -1393,10 +1482,17 @@
   // eingebetteten Suchtext (POST /fotos/search) und liefert Asset-IDs in
   // Score-Reihenfolge. Das Feld erscheint nur, wenn Vektoren vorliegen.
 
+  /** Suchzeile nur zeigen, wenn wenigstens ein Suchfeld darin sichtbar ist —
+      sonst stünde eine leere Zeile über den übrigen Filtern. */
+  function updateSearchLine() {
+    $('filterLineSearch').hidden = $('aiSearch').hidden && $('librarySearch').hidden;
+  }
+
   function probeAiSearch() {
     api('/fotos/search/status').then(function(data) {
       aiAvailable = !!data.available;
       $('aiSearch').hidden = !aiAvailable;
+      updateSearchLine();
     }).catch(function() {
       // Status nicht erreichbar → Feld bleibt einfach versteckt.
     });
@@ -1514,7 +1610,8 @@
     $('filterTo').classList.toggle('active', !!activeTo);
     libraryPhotos = photos;
     renderAiChip();
-    renderPersonChips();
+    renderSidebarPersons();
+    renderPersonSelect();
     renderAlbumSelect();
     renderSidebarAlbums();
     renderStarSelect();
@@ -1530,6 +1627,7 @@
     $('librarySearch').placeholder = hasCaptions
       ? 'Beschreibung oder Person durchsuchen…'
       : 'Person durchsuchen…';
+    updateSearchLine();
     // Zeitraum-Filter sind immer nützlich - die Zeile zeigt sich, sobald
     // überhaupt Fotos da sind.
     $('filterRow').hidden = libraryAll.length === 0;
@@ -2194,6 +2292,9 @@
     activeAlbumIndex = this.value === '' ? null : parseInt(this.value, 10);
     applyFilters();
   });
+  $('personSelect').addEventListener('change', function() {
+    setPersonFilter(this.value === '' ? null : this.value);
+  });
   $('starSelect').addEventListener('change', function() {
     activeMinStars = parseInt(this.value, 10) || 0;
     applyFilters();
@@ -2276,8 +2377,10 @@
     lbTouchX = null;
   }, { passive: true });
 
-  // Alben-Abschnitt in der Sidebar ein-/ausklappbar (Zustand bleibt gemerkt)
+  // Alben- und Personen-Abschnitt in der Sidebar ein-/ausklappbar
+  // (Zustand bleibt je Abschnitt in localStorage gemerkt)
   initSbSection('sbAlbums', 'sbAlbumsHead', 'fotos_sb_alben_zu');
+  initSbSection('sbPersons', 'sbPersonsHead', 'fotos_sb_personen_zu');
 
   // Glow-Interaktion sofort, Reveal erst nach dem ersten Rendern (renderAlbums)
   initGlow($('pageRoot'));
