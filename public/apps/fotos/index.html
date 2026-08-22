@@ -357,9 +357,79 @@
       display: block; border: 0; padding: 0; cursor: pointer;
       background: rgba(255,255,255,0.05);
       aspect-ratio: 1; overflow: hidden; border-radius: 6px;
+      position: relative; /* Anker für Info-Leiste + Auswahl-Häkchen */
     }
     .photo-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .photo-grid button:hover img { filter: brightness(1.12); }
+
+    /* ===== KACHEL-INFO + MEHRFACHAUSWAHL (2026-08-22) ===== */
+    /* Info-Leiste am unteren Kachelrand: Datum + Sterne, nur beim Überfahren */
+    .tile-info {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      padding: 18px 8px 6px; font-size: 11px; color: rgba(238,241,246,0.92);
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(transparent, rgba(10,12,16,0.85));
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 6px;
+      opacity: 0; transition: opacity 0.15s; pointer-events: none;
+    }
+    .photo-grid button:hover .tile-info { opacity: 1; }
+    .tile-info .stars { color: #fbbf24; letter-spacing: -1px; }
+    /* Auswahl-Häkchen oben links: beim Überfahren sichtbar, bei aktiver
+       Auswahl (irgendwo) dauerhaft — dann wird das Grid zur Auswahlfläche. */
+    .sel-check {
+      position: absolute; top: 6px; left: 6px; width: 22px; height: 22px;
+      border-radius: 50%; border: 2px solid rgba(255,255,255,0.85);
+      background: rgba(10,12,16,0.45); color: transparent;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; line-height: 1; cursor: pointer;
+      opacity: 0; transition: opacity 0.15s, background 0.15s;
+    }
+    .photo-grid button:hover .sel-check, .selecting .sel-check { opacity: 1; }
+    .photo-grid button.selected .sel-check { opacity: 1; background: #f472b6; border-color: #f472b6; color: #1c0a12; }
+    .photo-grid button.selected img { outline: 3px solid #f472b6; outline-offset: -3px; }
+    /* Auswahl-Leiste: erscheint über der Zeitleiste, bleibt beim Scrollen stehen */
+    .sel-bar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 10px 14px; margin-bottom: 14px; border-radius: 14px;
+      background: rgba(24,16,22,0.92); border: 1px solid rgba(244,114,182,0.4);
+      backdrop-filter: blur(8px);
+    }
+    .sel-bar .sel-count { font-weight: 700; font-size: 14px; }
+    .sel-bar .sel-stars button {
+      background: none; border: 0; cursor: pointer; font-size: 18px; padding: 0 2px;
+      color: rgba(238,241,246,0.35);
+    }
+    .sel-bar .sel-stars button:hover { color: #fbbf24; }
+    .sel-bar input {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(238,241,246,0.2);
+      border-radius: 999px; color: var(--text, #eef1f6); font: inherit; font-size: 13px;
+      padding: 5px 12px; width: 150px;
+    }
+    .sel-bar .sel-btn {
+      font-size: 13px; font-family: inherit; border-radius: 999px; padding: 6px 13px;
+      cursor: pointer; border: 1px solid rgba(238,241,246,0.25);
+      background: rgba(255,255,255,0.05); color: rgba(238,241,246,0.85);
+    }
+    .sel-bar .sel-btn:hover { background: rgba(255,255,255,0.12); }
+    .sel-bar .sel-btn.danger { border-color: rgba(248,113,113,0.4); color: #f87171; }
+    .sel-bar .sel-btn.danger:hover { background: rgba(248,113,113,0.12); }
+    .sel-bar .sel-hint { font-size: 12px; color: rgba(238,241,246,0.5); }
+
+    /* ===== FILTER EIN-/AUSKLAPPBAR (2026-08-22) ===== */
+    .filter-toggle {
+      display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+      font-size: 13px; font-family: inherit; border-radius: 999px; padding: 7px 14px;
+      cursor: pointer; border: 1px solid rgba(238,241,246,0.2);
+      background: rgba(255,255,255,0.04); color: rgba(238,241,246,0.8);
+    }
+    .filter-toggle:hover { background: rgba(255,255,255,0.1); }
+    .filter-toggle .chev { transition: transform 0.2s; }
+    .filter-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+    .filter-toggle .filter-count {
+      background: #f472b6; color: #1c0a12; border-radius: 999px;
+      font-size: 11px; font-weight: 700; padding: 1px 7px;
+    }
 
     /* ===== LIGHTBOX ===== */
     .lb {
@@ -384,8 +454,8 @@
     /* Bewerten/Taggen in der Lightbox (2026-08-22): Änderungen gehen als
        Marker in die Änderungs-Warteschlange, fotob0x holt sie ab. */
     .lb-meta {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
-      padding: 8px 16px 14px; color: rgba(238,241,246,0.75);
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+      gap: 8px 16px; padding: 8px 16px 14px; color: rgba(238,241,246,0.75);
       font-family: 'JetBrains Mono', monospace; font-size: 12px;
     }
     .lb-stars { display: flex; align-items: center; }
@@ -490,16 +560,17 @@
     /* ===== STATISTIK (schlichte horizontale Balkenlisten, 2026-08-09) =====
        Eine Farbreihe (Akzent #f472b6), Beschriftung/Werte in den normalen
        Text-Tönen, Wert rechts am Balken — bewusst kein Chart-Framework. */
+    /* CSS-Spalten statt Grid (2026-08-22): unterschiedlich hohe Karten
+       füllen die Spalten lückenlos statt Löcher im Raster zu lassen. */
     .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 18px; align-items: start;
+      columns: 320px; column-gap: 18px;
     }
     .stat-card {
       background: rgba(255,255,255,0.035);
       border: 1px solid rgba(255,255,255,0.07);
       border-radius: var(--radius-card, 18px);
       padding: 18px 20px;
+      break-inside: avoid; margin-bottom: 18px;
     }
     .stat-card h2 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
     .stat-sub { font-size: 12px; color: rgba(238,241,246,0.45); margin-bottom: 12px; }
@@ -676,7 +747,18 @@
           </div>
           <input type="search" id="librarySearch" class="filter-search" placeholder="Beschreibung durchsuchen…"
                  title="Durchsucht die KI-Bildunterschriften und Personennamen" hidden>
+          <button type="button" id="filterToggle" class="filter-toggle" aria-expanded="false"
+                  title="Weitere Filter (Zeitraum, Bewertung, Tags) ein- oder ausklappen — bleibt gemerkt">
+            Filter
+            <span class="filter-count" id="filterCount" hidden></span>
+            <svg class="chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
+        <!-- Zeitraum/Bewertung + Tags sind einklappbar (2026-08-22): der
+             Filterblock nahm sonst den halben Bildschirm ein, bevor das
+             erste Foto kam. Zustand bleibt in localStorage gemerkt; sind
+             Filter aktiv, zeigt der Knopf einen Zähler. -->
+        <div id="filterMore" hidden>
         <!-- Zeile 2: Zeitraum, Bewertung und (nur mobil) Album-/Personen-Auswahl -->
         <div class="filter-line">
           <span class="filter-label">Zeitraum</span>
@@ -713,6 +795,20 @@
           </div>
           <div class="filter-line tag-quick" id="tagQuick"></div>
         </div>
+        </div><!-- /filterMore -->
+      </div>
+      <!-- Auswahl-Leiste (Mehrfachauswahl, 2026-08-22): erscheint sobald
+           Fotos über die Häkchen ausgewählt sind; Aktionen laufen über die
+           bestehenden Warteschlangen (delete-queue / edit-queue). -->
+      <div class="sel-bar" id="selBar" hidden>
+        <span class="sel-count" id="selCount"></span>
+        <span class="sel-stars" id="selStars" title="Bewertung für alle ausgewählten Fotos setzen"></span>
+        <input type="text" id="selTagInput" maxlength="60" placeholder="+ Tag für Auswahl" autocomplete="off"
+               title="Tag für alle ausgewählten Fotos — Enter bestätigt">
+        <button type="button" class="sel-btn danger" id="selDelete"
+                title="Alle ausgewählten Fotos auf dem PC in den Papierkorb verschieben (wiederherstellbar)">In den Papierkorb</button>
+        <button type="button" class="sel-btn" id="selClear" title="Auswahl aufheben (Esc)">Aufheben</button>
+        <span class="sel-hint">Umschalt-Klick wählt einen Bereich</span>
       </div>
       <div id="timeline"></div>
       <div id="timelineSentinel"></div>
@@ -896,7 +992,12 @@
   // ANSICHTEN (Alle Fotos / Geteilte Alben)
   // ============================================================
 
+  var currentView = 'library';
+  var sbHasAlbums = false;   // Manifest liefert Alben (Sidebar-Abschnitt)
+  var sbHasPersons = false;  // Manifest liefert Personen
+
   function showView(view) {
+    currentView = view;
     $('viewLibrary').hidden = view !== 'library';
     $('viewAlbums').hidden = view !== 'albums';
     $('viewUpload').hidden = view !== 'upload';
@@ -915,6 +1016,11 @@
     };
     $('viewLabel').textContent = labels[view][0];
     $('viewTitle').textContent = labels[view][1];
+    // Alben-/Personen-Abschnitte in der Sidebar filtern NUR „Alle Fotos" —
+    // in den anderen Ansichten wären sie tote Bedienelemente (2026-08-22).
+    // sbHasAlbums/sbHasPersons merken, ob es überhaupt Inhalte gibt.
+    $('sbAlbums').hidden = view !== 'library' || !sbHasAlbums;
+    $('sbPersons').hidden = view !== 'library' || !sbHasPersons;
     updateSlideshowButton();
     if (view === 'upload') refreshInbox();
     if (view === 'stats') renderStats();
@@ -950,6 +1056,10 @@
   var libraryGroups = [];   // [{type:'event'|'month', title, rangeLabel?, indices: [i in libraryPhotos]}]
   var renderedGroups = 0;
   var sentinelObserver = null;
+  // Mehrfachauswahl (2026-08-22): Dateinamen (photo.n) der ausgewählten
+  // Fotos — Namen statt Indizes, damit die Auswahl Filterwechsel übersteht.
+  var selected = new Set();
+  var lastSelIdx = null;    // letzter Auswahl-Index (für Umschalt-Bereiche)
 
   function monthTitle(key) {
     if (key === 'unbekannt') return 'Ohne Datum';
@@ -1107,12 +1217,36 @@
         var photo = libraryPhotos[photoIndex];
         var btn = document.createElement('button');
         btn.type = 'button';
+        btn.dataset.idx = String(photoIndex);
+        btn.dataset.name = photo.n;
+        if (selected.has(photo.n)) btn.classList.add('selected');
         var img = document.createElement('img');
         img.src = '/api/fotos/library/thumb/' + encodeURIComponent(photo.n);
         img.loading = 'lazy';
         img.alt = photo.d ? photo.d.slice(0, 10) : '';
         btn.appendChild(img);
-        btn.addEventListener('click', function() { openLightbox(photoIndex); });
+        // Info-Leiste (nur beim Überfahren): Datum + Bewertung
+        var info = document.createElement('span');
+        info.className = 'tile-info';
+        var dateTxt = photo.d ? photo.d.slice(8, 10) + '.' + photo.d.slice(5, 7) + '.' + photo.d.slice(2, 4) : '';
+        info.innerHTML = '<span>' + dateTxt + '</span>' +
+          (photo.r ? '<span class="stars">' + '★★★★★'.slice(0, photo.r) + '</span>' : '');
+        btn.appendChild(info);
+        // Auswahl-Häkchen: Klick togglet, Umschalt-Klick wählt den Bereich
+        // seit der letzten Auswahl; normaler Klick auf die Kachel öffnet
+        // weiterhin die Lightbox (bzw. togglet, solange eine Auswahl aktiv ist).
+        var check = document.createElement('span');
+        check.className = 'sel-check';
+        check.textContent = '✓';
+        check.title = 'Foto auswählen (Umschalt-Klick: Bereich)';
+        btn.appendChild(check);
+        btn.addEventListener('click', function(e) {
+          if (e.target === check || selected.size > 0) {
+            toggleSelect(photoIndex, e.shiftKey);
+          } else {
+            openLightbox(photoIndex);
+          }
+        });
         grid.appendChild(btn);
       });
       block.appendChild(grid);
@@ -1123,6 +1257,112 @@
       sentinelObserver.disconnect();
       sentinelObserver = null;
     }
+  }
+
+  // ============================================================
+  // MEHRFACHAUSWAHL (2026-08-22)
+  // ============================================================
+  // Aktionen auf N Fotos über die bestehenden Warteschlangen: Papierkorb
+  // via /fotos/delete-request (nahm schon immer ids[]), Bewerten/Taggen
+  // via /fotos/edit-request (nimmt seit heute auch ids[]).
+
+  function toggleSelect(photoIndex, shiftKey) {
+    var apply = function(i, on) {
+      var p = libraryPhotos[i];
+      if (!p) return;
+      if (on) selected.add(p.n); else selected.delete(p.n);
+    };
+    var isOn = selected.has(libraryPhotos[photoIndex].n);
+    if (shiftKey && lastSelIdx !== null) {
+      var from = Math.min(lastSelIdx, photoIndex), to = Math.max(lastSelIdx, photoIndex);
+      for (var i = from; i <= to; i++) apply(i, true);
+    } else {
+      apply(photoIndex, !isOn);
+    }
+    lastSelIdx = photoIndex;
+    updateSelectionUi();
+  }
+
+  function clearSelection() {
+    selected.clear();
+    lastSelIdx = null;
+    updateSelectionUi();
+  }
+
+  /** Kachel-Markierungen + Auswahl-Leiste an den Set-Zustand angleichen. */
+  function updateSelectionUi() {
+    var any = selected.size > 0;
+    document.querySelectorAll('#timeline .photo-grid button').forEach(function(btn) {
+      btn.classList.toggle('selected', selected.has(btn.dataset.name));
+    });
+    $('timeline').classList.toggle('selecting', any);
+    $('selBar').hidden = !any;
+    if (!any) { selDeleteArmed = false; }
+    $('selCount').textContent = selected.size + ' ausgewählt';
+    $('selDelete').textContent = selDeleteArmed
+      ? 'Wirklich ' + selected.size + ' in den Papierkorb?'
+      : 'In den Papierkorb';
+  }
+
+  function selectedIds() {
+    return Array.from(selected).map(function(n) { return parseInt(n, 10); }).filter(Boolean);
+  }
+
+  /** Bewertung für alle ausgewählten Fotos setzen (0 = entfernen). */
+  function bulkRate(rating) {
+    var ids = selectedIds();
+    if (ids.length === 0) return;
+    api('/fotos/edit-request', { method: 'POST', body: { ids: ids, rating: rating } }).then(function() {
+      libraryAll.forEach(function(p) {
+        if (!selected.has(p.n)) return;
+        if (rating > 0) p.r = rating; else delete p.r;
+      });
+      toast(ids.length + ' Foto(s) mit ' + (rating > 0 ? rating + ' Stern(en) bewertet' : 'Bewertung entfernt') + ' – fotob0x übernimmt das auf dem PC.');
+      applyFilters();
+      updateSelectionUi();
+    }).catch(function(err) {
+      toast(err.error || 'Die Bewertung konnte nicht gemerkt werden.', 'error');
+    });
+  }
+
+  /** Einen Tag zu allen ausgewählten Fotos hinzufügen. */
+  function bulkTag(raw) {
+    var tag = raw.replace(/\s+/g, ' ').trim();
+    var ids = selectedIds();
+    if (!tag || ids.length === 0) return;
+    api('/fotos/edit-request', { method: 'POST', body: { ids: ids, addTags: [tag] } }).then(function() {
+      libraryAll.forEach(function(p) {
+        if (!selected.has(p.n)) return;
+        var t = p.t || [];
+        if (!t.some(function(x) { return x.toLowerCase() === tag.toLowerCase(); })) p.t = t.concat([tag]);
+      });
+      $('selTagInput').value = '';
+      toast('Tag „' + tag + '“ für ' + ids.length + ' Foto(s) gemerkt – fotob0x übernimmt ihn auf dem PC.');
+    }).catch(function(err) {
+      toast(err.error || 'Der Tag konnte nicht gemerkt werden.', 'error');
+    });
+  }
+
+  // Papierkorb mit zweistufiger Bestätigung (erster Klick fragt nach).
+  var selDeleteArmed = false;
+
+  function bulkDelete() {
+    if (!selDeleteArmed) { selDeleteArmed = true; updateSelectionUi(); return; }
+    var ids = selectedIds();
+    if (ids.length === 0) return;
+    $('selDelete').disabled = true;
+    api('/fotos/delete-request', { method: 'POST', body: { ids: ids } }).then(function() {
+      toast(ids.length + ' Foto(s) in den Papierkorb verschoben – verschwinden nach der nächsten Synchronisierung auch hier.');
+      libraryAll = libraryAll.filter(function(p) { return !selected.has(p.n); });
+      clearSelection();
+      applyFilters();
+    }).catch(function(err) {
+      toast(err.error || 'Konnte nicht markiert werden.', 'error');
+    }).finally(function() {
+      $('selDelete').disabled = false;
+      selDeleteArmed = false;
+      updateSelectionUi();
+    });
   }
 
   // ---- Personen-Filter (2026-08-09 in die Sidebar umgezogen) ----
@@ -1142,7 +1382,8 @@
   /** Personen-Abschnitt in der Sidebar (Desktop-Pendant zum Dropdown). */
   function renderSidebarPersons() {
     var box = $('sbPersons');
-    box.hidden = libraryPersons.length === 0;
+    sbHasPersons = libraryPersons.length > 0;
+    box.hidden = !sbHasPersons || currentView !== 'library';
     var list = $('sbPersonList');
     list.textContent = '';
     if (libraryPersons.length === 0) return;
@@ -1168,7 +1409,9 @@
       });
       list.appendChild(btn);
     };
-    mk('Alle Personen', null, null);
+    // „Alle" statt „Alle Personen": kürzer, und der Abschnittstitel liefert
+    // den Kontext schon (die Dopplung mit der Ansicht „Alle Fotos" verwirrte).
+    mk('Alle', null, null);
     libraryPersons.forEach(function(name) { mk(name, counts[name] || 0, name); });
   }
 
@@ -1213,7 +1456,8 @@
   /** Alben-Liste in der Sidebar (Desktop-Pendant zum Dropdown). */
   function renderSidebarAlbums() {
     var box = $('sbAlbums');
-    box.hidden = libraryAlbums.length === 0;
+    sbHasAlbums = libraryAlbums.length > 0;
+    box.hidden = !sbHasAlbums || currentView !== 'library';
     var list = $('sbAlbumList');
     list.textContent = '';
     if (libraryAlbums.length === 0) return;
@@ -1238,7 +1482,9 @@
       });
       list.appendChild(btn);
     };
-    mk('Alle Fotos', null, null);
+    // „Alle" statt „Alle Fotos": der Eintrag hebt nur den ALBUM-Filter auf
+    // und ist nicht dasselbe wie die Ansicht „Alle Fotos" oben.
+    mk('Alle', null, null);
     libraryAlbums.forEach(function(album, idx) { mk(album.n, album.ids.length, idx); });
   }
 
@@ -1581,7 +1827,19 @@
   }
 
   /** Wendet Album-, Personen- und Text-Filter auf die Gesamtliste an. */
+  /** Zähler am „Filter"-Knopf: wie viele der EINKLAPPBAREN Filter aktiv sind. */
+  function updateFilterCount() {
+    var n = 0;
+    if (activeFrom || activeTo) n++;
+    if (activeMinStars > 0) n++;
+    n += activeTags.length;
+    var badge = $('filterCount');
+    badge.hidden = n === 0;
+    badge.textContent = String(n);
+  }
+
   function applyFilters() {
+    updateFilterCount();
     var photos = libraryAll;
     if (activeAlbumIndex !== null && libraryAlbums[activeAlbumIndex]) {
       var idSet = {};
@@ -2155,9 +2413,11 @@
 
     albums.forEach(function(album, i) {
       var card = document.createElement('div');
+      // Bewusst KEIN data-reveal mehr (2026-08-22): die Karten wurden beim
+      // Laden gestylt, während die Ansicht noch versteckt war — beim Wechsel
+      // blieben sie dann sekundenlang unsichtbar, bis die Einblend-Animation
+      // durch war. Karten erscheinen jetzt sofort.
       card.className = 'album-card';
-      card.setAttribute('data-reveal', '');
-      card.setAttribute('data-reveal-index', String(Math.min(i + 1, 8)));
 
       var thumbLink = document.createElement('a');
       thumbLink.className = 'album-thumb';
@@ -2224,8 +2484,6 @@
       grid.appendChild(card);
     });
 
-    // Reveal-Animation für Toolbar + frisch gerenderte Karten
-    initReveal($('pageRoot'));
   }
 
   function loadAlbums() {
@@ -2469,6 +2727,48 @@
     }, 250);
   });
 
+  // Auswahl-Leiste: Sterne einmalig aufbauen, Aktionen verkabeln
+  (function() {
+    var stars = $('selStars');
+    for (var s = 1; s <= 5; s++) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = '★';
+      b.title = s + ' Stern(e) für alle ausgewählten Fotos';
+      b.dataset.stars = String(s);
+      stars.appendChild(b);
+    }
+    var none = document.createElement('button');
+    none.type = 'button';
+    none.textContent = '∅';
+    none.title = 'Bewertung bei allen ausgewählten Fotos entfernen';
+    none.dataset.stars = '0';
+    stars.appendChild(none);
+    stars.addEventListener('click', function(e) {
+      var v = e.target && e.target.dataset ? e.target.dataset.stars : null;
+      if (v !== null && v !== undefined) bulkRate(Number(v));
+    });
+  })();
+  $('selTagInput').addEventListener('keydown', function(e) {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); bulkTag(this.value); }
+    else if (e.key === 'Escape') this.blur();
+  });
+  $('selDelete').addEventListener('click', bulkDelete);
+  $('selClear').addEventListener('click', clearSelection);
+
+  // Filter ein-/ausklappen (Zustand bleibt gemerkt)
+  $('filterToggle').addEventListener('click', function() {
+    var open = $('filterMore').hidden; // wird gleich umgedreht
+    $('filterMore').hidden = !open;
+    this.setAttribute('aria-expanded', String(open));
+    try { localStorage.setItem('fotos_filter_offen', open ? '1' : ''); } catch (e) {}
+  });
+  if ((function() { try { return localStorage.getItem('fotos_filter_offen') === '1'; } catch (e) { return false; } })()) {
+    $('filterMore').hidden = false;
+    $('filterToggle').setAttribute('aria-expanded', 'true');
+  }
+
   $('lbClose').addEventListener('click', closeLightbox);
   $('lbDelete').addEventListener('click', deleteCurrentPhoto);
   // Bewerten/Taggen: Stern-Klick setzt die Bewertung, × entfernt einen Tag,
@@ -2501,7 +2801,11 @@
       else if (e.key === 'ArrowRight') { ssShow(ssIndex + 1); ssSchedule(); }
       return;
     }
-    if (lbCurrent < 0) return;
+    if (lbCurrent < 0) {
+      // Esc hebt die Mehrfachauswahl auf (wenn keine Lightbox offen ist)
+      if (e.key === 'Escape' && selected.size > 0) clearSelection();
+      return;
+    }
     if (e.key === 'Escape') closeLightbox();
     else if (e.key === 'ArrowLeft') openLightbox(lbCurrent - 1);
     else if (e.key === 'ArrowRight') openLightbox(lbCurrent + 1);
@@ -2521,8 +2825,10 @@
   initSbSection('sbAlbums', 'sbAlbumsHead', 'fotos_sb_alben_zu');
   initSbSection('sbPersons', 'sbPersonsHead', 'fotos_sb_personen_zu');
 
-  // Glow-Interaktion sofort, Reveal erst nach dem ersten Rendern (renderAlbums)
+  // Glow-Interaktion + EINMALIGES Reveal der Toolbar beim Start — Ansichts-
+  // wechsel animieren seit 2026-08-22 nicht mehr (wirkte träge).
   initGlow($('pageRoot'));
+  initReveal($('pageRoot'));
 
   checkAuth();
 })();

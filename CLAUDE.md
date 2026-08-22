@@ -101,7 +101,7 @@ toolb0x/
 | `/api/fotos/upload/:name` | PUT = Datei als roher Stream hochladen, DELETE = entfernen (requireAdmin) |
 | `/api/fotos/search/status` | KI-Suche: liegen Suchvektoren vor? (requireAdmin) |
 | `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
-| `/api/fotos/edit-request` | POST `{ id, rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange, GET = offene Anzahl (requireAdmin) |
+| `/api/fotos/edit-request` | POST `{ id \| ids: [...], rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange (ids[] max. 500, je Foto ein Marker), GET = offene Anzahl (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -652,6 +652,31 @@ zurückgerollt) — die Wahrheit bleibt der PC. Tag-Validierung beidseitig
 identisch: max. 60 Zeichen, max. 20 je Anfrage, keine Steuerzeichen oder
 `/`\`\\`, Duplikate case-insensitiv. Tests:
 `tests/routes/fotos-edit.test.js`; der Layout-Stub fakt die Route.
+
+**Fotos-UI-Überarbeitung (2026-08-22, Michaels Backlog „Online-Fotooberfläche"):**
+- **Filter einklappbar:** Zeitraum/Bewertung/Tags stecken in `#filterMore`
+  hinter dem „Filter"-Knopf (Zustand in localStorage `fotos_filter_offen`,
+  Zähler aktiver Filter am Knopf via `updateFilterCount()` in applyFilters).
+  Suchzeile + „An diesem Tag" bleiben immer sichtbar.
+- **Mehrfachauswahl:** Häkchen auf jeder Kachel (Hover bzw. dauerhaft bei
+  aktiver Auswahl), Umschalt-Klick wählt Bereiche, Esc hebt auf. Auswahl-
+  Leiste (sticky `#selBar`): Sterne/∅ = Sammel-Bewertung, „+ Tag", Papierkorb
+  mit ZWEISTUFIGER Bestätigung, Aufheben. Aktionen laufen über
+  delete-request (ids[]) und edit-request (ids[], seit heute). Auswahl-Set
+  hält Dateinamen (photo.n), überlebt also Filterwechsel.
+- **Kachel-Infos:** `.tile-info` (Datum + Sterne) beim Überfahren;
+  `.photo-grid button` ist dafür position:relative.
+- **Keine Reveal-Animation mehr bei Ansichtswechseln:** initReveal läuft
+  EINMAL beim Start (Toolbar); die Alben-Karten haben KEIN data-reveal mehr
+  (sie wurden unsichtbar gestylt, solange die Ansicht hidden war → wirkten
+  beim Wechsel sekundenlang leer).
+- **Sidebar kontextbezogen:** ALBEN/PERSONEN nur in „Alle Fotos" sichtbar
+  (showView + sbHasAlbums/sbHasPersons); Reset-Einträge heißen „Alle"
+  statt „Alle Fotos"/„Alle Personen".
+- **Statistik:** `.stats-grid` nutzt CSS-Spalten (columns) statt Grid —
+  unterschiedlich hohe Karten füllen lückenlos; `.stat-card` braucht
+  deshalb break-inside:avoid + margin-bottom.
+- Lightbox-Meta-Zeile (Sterne/Tags) ist zentriert.
 
 > **Fallstrick `hidden` (kostete den Aufräum-Bug):** Eine eigene CSS-Regel
 > wie `.otd-bar { display: flex }` schlägt das `display:none`, das der

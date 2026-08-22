@@ -396,13 +396,20 @@ function cleanEditTags(value) {
   return out;
 }
 
-// POST /api/fotos/edit-request  { id, rating?, addTags?, removeTags? }
+// POST /api/fotos/edit-request  { id | ids: [...], rating?, addTags?, removeTags? }
+// Seit 2026-08-22 auch mit ids[] (Mehrfachauswahl, max. 500 wie delete-request) —
+// dieselbe Änderung wird dann als Marker für JEDES Foto abgelegt.
 router.post('/edit-request', async (req, res) => {
   try {
-    const id = Number(req.body.id);
-    if (!Number.isInteger(id) || id <= 0 || id >= 1e12) {
-      return res.status(400).json({ error: 'Keine gültige Foto-ID.' });
-    }
+    const ids = [];
+    const pushId = (raw) => {
+      const n = Number(raw);
+      if (Number.isInteger(n) && n > 0 && n < 1e12 && ids.length < 500 && !ids.includes(n)) ids.push(n);
+    };
+    if (Array.isArray(req.body.ids)) req.body.ids.forEach(pushId);
+    else pushId(req.body.id);
+    if (ids.length === 0) return res.status(400).json({ error: 'Keine gültige Foto-ID.' });
+
     const hasRating = req.body.rating !== undefined && req.body.rating !== null;
     const rating = hasRating ? Number(req.body.rating) : null;
     if (hasRating && (!Number.isInteger(rating) || rating < 0 || rating > 5)) {
@@ -415,27 +422,29 @@ router.post('/edit-request', async (req, res) => {
     }
 
     await fs.mkdir(EDIT_QUEUE_DIR, { recursive: true });
-    const file = path.join(EDIT_QUEUE_DIR, id + '.json');
+    for (const id of ids) {
+      const file = path.join(EDIT_QUEUE_DIR, id + '.json');
 
-    // Bestehenden Marker einmischen (Read-Modify-Write; ein Nutzer, kein Lock).
-    let marker = {};
-    try {
-      marker = JSON.parse(await fs.readFile(file, 'utf8')) || {};
-    } catch (e) {
-      marker = {};
+      // Bestehenden Marker einmischen (Read-Modify-Write; ein Nutzer, kein Lock).
+      let marker = {};
+      try {
+        marker = JSON.parse(await fs.readFile(file, 'utf8')) || {};
+      } catch (e) {
+        marker = {};
+      }
+      const add = new Set(cleanEditTags(marker.add));
+      const del = new Set(cleanEditTags(marker.del));
+      for (const tag of addTags) { add.add(tag); del.delete(tag); }
+      for (const tag of removeTags) { del.add(tag); add.delete(tag); }
+      const next = {};
+      if (hasRating) next.r = rating;
+      else if (Number.isInteger(marker.r) && marker.r >= 0 && marker.r <= 5) next.r = marker.r;
+      if (add.size > 0) next.add = [...add];
+      if (del.size > 0) next.del = [...del];
+
+      await fs.writeFile(file, JSON.stringify(next));
     }
-    const add = new Set(cleanEditTags(marker.add));
-    const del = new Set(cleanEditTags(marker.del));
-    for (const tag of addTags) { add.add(tag); del.delete(tag); }
-    for (const tag of removeTags) { del.add(tag); add.delete(tag); }
-    const next = {};
-    if (hasRating) next.r = rating;
-    else if (Number.isInteger(marker.r) && marker.r >= 0 && marker.r <= 5) next.r = marker.r;
-    if (add.size > 0) next.add = [...add];
-    if (del.size > 0) next.del = [...del];
-
-    await fs.writeFile(file, JSON.stringify(next));
-    res.json({ queued: true });
+    res.json({ queued: ids.length });
   } catch (error) {
     console.error('Änderungs-Warteschlange fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });

@@ -122,6 +122,25 @@ describe('POST /api/fotos/edit-request', () => {
     assert.equal(res.status, 400);
   });
 
+
+  it('nimmt ids[] für Mehrfachauswahl an und legt je Foto einen Marker an', async () => {
+    const res = await request(app)
+      .post('/api/fotos/edit-request')
+      .set('Cookie', admin.cookie)
+      .send({ ids: [201, 202, 202, 'x', -5], rating: 5, addTags: ['Auswahl'] });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.queued, 2); // 202 dedupliziert, ungültige verworfen
+    assert.deepEqual(readMarker(201), { r: 5, add: ['Auswahl'] });
+    assert.deepEqual(readMarker(202), { r: 5, add: ['Auswahl'] });
+  });
+
+  it('lehnt leere/ungültige ids-Listen ab', async () => {
+    const res = await request(app)
+      .post('/api/fotos/edit-request')
+      .set('Cookie', admin.cookie)
+      .send({ ids: ['abc', 0], rating: 3 });
+    assert.equal(res.status, 400);
+  });
   it('blockt Nicht-Admins', async () => {
     const res = await request(app)
       .post('/api/fotos/edit-request')
@@ -135,6 +154,6 @@ describe('GET /api/fotos/edit-request', () => {
   it('zählt die offenen Marker', async () => {
     const res = await request(app).get('/api/fotos/edit-request').set('Cookie', admin.cookie);
     assert.equal(res.status, 200);
-    assert.equal(res.body.pending, 2); // 42.json und 7.json
+    assert.equal(res.body.pending, 4); // 42, 7 sowie 201/202 aus dem ids[]-Test
   });
 });
