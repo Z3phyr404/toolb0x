@@ -74,7 +74,7 @@ toolb0x/
 
 | URL | Beschreibung |
 |-----|-------------|
-| `/` | **Öffentliche Landing Page** (`public/landing/index.html`) — erklärt das Portal, CTAs → `/portal` bzw. `/portal?register=1` (öffnet direkt den Registrieren-Modus). Eingeloggte Besucher sehen „Zum Portal"-CTAs |
+| `/` | **Landing Page** (`public/landing/index.html`, seit 2026-08-22 bewusst als **privates, nicht-kommerzielles Projekt** formuliert: noindex, Hinweisblock „Privat, nicht öffentlich", kein Marketing-Ton) — Primär-CTA „Anmelden" → `/portal`, Sekundär „Konto anlegen" → `/portal?register=1` (öffnet direkt den Registrieren-Modus). Eingeloggte Besucher sehen „Zum Portal", die Registrieren-Buttons werden ausgeblendet |
 | `/portal` | Tool-Übersicht (HTML mit Nonce) |
 | `/portal/profil` | Profilseite (HTML mit Nonce) |
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |

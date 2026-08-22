@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Toolb0x — Deine Tools. Deine Daten. Verschlüsselt.</title>
-<meta name="description" content="Toolb0x ist dein privates, verschlüsseltes Tool-Portal: Finanzen, Notizen und Passwörter — Zero-Knowledge-verschlüsselt, ohne Werbung, ohne Tracking.">
+<title>Toolb0x — privates Tool-Portal</title>
+<meta name="description" content="Toolb0x ist ein privates, nicht-kommerzielles Tool-Portal für Familie und Freunde: Finanzen, Notizen, Passwörter — Zero-Knowledge-verschlüsselt, ohne Werbung, ohne Tracking.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/shared/fonts.css">
 <link rel="stylesheet" href="/shared/obsidian.css">
 <style nonce="__CSP_NONCE__">
@@ -38,6 +39,20 @@
 .section-label { font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.14em; color:#ff9f43; margin-bottom:12px; }
 .section h2 { font-size:30px; font-weight:700; letter-spacing:-0.02em; margin-bottom:10px; }
 .section-sub { font-size:15px; color:var(--text-2); line-height:1.6; max-width:600px; margin-bottom:34px; }
+
+/* ===== PRIVAT-HINWEIS ===== */
+.notice { display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:stretch; }
+.notice-card { padding:28px; }
+.notice-card h3 { font-size:18px; font-weight:700; margin-bottom:10px; }
+.notice-card p { font-size:14px; color:var(--text-2); line-height:1.65; }
+.notice-card p + p { margin-top:10px; }
+.notice-list { margin:0; padding:0; list-style:none; display:grid; gap:10px; }
+.notice-list li { display:flex; gap:12px; align-items:flex-start; font-size:14px; color:var(--text-2); line-height:1.55; }
+.notice-list .ok, .notice-list .no { flex:0 0 auto; width:22px; height:22px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; margin-top:1px; }
+.notice-list .ok { background:rgba(52,211,153,0.14); color:#34d399; }
+.notice-list .no { background:rgba(255,92,122,0.14); color:#ff7a94; }
+.notice-list strong { color:var(--text); font-weight:600; }
+@media (max-width:760px) { .notice { grid-template-columns:1fr; } }
 
 /* ===== TOOL GRID ===== */
 .tool-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
@@ -120,27 +135,66 @@
 
     <!-- HERO -->
     <section class="hero" data-reveal data-reveal-index="0">
-      <div class="hero-pill">AES-256 · ZERO-KNOWLEDGE · WERBEFREI</div>
-      <h1>Deine Tools. Deine Daten. <em>Nur deine.</em></h1>
+      <div class="hero-pill">PRIVATES PROJEKT · ZERO-KNOWLEDGE · WERBEFREI</div>
+      <h1>Ein privates Portal — <em>kein Produkt.</em></h1>
       <p>
-        Toolb0x bündelt Finanzen, Notizen und Passwörter in einem privaten Portal.
-        Alles wird verschlüsselt, bevor es gespeichert wird — nicht einmal der
-        Betreiber kann deine Daten lesen.
+        Toolb0x ist ein Hobby-Projekt: ein kleines Tool-Portal mit Finanzen,
+        Notizen und Passwörtern, das ich für mich, Familie und Freunde betreibe.
+        Kein kommerzieller Dienst, keine Werbung, kein Tracking. Wer mitmachen
+        möchte, kann sich anmelden oder ein Konto anlegen.
       </p>
       <div class="hero-cta">
-        <a href="/portal?register=1" class="btn-cta" id="heroCta">Kostenlos registrieren</a>
-        <a href="/portal" class="btn-ghost">Anmelden</a>
+        <a href="/portal" class="btn-cta" id="heroCta">Anmelden</a>
+        <a href="/portal?register=1" class="btn-ghost" id="heroRegister">Konto anlegen</a>
       </div>
-      <div class="hero-trust">Keine Werbung · Kein Tracking · Keine Datenweitergabe</div>
+      <div class="hero-trust">Privat betrieben · Keine Werbung · Kein Tracking · Keine Datenweitergabe</div>
+    </section>
+
+    <!-- PRIVATES PROJEKT -->
+    <section class="section">
+      <div class="section-label" data-reveal data-reveal-index="1">// WORUM ES GEHT</div>
+      <h2 data-reveal data-reveal-index="1">Privat, nicht öffentlich</h2>
+      <p class="section-sub" data-reveal data-reveal-index="1">
+        Die Seite ist zwar erreichbar, Toolb0x ist aber kein Angebot an die
+        Allgemeinheit. Damit klar ist, worauf du dich einlässt:
+      </p>
+      <div class="notice">
+        <div class="ob-card notice-card" data-reveal data-reveal-index="2">
+          <h3>Ein Portal für den eigenen Bedarf</h3>
+          <p>
+            Toolb0x ist aus dem Wunsch entstanden, die eigenen Finanzen, Notizen
+            und Passwörter an einem Ort zu haben — verschlüsselt und ohne einen
+            Dienst, der mit den Daten etwas anfängt. Es wird von einer Privatperson
+            in der Freizeit entwickelt und betrieben.
+          </p>
+          <p>
+            Registrieren darf, wer das Portal kennt und nutzen möchte — in erster
+            Linie Familie, Freunde und Bekannte. Es gibt keinen Support, keine
+            Verfügbarkeitsgarantie und kein Bezahlmodell. Das Konto lässt sich
+            jederzeit wieder löschen.
+          </p>
+        </div>
+        <div class="ob-card notice-card" data-reveal data-reveal-index="3">
+          <h3>Kurz gesagt</h3>
+          <ul class="notice-list">
+            <li><span class="ok">✓</span><span><strong>Anmelden &amp; Konto anlegen</strong> sind möglich — ohne Bestätigungs-Mail.</span></li>
+            <li><span class="ok">✓</span><span><strong>Zero-Knowledge:</strong> Inhalte werden mit deinem Passwort verschlüsselt, der Server sieht nur Chiffretext.</span></li>
+            <li><span class="ok">✓</span><span><strong>Kostenlos, werbefrei,</strong> keine Weitergabe von Daten.</span></li>
+            <li><span class="no">×</span><span><strong>Kein kommerzieller Dienst,</strong> kein Support, kein SLA.</span></li>
+            <li><span class="no">×</span><span><strong>Keine Verfügbarkeitsgarantie</strong> — Wartungen und Ausfälle kommen ohne Ankündigung.</span></li>
+            <li><span class="no">×</span><span><strong>Nicht für Dritte gedacht,</strong> die den Betreiber nicht kennen — Nutzung auf eigene Verantwortung.</span></li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <!-- TOOLS -->
     <section class="section">
-      <div class="section-label" data-reveal data-reveal-index="1">// WERKZEUGE</div>
+      <div class="section-label" data-reveal data-reveal-index="1">// WAS DRIN IST</div>
       <h2 data-reveal data-reveal-index="1">Ein Login, alle Tools</h2>
       <p class="section-sub" data-reveal data-reveal-index="1">
-        Einmal anmelden, alles nutzen. Jedes Werkzeug arbeitet mit denselben
-        verschlüsselten Daten — ohne Extra-Konten, ohne Abo.
+        Die Werkzeuge, die im Alltag gebraucht werden — einmal anmelden, alles
+        nutzen. Jedes Tool arbeitet mit denselben verschlüsselten Daten.
       </p>
       <div class="tool-grid">
         <div class="ob-card tool-card" data-reveal data-reveal-index="2">
@@ -229,14 +283,14 @@
 
     <!-- STEPS -->
     <section class="section">
-      <div class="section-label" data-reveal data-reveal-index="1">// LOSLEGEN</div>
-      <h2 data-reveal data-reveal-index="1">In einer Minute startklar</h2>
-      <p class="section-sub" data-reveal data-reveal-index="1">Kein Setup, keine App-Installation — Toolb0x läuft im Browser.</p>
+      <div class="section-label" data-reveal data-reveal-index="1">// SO KOMMST DU REIN</div>
+      <h2 data-reveal data-reveal-index="1">Anmelden oder Konto anlegen</h2>
+      <p class="section-sub" data-reveal data-reveal-index="1">Toolb0x läuft im Browser — nichts zu installieren. Wer schon ein Konto hat, meldet sich einfach an.</p>
       <div class="steps">
         <div class="ob-card step" data-reveal data-reveal-index="2">
           <div class="step-num">SCHRITT 01</div>
-          <h3>Konto erstellen</h3>
-          <p>Name, E-Mail, Passwort — mehr braucht es nicht. Keine Bestätigungs-Mail, kein Warten.</p>
+          <h3>Konto anlegen</h3>
+          <p>Name, E-Mail, Passwort — mehr braucht es nicht. Keine Bestätigungs-Mail, kein Warten. Bestehende Konten melden sich direkt an.</p>
         </div>
         <div class="ob-card step" data-reveal data-reveal-index="3">
           <div class="step-num">SCHRITT 02</div>
@@ -245,22 +299,25 @@
         </div>
         <div class="ob-card step" data-reveal data-reveal-index="4">
           <div class="step-num">SCHRITT 03</div>
-          <h3>Loslegen</h3>
-          <p>Erste Ausgabe eintragen, Notiz anlegen oder Passwörter importieren — alles ab Sekunde eins verschlüsselt.</p>
+          <h3>Nutzen</h3>
+          <p>Ausgabe eintragen, Notiz anlegen oder Passwörter importieren — alles ab dem ersten Eintrag verschlüsselt.</p>
         </div>
       </div>
     </section>
 
     <!-- BOTTOM CTA -->
     <section class="bottom-cta" data-reveal data-reveal-index="1">
-      <h2>Bereit für dein privates Portal?</h2>
-      <p>Kostenlos, werbefrei und in unter einer Minute eingerichtet.</p>
-      <a href="/portal?register=1" class="btn-cta" id="bottomCta">Jetzt Konto erstellen</a>
+      <h2>Mitmachen? Gern — ohne Versprechen.</h2>
+      <p>Toolb0x bleibt ein privates Projekt: kostenlos, werbefrei, ohne Garantie. Wer das in Ordnung findet, ist willkommen.</p>
+      <div class="hero-cta">
+        <a href="/portal" class="btn-cta" id="bottomCta">Anmelden</a>
+        <a href="/portal?register=1" class="btn-ghost" id="bottomRegister">Konto anlegen</a>
+      </div>
     </section>
 
     <!-- FOOTER -->
     <footer class="footer">
-      <span>© 2026 Toolb0x — privates Projekt</span>
+      <span>© 2026 Toolb0x — privates, nicht-kommerzielles Projekt</span>
       <span class="footer-links">
         <a href="/impressum">Impressum</a>
         <span>·</span>
@@ -279,12 +336,15 @@ fetch('/api/auth/me', { credentials: 'include' })
   .then(function (res) { if (!res.ok) throw new Error(); return res.json(); })
   .then(function () {
     document.getElementById('topbarLogin').textContent = 'Zum Portal';
-    var hero = document.getElementById('heroCta');
-    hero.textContent = 'Zum Portal';
-    hero.href = '/portal';
-    var bottom = document.getElementById('bottomCta');
-    bottom.textContent = 'Zum Portal';
-    bottom.href = '/portal';
+    ['heroCta', 'bottomCta'].forEach(function (id) {
+      var el = document.getElementById(id);
+      el.textContent = 'Zum Portal';
+      el.href = '/portal';
+    });
+    // Eingeloggt ergibt „Konto anlegen" keinen Sinn mehr
+    ['heroRegister', 'bottomRegister'].forEach(function (id) {
+      document.getElementById(id).style.display = 'none';
+    });
   })
   .catch(function () { /* nicht eingeloggt — Standard-CTAs */ });
 
