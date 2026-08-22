@@ -412,3 +412,155 @@ describe('DELETE /api/expenses — Löschschutz', () => {
     assert.equal(res.body.expenses.length, 0, 'Gelöschte Ausgabe darf nicht zurückkommen');
   });
 });
+
+// ============================================================
+// TAGESDATUM (spentOn, 2026-08-22)
+// ============================================================
+describe('spentOn — Tagesdatum je Ausgabe', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+    seedCategory();
+  });
+
+  it('speichert das Datum und liefert es wieder aus', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Tanken', amount: 72.4, categoryId: testCategoryId, month: '2026-08', spentOn: '2026-08-11', isRecurring: false });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.expense.spentOn, '2026-08-11');
+  });
+
+  it('lehnt ein Datum außerhalb des Monats ab', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Tanken', amount: 72.4, categoryId: testCategoryId, month: '2026-08', spentOn: '2026-09-01', isRecurring: false });
+    assert.equal(res.status, 400);
+  });
+
+  it('lehnt ungültige Datumsformate ab', async () => {
+    for (const bad of ['11.08.2026', '2026-8-1', '2026-08-32']) {
+      const res = await request(app)
+        .post('/api/expenses')
+        .set('Cookie', auth.cookie)
+        .send({ name: 'X', amount: 1, categoryId: testCategoryId, month: '2026-08', spentOn: bad });
+      assert.equal(res.status, 400, 'spentOn=' + bad);
+    }
+  });
+
+  it('leeres/fehlendes Datum wird zu null', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Bar', amount: 12, categoryId: testCategoryId, month: '2026-08', spentOn: '', isRecurring: false });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.expense.spentOn, null);
+  });
+
+  it('Auto-Copy überträgt den Tag in den neuen Monat (gekappt auf Monatslänge)', async () => {
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-01' });
+    const rec = mockPrisma._store.expenses[0];
+    rec.spentOn = '2026-01-31';
+
+    const res = await request(app)
+      .get('/api/expenses?month=2026-02')
+      .set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.expenses.length, 1);
+    // Februar 2026 hat 28 Tage -> aus dem 31. wird der 28.
+    assert.equal(res.body.expenses[0].spentOn, '2026-02-28');
+  });
+
+  it('PUT kann das Datum entfernen (leerer Wert)', async () => {
+    seedExpense({ name: 'Kino', amount: 20, month: '2026-08', isRecurring: false });
+    const id = mockPrisma._store.expenses[0].id;
+    mockPrisma._store.expenses[0].spentOn = '2026-08-16';
+
+    const res = await request(app)
+      .put('/api/expenses/' + id)
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Kino', amount: 20, categoryId: testCategoryId, month: '2026-08', spentOn: '', isRecurring: false });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.expense.spentOn, null);
+  });
+});
+
+// ============================================================
+// VERLAUF (GET /api/expenses/history, 2026-08-22)
+// ============================================================
+describe('GET /api/expenses/history — Monatsverlauf', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+    seedCategory();
+  });
+
+  it('aggregiert Ausgaben und Einnahmen je Monat (entschlüsselt)', async () => {
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-07' });
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-08' });
+    seedExpense({ name: 'Kino', amount: 20, month: '2026-08', isRecurring: false });
+    mockPrisma._store.incomes.push({
+      id: crypto.randomUUID(),
+      name: encrypt('Gehalt', auth.encryptionKey),
+      amount: encrypt('3000', auth.encryptionKey),
+      month: '2026-08',
+      isRecurring: true,
+      userId: auth.userId,
+    });
+
+    const res = await request(app)
+      .get('/api/expenses/history?months=3&month=2026-08')
+      .set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.months.length, 3);
+    assert.deepEqual(res.body.months.map(m => m.month), ['2026-06', '2026-07', '2026-08']);
+    const aug = res.body.months[2];
+    assert.equal(aug.expenses, 660);
+    assert.equal(aug.income, 3000);
+    assert.equal(res.body.months[1].expenses, 640);
+    assert.equal(res.body.months[0].expenses, 0);
+    // Kategoriesumme über das Fenster, Name entschlüsselt
+    assert.equal(res.body.byCategory.length, 1);
+    assert.equal(res.body.byCategory[0].name, 'Wohnen');
+    assert.equal(res.body.byCategory[0].total, 1300);
+    assert.equal(res.body.byCategory[0].count, 3);
+  });
+
+  it('liefert KEINE Einzelposten und keine fremden Nutzerdaten', async () => {
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-08' });
+    // Fremder Nutzer mit eigener Ausgabe im selben Monat
+    const other = createTestAuth(mockPrisma);
+    mockPrisma._store.expenses.push({
+      id: crypto.randomUUID(),
+      name: encrypt('Fremd', other.encryptionKey),
+      amount: encrypt('999', other.encryptionKey),
+      categoryId: null,
+      tags: '',
+      month: '2026-08',
+      isRecurring: false,
+      userId: other.userId,
+    });
+
+    const res = await request(app)
+      .get('/api/expenses/history?months=3&month=2026-08')
+      .set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.months[2].expenses, 640, 'nur eigene Ausgaben');
+    assert.ok(!('expenses' in res.body) || Array.isArray(res.body.expenses) === false, 'keine Einzelposten-Liste');
+  });
+
+  it('kappt months auf 3–24 und prüft das Monatsformat', async () => {
+    const res = await request(app)
+      .get('/api/expenses/history?months=999&month=2026-08')
+      .set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.months.length, 24);
+
+    const bad = await request(app)
+      .get('/api/expenses/history?month=august')
+      .set('Cookie', auth.cookie);
+    assert.equal(bad.status, 400);
+  });
+});

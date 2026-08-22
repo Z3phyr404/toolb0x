@@ -39,15 +39,59 @@ const API = {
     createdAt: '2026-06-01T00:00:00.000Z',
   })) },
   '/api/servers': { servers: [] },
-  '/api/reminders/upcoming': { reminders: [] },
-  '/api/reminders': { reminders: [] },
-  '/api/expenses': { expenses: [] },
-  '/api/income': { incomes: [] },
+  // Finanz-App (2026-08-22): realistischer Monat, damit Dashboard/Listen
+  // beim UI-Check gefüllt sind (vorher leere Arrays -> leere App).
+  '/api/reminders/upcoming': { reminders: [
+    { id: 'r1', note: 'Kündigungsfrist Fitnessstudio', reminderDate: '2026-08-25T00:00:00.000Z', daysBefore: 7, status: 'pending', expenseId: 'e9' },
+  ] },
+  '/api/reminders': { reminders: [
+    { id: 'r1', note: 'Kündigungsfrist Fitnessstudio', reminderDate: '2026-08-25T00:00:00.000Z', daysBefore: 7, status: 'pending', expenseId: 'e9' },
+    { id: 'r2', note: 'Handyvertrag prüfen', reminderDate: '2026-11-30T00:00:00.000Z', daysBefore: 14, status: 'pending', expenseId: 'e10' },
+  ] },
+  '/api/expenses': { expenses: [
+    { id: 'e1', name: 'Miete', amount: '1180', categoryId: 'c1', spentOn: '2026-08-01', tags: ['Fixkosten'], isRecurring: true },
+    { id: 'e2', name: 'Strom (Grundversorger)', amount: '84.50', categoryId: 'c1', spentOn: '2026-08-05', tags: ['Fixkosten'], isRecurring: true },
+    { id: 'e3', name: 'Internet & Festnetz', amount: '44.99', categoryId: 'c1', spentOn: '2026-08-03', tags: ['Fixkosten'], isRecurring: true },
+    { id: 'e4', name: 'Wocheneinkauf Rewe', amount: '86.32', categoryId: 'c2', spentOn: '2026-08-08', tags: [], isRecurring: false },
+    { id: 'e5', name: 'Wocheneinkauf Aldi', amount: '54.11', categoryId: 'c2', spentOn: '2026-08-15', tags: [], isRecurring: false },
+    { id: 'e6', name: 'Tanken', amount: '72.40', categoryId: 'c3', spentOn: '2026-08-11', tags: ['Auto'], isRecurring: false },
+    { id: 'e7', name: 'KFZ-Versicherung', amount: '61.20', categoryId: 'c3', spentOn: '2026-08-02', tags: ['Auto', 'Fixkosten'], isRecurring: true },
+    { id: 'e8', name: 'Kino + Essen', amount: '58', categoryId: 'c4', spentOn: '2026-08-16', tags: ['Nicole'], isRecurring: false },
+    { id: 'e9', name: 'Fitnessstudio', amount: '29.90', categoryId: 'c4', spentOn: '2026-08-01', tags: ['Abo'], isRecurring: true },
+    { id: 'e10', name: 'Handyvertrag', amount: '19.99', categoryId: 'c1', spentOn: '2026-08-04', tags: ['Abo', 'Fixkosten'], isRecurring: true },
+    { id: 'e11', name: 'Neue Wanderschuhe', amount: '139.95', categoryId: 'c5', spentOn: '2026-08-19', tags: ['Urlaub'], isRecurring: false },
+    { id: 'e12', name: 'Streaming (Netflix + Spotify)', amount: '22.98', categoryId: 'c4', spentOn: '2026-08-06', tags: ['Abo'], isRecurring: true },
+  ] },
+  '/api/income': { incomes: [
+    { id: 'i1', name: 'Gehalt', amount: '3240', isRecurring: true },
+    { id: 'i2', name: 'Ebay-Verkauf Objektiv', amount: '180', isRecurring: false },
+  ] },
+  // Verlauf-Seite (2026-08-22): 12 Monate mit plausiblen Schwankungen
+  '/api/expenses/history': { months: (function() {
+    const out = [];
+    let y = 2025, m = 9;
+    const exp = [1712, 1834, 2210, 1903, 1788, 2405, 1690, 1750, 1980, 2120, 1810, 1854];
+    const inc = [3240, 3240, 3420, 3240, 3240, 3560, 3240, 3240, 3240, 3420, 3240, 3420];
+    for (let i = 0; i < 12; i++) {
+      out.push({ month: y + '-' + String(m).padStart(2, '0'), expenses: exp[i], income: inc[i] });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return out;
+  })(), byCategory: [
+    { id: 'c1', name: 'Wohnen & Grund', color: '#FF9500', total: 15940.5, count: 60 },
+    { id: 'c2', name: 'Lebensmittel', color: '#34C759', total: 3480.2, count: 74 },
+    { id: 'c3', name: 'Mobilität', color: '#5AC8FA', total: 1610.4, count: 25 },
+    { id: 'c4', name: 'Freizeit & Abos', color: '#AF52DE', total: 1333.1, count: 38 },
+    { id: 'c5', name: 'Sparen & Anschaffungen', color: '#FFCC00', total: 980, count: 7 },
+  ] },
   '/api/share': { shares: [] },
   '/api/notes': { notes: [] },
   '/api/categories': { categories: [
-    { id: 'c1', name: 'Wohnen & Grund', color: '#FF9500', _count: { expenses: 0 } },
-    { id: 'c2', name: 'Lebensmittel', color: '#34C759', _count: { expenses: 0 } },
+    { id: 'c1', name: 'Wohnen & Grund', color: '#FF9500', _count: { expenses: 5 } },
+    { id: 'c2', name: 'Lebensmittel', color: '#34C759', _count: { expenses: 2 } },
+    { id: 'c3', name: 'Mobilität', color: '#5AC8FA', _count: { expenses: 2 } },
+    { id: 'c4', name: 'Freizeit & Abos', color: '#AF52DE', _count: { expenses: 3 } },
+    { id: 'c5', name: 'Sparen & Anschaffungen', color: '#FFCC00', _count: { expenses: 1 } },
   ] },
   '/api/admin/stats': { userCount: 1, newestUser: { name: 'Michael Test', createdAt: '2026-01-01T00:00:00.000Z' } },
   '/api/admin/users': { users: [

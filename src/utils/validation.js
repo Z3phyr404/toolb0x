@@ -95,6 +95,15 @@ function validateExpense(data) {
     errors.push('Ungültiges Monatsformat. Erwartet: YYYY-MM (z.B. 2026-02).');
   }
 
+  // Tagesdatum (optional, Format: YYYY-MM-DD) — muss im angegebenen Monat liegen
+  if (data.spentOn !== undefined && data.spentOn !== null && data.spentOn !== '') {
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(data.spentOn)) {
+      errors.push('Ungültiges Datum. Erwartet: YYYY-MM-DD (z.B. 2026-08-22).');
+    } else if (data.month && !data.spentOn.startsWith(data.month + '-')) {
+      errors.push('Das Datum muss im gewählten Monat liegen.');
+    }
+  }
+
   // Tags (optional)
   if (data.tags !== undefined && data.tags !== null) {
     if (!Array.isArray(data.tags)) {

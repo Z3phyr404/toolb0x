@@ -89,6 +89,9 @@ model Expense {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   month       String  @default("2026-02")  // NICHT verschlüsselt (für DB-Queries)
+  // Tagesdatum "YYYY-MM-DD" (optional; NICHT verschlüsselt, wie month —
+  // Kalenderdaten ohne Betrags-/Namensbezug). Bestandsdaten bleiben null.
+  spentOn     String?
   isRecurring Boolean @default(true)
 
   reminders Reminder[]

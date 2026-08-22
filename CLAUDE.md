@@ -190,6 +190,9 @@ userId → User (Cascade Delete)
 ```
 id (UUID), name (enc), amount (enc, String), categoryId → Category
 tags (enc, JSON-Array als String, default ""), month (YYYY-MM, nicht enc)
+spentOn (YYYY-MM-DD oder null, nicht enc — Tagesdatum, seit 2026-08-22;
+  muss im month liegen, Bestandsdaten sind null; Auto-Copy/Propagation
+  übertragen den Tag in den Zielmonat, gekappt auf Monatslänge (carryDay))
 isRecurring (Boolean), userId → User (Cascade Delete)
 Index: [userId, month]
 → hat: reminders[]
@@ -287,8 +290,12 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 ### Expenses (`/api/expenses/`)
 - GET `/?month=YYYY-MM` — Ausgaben für Monat
 - GET `/summary?month=YYYY-MM` — Dashboard-Daten (Summen, Kategorien)
-- POST `/` — Neue Ausgabe
-- PUT `/:id` — Ausgabe bearbeiten
+- GET `/history?months=N&month=YYYY-MM` — Monatsverlauf (2026-08-22): je Monat
+  Ausgaben-/Einnahmensumme + Kategoriesummen übers Fenster (N 3–24, Default 12,
+  Ende = month oder aktueller Monat). Entschlüsselt serverseitig, gibt NUR
+  Summen zurück, keine Einzelposten. MUSS vor /:id registriert bleiben.
+- POST `/` — Neue Ausgabe (optional `spentOn`)
+- PUT `/:id` — Ausgabe bearbeiten (`spentOn` mitschicken, sonst bleibt alt; leer = entfernen)
 - DELETE `/:id` — Ausgabe löschen
 
 ### Income (`/api/income/`)
@@ -657,6 +664,29 @@ identisch: max. 60 Zeichen, max. 20 je Anfrage, keine Steuerzeichen oder
 > `public/apps/fotos/index.html` gesetzt).
 
 ---
+
+## Finanz-App: Überarbeitung 2026-08-22 (Michaels „noch nicht zufrieden")
+
+Drei Pakete in `public/apps/finanzen/index.html` + Routen:
+- **Datum & Filter:** Tagesdatum je Ausgabe (Feld `spentOn`, Migration
+  `20260822120000_add_expense_spent_on`), Datum-Spalte mit sortierbaren
+  Spaltenköpfen (Standard: Datum absteigend, Einträge ohne Datum ans Ende),
+  Datumsfeld im Dialog (auf den gewählten Monat begrenzt, heute vorbelegt),
+  Kategorie-Chips über der Ausgabenliste („Alle" + je Kategorie mit Summe),
+  Klick auf die Donut-Legende im Dashboard springt gefiltert in die Liste.
+- **Verlauf:** Neue Seite (Sidebar „Verlauf"): 12-Monats-Chart Einnahmen/
+  Ausgaben (gruppierte Balken, Hover-Tooltip je Monat mit Saldo), KPIs
+  (Summen + Ø), Kategoriesummen übers Fenster. Endpunkt
+  `GET /api/expenses/history`. Chart-Farben `--hist-income:#059669` /
+  `--hist-expense:#f43f5e` sind mit dem dataviz-Palette-Validator gegen die
+  dunkle Fläche geprüft (Rot-Grün-Schwäche!) — bei Änderungen neu validieren.
+- **Politur:** „Wiederkehrend" im Dialog NICHT mehr vorausgewählt (Ausgaben
+  UND Einnahmen), Seitenwechsel scrollt nach oben (und main hat bewusst KEIN
+  scroll-behavior:smooth mehr), Reveal-Animation nur noch beim App-Start
+  (nicht mehr je Seitenwechsel), Beträge in der Tabelle neutral statt in
+  Kategoriefarbe + nowrap, `.bar-fill` braucht `display:block` (war inline
+  → width/height wirkungslos), unter 1500px wird die Anteil-Spalte
+  ausgeblendet (nth-child(5) — bei Spaltenänderungen mitzählen!).
 
 ## Wichtige Designentscheidungen
 

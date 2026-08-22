@@ -38,6 +38,21 @@ function prevMonth(ym) {
   return `${newY}-${String(newM).padStart(2, '0')}`;
 }
 
+// Tagesdatum in einen anderen Monat übertragen (Tag beibehalten, auf die
+// Monatslänge gekappt — aus "…-31" wird im Februar "…-28"/"…-29").
+function carryDay(spentOn, targetMonth) {
+  if (!spentOn) return null;
+  const day = Number(spentOn.slice(8, 10));
+  const [y, m] = targetMonth.split('-').map(Number);
+  const maxDay = new Date(y, m, 0).getDate();
+  return `${targetMonth}-${String(Math.min(day, maxDay)).padStart(2, '0')}`;
+}
+
+// spentOn aus dem Request lesen: leer/fehlend -> null (Validierung lief schon).
+function readSpentOn(body) {
+  return body.spentOn ? body.spentOn : null;
+}
+
 // GET /api/expenses/summary — MUSS vor /:id stehen!
 router.get('/summary', async (req, res) => {
   try {
@@ -120,6 +135,81 @@ router.get('/summary', async (req, res) => {
 });
 
 // ============================================================
+// GET /api/expenses/history?months=12 — Monatsverlauf (MUSS vor /:id stehen!)
+// ============================================================
+// Aggregiert die letzten N Monate (Ende = ?month oder aktueller Monat):
+// je Monat Ausgaben- und Einnahmensumme, dazu Kategoriesummen über das
+// ganze Fenster. Beträge sind verschlüsselt — die Aggregation entschlüsselt
+// serverseitig (Einzelnutzer-Datenmengen, unkritisch). Es werden KEINE
+// Einzelposten zurückgegeben, nur Summen.
+router.get('/history', async (req, res) => {
+  try {
+    const n = Math.min(24, Math.max(3, parseInt(req.query.months, 10) || 12));
+    const endMonth = req.query.month || new Date().toISOString().slice(0, 7);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(endMonth)) {
+      return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
+    }
+    const monthList = [endMonth];
+    while (monthList.length < n) monthList.unshift(prevMonth(monthList[0]));
+
+    const [rawExpenses, rawIncomes] = await Promise.all([
+      prisma.expense.findMany({
+        where: { userId: req.userId, month: { in: monthList } },
+        include: { category: { select: { id: true, name: true, color: true } } },
+      }),
+      prisma.income.findMany({
+        where: { userId: req.userId, month: { in: monthList } },
+      }),
+    ]);
+
+    const key = req.encryptionKey;
+    const parseAmount = (enc) => {
+      const num = parseFloat(decrypt(enc, key));
+      return isNaN(num) ? 0 : num;
+    };
+
+    const perMonth = {};
+    for (const m of monthList) perMonth[m] = { month: m, expenses: 0, income: 0 };
+    const byCategory = {};
+    const catNames = {}; // Kategorie nur EINMAL entschlüsseln
+
+    for (const e of rawExpenses) {
+      const amount = parseAmount(e.amount);
+      perMonth[e.month].expenses += amount;
+      if (e.category) {
+        if (!catNames[e.category.id]) {
+          catNames[e.category.id] = {
+            id: e.category.id,
+            name: decrypt(e.category.name, key),
+            color: decrypt(e.category.color, key),
+          };
+        }
+        const cat = catNames[e.category.id];
+        if (!byCategory[cat.id]) byCategory[cat.id] = { ...cat, total: 0, count: 0 };
+        byCategory[cat.id].total += amount;
+        byCategory[cat.id].count += 1;
+      }
+    }
+    for (const i of rawIncomes) perMonth[i.month].income += parseAmount(i.amount);
+
+    const round2 = (v) => Math.round(v * 100) / 100;
+    res.json({
+      months: monthList.map((m) => ({
+        month: m,
+        expenses: round2(perMonth[m].expenses),
+        income: round2(perMonth[m].income),
+      })),
+      byCategory: Object.values(byCategory)
+        .map((c) => ({ ...c, total: round2(c.total) }))
+        .sort((a, b) => b.total - a.total),
+    });
+  } catch (error) {
+    console.error('Verlauf fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Der Verlauf konnte nicht geladen werden.' });
+  }
+});
+
+// ============================================================
 // GET /api/expenses
 // Lädt Ausgaben für den Monat.
 // Falls keine existieren: wiederkehrende aus dem letzten
@@ -181,6 +271,7 @@ router.get('/', async (req, res) => {
             tags: e.tags,           // bleibt verschlüsselt
             userId: e.userId,
             month,
+            spentOn: carryDay(e.spentOn, month), // gleicher Tag im neuen Monat
             isRecurring: true,
           })),
         });
@@ -257,6 +348,7 @@ router.post('/', async (req, res) => {
         tags: encryptedTags,
         userId: req.userId,
         month,
+        spentOn: readSpentOn(req.body),
         isRecurring: req.body.isRecurring !== false,
       },
       include: { category: { select: { id: true, name: true, color: true } } },
@@ -277,6 +369,7 @@ router.post('/', async (req, res) => {
             tags: expense.tags,
             userId: expense.userId,
             month: fi.month,
+            spentOn: carryDay(expense.spentOn, fi.month),
             isRecurring: true,
           })),
         });
@@ -324,6 +417,7 @@ router.put('/:id', async (req, res) => {
         categoryId: req.body.categoryId,
         tags: encryptedTags,
         month: req.body.month || existing.month,
+        spentOn: req.body.spentOn !== undefined ? readSpentOn(req.body) : existing.spentOn,
         isRecurring: req.body.isRecurring ?? existing.isRecurring,
       },
       include: { category: { select: { id: true, name: true, color: true } } },
