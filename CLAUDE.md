@@ -82,8 +82,6 @@ toolb0x/
 | `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
 | `/app/fotos` | Fotos-Übersicht (nur für Admins, HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
-| `/impressum` | **Öffentlich.** Impressum (`public/legal/impressum.html`) — enthält noch Platzhalter |
-| `/datenschutz` | **Öffentlich.** Datenschutzerklärung (`public/legal/datenschutz.html`) — technische Angaben stimmen, juristische Prüfung offen |
 | `/s` | **Öffentliche** View-Seite für geteilte Links (KEIN Login, KEIN Portal-Redirect) — Schlüssel steht im URL-Fragment `#<token>~<key>` |
 | `/api/auth/*` | Auth-API |
 | `/api/categories/*` | Kategorien-API |

@@ -189,14 +189,6 @@ app.get('/s', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'share', 'index.html')
 ));
 
-// Rechtsseiten — öffentlich, müssen ohne Login erreichbar sein
-app.get('/impressum', serveHtmlWithNonce(
-  path.join(__dirname, 'public', 'legal', 'impressum.html')
-));
-app.get('/datenschutz', serveHtmlWithNonce(
-  path.join(__dirname, 'public', 'legal', 'datenschutz.html')
-));
-
 // 404 für API
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API-Route nicht gefunden.' });

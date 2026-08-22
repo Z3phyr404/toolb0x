@@ -198,8 +198,6 @@ const PAGES = {
   '/app/fotos': '/apps/fotos/index.html',
   '/app/notizen': '/apps/notizen/index.html',
   '/s': '/share/index.html',
-  '/impressum': '/legal/impressum.html',
-  '/datenschutz': '/legal/datenschutz.html',
 };
 
 const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.txt': 'text/plain' };
