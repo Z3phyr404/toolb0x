@@ -361,6 +361,102 @@ router.get('/delete-request', async (req, res) => {
 });
 
 // ============================================================
+// Änderungs-Warteschlange (2026-08-22) — Bewerten/Taggen im Web -> PC
+// ============================================================
+// Gleiche Idee wie die Lösch-Warteschlange: „Alle Fotos" bleibt eine
+// schreibgeschützte Kopie, der PC ist die Wahrheit. Bewertungen und Tags
+// aus der Lightbox landen als Marker-Datei "<assetId>.json" unter
+// fotos-privat/edit-queue ({ r: 0-5, add: [...], del: [...] }); fotob0x
+// holt die Marker per SFTP ab, schreibt Bewertung/Stichwörter in seine
+// Datenbank und löscht die Marker. Mehrere Änderungen am selben Foto
+// werden hier in EINEN Marker gemischt (letzte Bewertung gewinnt,
+// add/del heben sich gegenseitig auf).
+const EDIT_QUEUE_DIR = path.join(PRIVAT_DIR, 'edit-queue');
+
+// Tags: sichtbare Zeichen, keine Steuerzeichen/Pfade, wie fotob0x sie kennt.
+const EDIT_TAG_MAX_LEN = 60;
+const EDIT_TAGS_MAX = 20;
+
+function cleanEditTags(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of value) {
+    if (typeof raw !== 'string') continue;
+    const tag = raw.replace(/\s+/g, ' ').trim();
+    if (!tag || tag.length > EDIT_TAG_MAX_LEN) continue;
+    // eslint-disable-next-line no-control-regex
+    if (/[\x00-\x1f\x7f/\\]/.test(tag)) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= EDIT_TAGS_MAX) break;
+  }
+  return out;
+}
+
+// POST /api/fotos/edit-request  { id, rating?, addTags?, removeTags? }
+router.post('/edit-request', async (req, res) => {
+  try {
+    const id = Number(req.body.id);
+    if (!Number.isInteger(id) || id <= 0 || id >= 1e12) {
+      return res.status(400).json({ error: 'Keine gültige Foto-ID.' });
+    }
+    const hasRating = req.body.rating !== undefined && req.body.rating !== null;
+    const rating = hasRating ? Number(req.body.rating) : null;
+    if (hasRating && (!Number.isInteger(rating) || rating < 0 || rating > 5)) {
+      return res.status(400).json({ error: 'Die Bewertung muss zwischen 0 und 5 Sternen liegen.' });
+    }
+    const addTags = cleanEditTags(req.body.addTags);
+    const removeTags = cleanEditTags(req.body.removeTags);
+    if (!hasRating && addTags.length === 0 && removeTags.length === 0) {
+      return res.status(400).json({ error: 'Keine Änderung angegeben.' });
+    }
+
+    await fs.mkdir(EDIT_QUEUE_DIR, { recursive: true });
+    const file = path.join(EDIT_QUEUE_DIR, id + '.json');
+
+    // Bestehenden Marker einmischen (Read-Modify-Write; ein Nutzer, kein Lock).
+    let marker = {};
+    try {
+      marker = JSON.parse(await fs.readFile(file, 'utf8')) || {};
+    } catch (e) {
+      marker = {};
+    }
+    const add = new Set(cleanEditTags(marker.add));
+    const del = new Set(cleanEditTags(marker.del));
+    for (const tag of addTags) { add.add(tag); del.delete(tag); }
+    for (const tag of removeTags) { del.add(tag); add.delete(tag); }
+    const next = {};
+    if (hasRating) next.r = rating;
+    else if (Number.isInteger(marker.r) && marker.r >= 0 && marker.r <= 5) next.r = marker.r;
+    if (add.size > 0) next.add = [...add];
+    if (del.size > 0) next.del = [...del];
+
+    await fs.writeFile(file, JSON.stringify(next));
+    res.json({ queued: true });
+  } catch (error) {
+    console.error('Änderungs-Warteschlange fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// GET /api/fotos/edit-request — offene Anzahl (für die UI)
+router.get('/edit-request', async (req, res) => {
+  try {
+    const entries = await fs.readdir(EDIT_QUEUE_DIR).catch((e) => {
+      if (e.code === 'ENOENT') return [];
+      throw e;
+    });
+    res.json({ pending: entries.filter((n) => /^\d{1,12}\.json$/.test(n)).length });
+  } catch (error) {
+    console.error('Änderungs-Warteschlangen-Status fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+  }
+});
+
+// ============================================================
 // Upload-Posteingang — Fotos von iPad/Mac sichern (2026-08-07)
 // ============================================================
 // Der Upload läuft als ROHER Body-Stream (PUT, application/octet-stream,

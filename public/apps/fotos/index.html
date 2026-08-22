@@ -381,6 +381,29 @@
     .lb button:hover { color: #f472b6; }
     #lbDelete { font-size: 12px; font-family: inherit; border: 1px solid rgba(248,113,113,0.35); border-radius: 8px; padding: 6px 12px; color: rgba(248,113,113,0.9); }
     #lbDelete:hover { background: rgba(248,113,113,0.12); color: #f87171; }
+    /* Bewerten/Taggen in der Lightbox (2026-08-22): Änderungen gehen als
+       Marker in die Änderungs-Warteschlange, fotob0x holt sie ab. */
+    .lb-meta {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+      padding: 8px 16px 14px; color: rgba(238,241,246,0.75);
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    }
+    .lb-stars { display: flex; align-items: center; }
+    .lb-stars button { font-size: 20px; padding: 0 3px; color: rgba(238,241,246,0.3); }
+    .lb-stars button.on, .lb-stars button:hover { color: #fbbf24; }
+    .lb-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .lb-tag {
+      display: inline-flex; align-items: center; gap: 2px;
+      border: 1px solid rgba(238,241,246,0.22); border-radius: 999px; padding: 2px 4px 2px 10px;
+    }
+    .lb-tag button { font-size: 14px; padding: 0 4px; line-height: 1.2; }
+    #lbTagInput {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(238,241,246,0.2);
+      border-radius: 999px; color: rgba(238,241,246,0.9); font: inherit;
+      padding: 4px 10px; width: 140px;
+    }
+    #lbTagInput::placeholder { color: rgba(238,241,246,0.35); }
+    #lbTagInput:focus { outline: none; border-color: rgba(244,114,182,0.55); }
     .lb .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 2.3rem; }
     .lb .prev { left: 6px; } .lb .next { right: 6px; }
 
@@ -759,6 +782,12 @@
     </div>
   </div>
   <div class="lb-stage"><img id="lbImg" alt=""></div>
+  <div class="lb-meta">
+    <div class="lb-stars" id="lbStars" title="Bewertung — wird von fotob0x auf dem PC übernommen (Klick auf den aktiven Stern entfernt die Bewertung)"></div>
+    <div class="lb-tags" id="lbTags"></div>
+    <input id="lbTagInput" type="text" maxlength="60" placeholder="+ Tag" autocomplete="off"
+           title="Tag hinzufügen — Enter bestätigt; fotob0x übernimmt ihn als Stichwort auf dem PC">
+  </div>
   <button class="nav prev" id="lbPrev" type="button" title="Vorheriges (←)">‹</button>
   <button class="nav next" id="lbNext" type="button" title="Nächstes (→)">›</button>
 </div>
@@ -1689,6 +1718,7 @@
     $('lbImg').src = '/api/fotos/library/img/' + encodeURIComponent(photo.n);
     var date = photo.d ? photo.d.slice(0, 10).split('-').reverse().join('.') : '';
     $('lbInfo').textContent = (lbCurrent + 1) + ' / ' + libraryPhotos.length + (date ? ' · ' + date : '');
+    renderLbMeta(photo);
     $('lb').classList.add('open');
     // Nächstes Bild vorladen für flüssiges Blättern
     if (libraryPhotos.length > 1) {
@@ -1722,6 +1752,99 @@
     }).catch(function(err) {
       toast(err.error || 'Konnte nicht markiert werden.', 'error');
     }).finally(function() { btn.disabled = false; });
+  }
+
+  // ============================================================
+  // BEWERTEN/TAGGEN IN DER LIGHTBOX (2026-08-22)
+  // ============================================================
+  // „Alle Fotos" bleibt eine schreibgeschützte Kopie — die Änderung wird
+  // hier nur OPTIMISTISCH am geladenen Manifest-Eintrag vorgenommen und
+  // als Marker an /api/fotos/edit-request geschickt. fotob0x holt die
+  // Marker ab und schreibt Bewertung/Stichwörter in die Bibliothek; nach
+  // dem nächsten Websync stimmen Web und PC wieder überein. Schlägt der
+  // Request fehl, wird die Änderung zurückgenommen.
+
+  function renderLbMeta(photo) {
+    var stars = $('lbStars');
+    stars.textContent = '';
+    var rating = photo.r || 0;
+    for (var s = 1; s <= 5; s++) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = s <= rating ? '★' : '☆';
+      if (s <= rating) b.className = 'on';
+      b.dataset.stars = String(s);
+      stars.appendChild(b);
+    }
+    var tags = $('lbTags');
+    tags.textContent = '';
+    (photo.t || []).forEach(function(tag) {
+      var chip = document.createElement('span');
+      chip.className = 'lb-tag';
+      chip.appendChild(document.createTextNode(tag));
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '×';
+      x.title = 'Tag „' + tag + '“ entfernen (auch auf dem PC)';
+      x.dataset.tag = tag;
+      chip.appendChild(x);
+      tags.appendChild(chip);
+    });
+    $('lbTagInput').value = '';
+  }
+
+  /** Schickt eine Änderung an die Warteschlange; bei Fehler zurückrollen. */
+  function sendEdit(photo, body, revert) {
+    body.id = parseInt(photo.n, 10);
+    api('/fotos/edit-request', { method: 'POST', body: body }).then(function() {
+      toast('Gemerkt – fotob0x übernimmt die Änderung auf dem PC.');
+    }).catch(function(err) {
+      revert();
+      if (lbCurrent >= 0 && libraryPhotos[lbCurrent] === photo) renderLbMeta(photo);
+      toast(err.error || 'Die Änderung konnte nicht gemerkt werden.', 'error');
+    });
+  }
+
+  function lbSetRating(starsClicked) {
+    if (lbCurrent < 0) return;
+    var photo = libraryPhotos[lbCurrent];
+    var before = photo.r || 0;
+    // Klick auf den aktiven Stern nimmt die Bewertung zurück.
+    var next = starsClicked === before ? 0 : starsClicked;
+    if (next > 0) photo.r = next; else delete photo.r;
+    renderLbMeta(photo);
+    sendEdit(photo, { rating: next }, function() {
+      if (before > 0) photo.r = before; else delete photo.r;
+    });
+  }
+
+  function lbAddTag(raw) {
+    if (lbCurrent < 0) return;
+    var photo = libraryPhotos[lbCurrent];
+    var tag = raw.replace(/\s+/g, ' ').trim();
+    if (!tag) return;
+    var existing = photo.t || [];
+    var dup = existing.some(function(t) { return t.toLowerCase() === tag.toLowerCase(); });
+    if (dup) { $('lbTagInput').value = ''; return; }
+    photo.t = existing.concat([tag]);
+    renderLbMeta(photo);
+    sendEdit(photo, { addTags: [tag] }, function() {
+      photo.t = (photo.t || []).filter(function(t) { return t !== tag; });
+      if (photo.t.length === 0) delete photo.t;
+    });
+  }
+
+  function lbRemoveTag(tag) {
+    if (lbCurrent < 0) return;
+    var photo = libraryPhotos[lbCurrent];
+    var before = photo.t || [];
+    if (before.indexOf(tag) === -1) return;
+    photo.t = before.filter(function(t) { return t !== tag; });
+    if (photo.t.length === 0) delete photo.t;
+    renderLbMeta(photo);
+    sendEdit(photo, { removeTags: [tag] }, function() {
+      photo.t = before;
+    });
   }
 
   // ============================================================
@@ -2348,6 +2471,22 @@
 
   $('lbClose').addEventListener('click', closeLightbox);
   $('lbDelete').addEventListener('click', deleteCurrentPhoto);
+  // Bewerten/Taggen: Stern-Klick setzt die Bewertung, × entfernt einen Tag,
+  // Enter im Eingabefeld fügt einen hinzu (Event-Delegation, die Elemente
+  // werden je Foto neu aufgebaut).
+  $('lbStars').addEventListener('click', function(e) {
+    var stars = e.target && e.target.dataset ? Number(e.target.dataset.stars) : 0;
+    if (stars >= 1 && stars <= 5) lbSetRating(stars);
+  });
+  $('lbTags').addEventListener('click', function(e) {
+    var tag = e.target && e.target.dataset ? e.target.dataset.tag : null;
+    if (tag) lbRemoveTag(tag);
+  });
+  $('lbTagInput').addEventListener('keydown', function(e) {
+    e.stopPropagation(); // Pfeiltasten/Esc blättern nicht, solange getippt wird
+    if (e.key === 'Enter') { e.preventDefault(); lbAddTag(this.value); }
+    else if (e.key === 'Escape') this.blur();
+  });
   $('lbPrev').addEventListener('click', function() { openLightbox(lbCurrent - 1); });
   $('lbNext').addEventListener('click', function() { openLightbox(lbCurrent + 1); });
   $('lb').addEventListener('click', function(e) {

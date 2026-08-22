@@ -101,6 +101,7 @@ toolb0x/
 | `/api/fotos/upload/:name` | PUT = Datei als roher Stream hochladen, DELETE = entfernen (requireAdmin) |
 | `/api/fotos/search/status` | KI-Suche: liegen Suchvektoren vor? (requireAdmin) |
 | `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
+| `/api/fotos/edit-request` | POST `{ id, rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange, GET = offene Anzahl (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -628,6 +629,22 @@ darunter dasselbe generische `.sb-section`/`.sb-section-body`-Muster wie
 die Alben. Mobil (Sidebar versteckt) übernimmt `#personSelect` in der
 Filterzeile — analog zu `#albumSelect`; beide sind per Media-Query ab
 769px ausgeblendet.
+
+**Bewerten/Taggen in „Alle Fotos" (2026-08-22):** Die Lightbox hat unter dem
+Bild eine Meta-Zeile: 5 Sterne (Klick setzt die Bewertung, Klick auf den
+aktiven Stern entfernt sie) und die Tags des Fotos als Chips mit ×, daneben
+ein Eingabefeld „+ Tag" (Enter fügt hinzu). Gleiche Architektur wie die
+Lösch-Warteschlange: `POST /api/fotos/edit-request` mischt die Änderung in
+eine Marker-Datei `<assetId>.json` unter `fotos-privat/edit-queue`
+(`{ r: 0-5, add: [...], del: [...] }` — letzte Bewertung gewinnt, add/del
+heben sich gegenseitig auf). fotob0x (editqueue.ts) holt die Marker per
+rclone ab, schreibt Bewertung/Stichwörter in seine DB und löscht die Marker;
+der nächste Websync macht Web und PC wieder deckungsgleich. Die UI ändert
+das geladene Manifest nur OPTIMISTISCH (bei Request-Fehler wird
+zurückgerollt) — die Wahrheit bleibt der PC. Tag-Validierung beidseitig
+identisch: max. 60 Zeichen, max. 20 je Anfrage, keine Steuerzeichen oder
+`/`\`\\`, Duplikate case-insensitiv. Tests:
+`tests/routes/fotos-edit.test.js`; der Layout-Stub fakt die Route.
 
 > **Fallstrick `hidden` (kostete den Aufräum-Bug):** Eine eigene CSS-Regel
 > wie `.otd-bar { display: flex }` schlägt das `display:none`, das der

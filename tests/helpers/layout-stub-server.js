@@ -130,6 +130,8 @@ const API = {
   // sortierte Treffer-Gruppe im Browser zu prüfen.
   '/api/fotos/search/status': { available: true, count: 74, model: 'onnx-community/siglip2-base-patch16-224-ONNX', modelReady: true },
   '/api/fotos/search': { ids: [4966, 5000, 4979, 4993, 4948, 4930], scores: [0.34, 0.31, 0.27, 0.22, 0.19, 0.18] },
+  // Änderungs-Warteschlange (2026-08-22): Bewerten/Taggen in der Lightbox
+  '/api/fotos/edit-request': { queued: true },
   '/api/fotos/upload/status': { ready: true, freeBytes: 62 * 1024 * 1024 * 1024, files: [
     { name: 'DSC00123.ARW', size: 42 * 1024 * 1024, mtime: '2026-08-07T09:12:00.000Z' },
     { name: 'IMG_2210.jpg', size: 3.4 * 1024 * 1024, mtime: '2026-08-07T09:10:00.000Z' },
