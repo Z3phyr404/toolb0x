@@ -48,6 +48,7 @@ function decryptExpense(exp, key) {
     ...exp,
     name: entschaerfe(decrypt(exp.name, key)),
     amount: decrypt(exp.amount, key),
+    plannedAmount: exp.plannedAmount ? decrypt(exp.plannedAmount, key) : null,
     tags: entschaerfeListe(tags),
     category: exp.category ? {
       ...exp.category,
@@ -94,6 +95,14 @@ function checkPageBreak(doc, neededSpace = 80) {
 function drawLine(doc) {
   doc.strokeColor('#E0E0E0').lineWidth(0.5)
     .moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
+}
+
+// Sammelposten im PDF kenntlich machen: der Betrag ist die Summe der
+// Buchungen, das Budget steht als Zusatz dahinter.
+function postenName(e) {
+  if (!e.isCollector) return e.name;
+  const plan = e.plannedAmount ? ` (Budget ${fmtEuro(betrag(e.plannedAmount))})` : ' (Sammelposten)';
+  return e.name + plan;
 }
 
 // Beschriftung einer Periode. Bei Starttag 1 (Kalendermonat) bleibt es beim
@@ -347,7 +356,7 @@ router.get('/pdf', async (req, res) => {
         doc.fontSize(10).font('Helvetica').fillColor('#999999')
           .text(`${i + 1}.`, colTop[0], rowY, { width: 18 });
         doc.fillColor('#333333')
-          .text(expense.name, colTop[1], rowY, { width: 200 });
+          .text(postenName(expense), colTop[1], rowY, { width: 200 });
         doc.fillColor('#888888')
           .text(cat.name, colTop[2], rowY, { width: 110 });
         doc.fillColor('#333333').font('Helvetica-Bold')
@@ -848,7 +857,7 @@ router.get('/json', async (req, res) => {
           select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true },
         }),
         prisma.category.findMany({ where: { userId: req.userId } }),
-        prisma.expense.findMany({ where: { userId: req.userId }, include: { category: true } }),
+        prisma.expense.findMany({ where: { userId: req.userId }, include: { category: true, bookings: true } }),
         prisma.income.findMany({ where: { userId: req.userId } }),
         prisma.reminder.findMany({ where: { userId: req.userId } }),
         prisma.note.findMany({ where: { userId: req.userId } }),
@@ -890,8 +899,21 @@ router.get('/json', async (req, res) => {
           betrag: d.amount,
           tags: d.tags,
           monat: e.month,
+          tag: e.spentOn,
           wiederkehrend: e.isRecurring,
           kategorie: d.category ? d.category.name : null,
+          // Sammelposten: `betrag` ist die Summe der Buchungen, `geplant`
+          // der Budgetwert. Die Einzelbuchungen gehören zur Vollständigkeit
+          // nach Art. 20 dazu.
+          sammelposten: e.isCollector,
+          geplant: e.plannedAmount ? decrypt(e.plannedAmount, key) : null,
+          buchungen: (e.bookings || []).map(b => ({
+            id: b.id,
+            betrag: decrypt(b.amount, key),
+            notiz: b.note ? entschaerfe(decrypt(b.note, key)) : '',
+            tag: b.bookedOn,
+            erstelltAm: b.createdAt,
+          })),
           erstelltAm: e.createdAt,
         };
       }),

@@ -38,6 +38,7 @@ function resetStore() {
   mockPrisma._store.monthInits.length = 0;
   mockPrisma._store.categories.length = 0;
   mockPrisma._store.users.length = 0;
+  mockPrisma._store.expenseBookings.length = 0;
 }
 
 function seedCategory() {
@@ -814,5 +815,177 @@ describe('Ausgaben — doppelt escapte Altdaten', () => {
     // Auch in der DB steht der Klartext (verschlüsselt), keine Entities
     const roh = decrypt(mockPrisma._store.expenses[0].name, auth.encryptionKey);
     assert.equal(roh, 'Haushalt & Garten');
+  });
+});
+
+// ============================================================
+// SAMMELPOSTEN + BUCHUNGEN (2026-09-07)
+// ============================================================
+// Ein Sammelposten ("Rewe") hat einen Planwert und sammelt Einzelbuchungen.
+// `amount` ist immer die Summe der echten Buchungen, damit Dashboard,
+// Verlauf und Export unverändert weiterlesen und die Historie stimmt.
+describe('Sammelposten', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+    seedCategory();
+  });
+
+  after(() => cleanupAuth());
+
+  const posten = (extra = {}) => ({
+    name: 'Rewe',
+    amount: 400,
+    categoryId: testCategoryId,
+    month: '2026-09',
+    isRecurring: true,
+    isCollector: true,
+    ...extra,
+  });
+
+  const anlegen = (extra) => request(app).post('/api/expenses').set('Cookie', auth.cookie).send(posten(extra));
+  const buchen = (id, body) => request(app).post(`/api/expenses/${id}/bookings`).set('Cookie', auth.cookie).send(body);
+
+  it('legt einen Sammelposten mit Plan an, gebucht startet bei 0', async () => {
+    const res = await anlegen();
+    assert.equal(res.status, 201);
+    assert.equal(res.body.expense.isCollector, true);
+    assert.equal(res.body.expense.plannedAmount, '400');
+    assert.equal(res.body.expense.amount, '0');
+  });
+
+  it('Buchungen summieren sich in den Betrag des Postens', async () => {
+    const { body } = await anlegen();
+    const id = body.expense.id;
+
+    let r = await buchen(id, { amount: 37.19, note: 'Wocheneinkauf', bookedOn: '2026-09-03' });
+    assert.equal(r.status, 201);
+    assert.equal(r.body.total, 37.19);
+
+    r = await buchen(id, { amount: 12.81 });
+    assert.equal(r.body.total, 50);
+
+    const liste = await request(app).get('/api/expenses?month=2026-09').set('Cookie', auth.cookie);
+    const p = liste.body.expenses[0];
+    assert.equal(p.amount, '50');
+    assert.equal(p.plannedAmount, '400');
+    assert.equal(p.bookingCount, 2);
+  });
+
+  it('Summary weist geplant, gebucht und offen aus', async () => {
+    const { body } = await anlegen();
+    await buchen(body.expense.id, { amount: 150 });
+
+    const res = await request(app).get('/api/expenses/summary?month=2026-09').set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.collectors, { planned: 400, booked: 150, open: 250 });
+    assert.equal(res.body.totalExpenses, 150, 'Ausgaben zählen nur echte Buchungen');
+    assert.equal(res.body.remainingAfterPlan, res.body.remaining - 250);
+  });
+
+  it('über den Plan hinaus gebucht: offen wird 0, nicht negativ', async () => {
+    const { body } = await anlegen();
+    await buchen(body.expense.id, { amount: 450 });
+
+    const res = await request(app).get('/api/expenses/summary?month=2026-09').set('Cookie', auth.cookie);
+    assert.deepEqual(res.body.collectors, { planned: 400, booked: 450, open: 0 });
+  });
+
+  it('Folgemonat erbt den Plan, aber KEINE Buchungen', async () => {
+    const { body } = await anlegen();
+    await buchen(body.expense.id, { amount: 137.42 });
+
+    const res = await request(app).get('/api/expenses?month=2026-10').set('Cookie', auth.cookie);
+    const okt = res.body.expenses[0];
+    assert.equal(okt.plannedAmount, '400', 'Budget wandert mit');
+    assert.equal(okt.amount, '0', 'Gebucht startet bei null');
+    assert.equal(okt.bookingCount, 0);
+
+    // September bleibt unangetastet
+    const sep = await request(app).get('/api/expenses?month=2026-09').set('Cookie', auth.cookie);
+    assert.equal(sep.body.expenses[0].amount, '137.42');
+  });
+
+  it('Korrektur im September überschreibt den Ist-Wert im Oktober NICHT', async () => {
+    const { body } = await anlegen();
+    const sepId = body.expense.id;
+    await request(app).get('/api/expenses?month=2026-10').set('Cookie', auth.cookie);
+    const oktId = mockPrisma._store.expenses.find(e => e.month === '2026-10').id;
+    await buchen(sepId, { amount: 137.42 });
+    await buchen(oktId, { amount: 55 });
+
+    // Plan im September auf 350 ändern
+    const put = await request(app).put(`/api/expenses/${sepId}`).set('Cookie', auth.cookie)
+      .send(posten({ amount: 350 }));
+    assert.equal(put.status, 200);
+
+    const okt = mockPrisma._store.expenses.find(e => e.month === '2026-10');
+    assert.equal(decrypt(okt.plannedAmount, auth.encryptionKey), '350', 'Neuer Plan wandert weiter');
+    assert.equal(decrypt(okt.amount, auth.encryptionKey), '55', 'Gebuchter Ist-Wert bleibt');
+  });
+
+  it('Dialog erneut speichern löscht den gebuchten Betrag nicht', async () => {
+    const { body } = await anlegen();
+    await buchen(body.expense.id, { amount: 90 });
+
+    await request(app).put(`/api/expenses/${body.expense.id}`).set('Cookie', auth.cookie)
+      .send(posten({ amount: 400, name: 'Rewe & Lidl' }));
+
+    const res = await request(app).get('/api/expenses?month=2026-09').set('Cookie', auth.cookie);
+    assert.equal(res.body.expenses[0].amount, '90');
+    assert.equal(res.body.expenses[0].name, 'Rewe & Lidl');
+  });
+
+  it('Buchung ändern und löschen rechnet die Summe neu', async () => {
+    const { body } = await anlegen();
+    const id = body.expense.id;
+    const b1 = await buchen(id, { amount: 30 });
+    await buchen(id, { amount: 20 });
+
+    let r = await request(app).put(`/api/expenses/${id}/bookings/${b1.body.booking.id}`)
+      .set('Cookie', auth.cookie).send({ amount: 45 });
+    assert.equal(r.body.total, 65);
+
+    r = await request(app).delete(`/api/expenses/${id}/bookings/${b1.body.booking.id}`)
+      .set('Cookie', auth.cookie);
+    assert.equal(r.body.total, 20);
+  });
+
+  it('auf eine normale Ausgabe kann man nicht buchen', async () => {
+    const r = await request(app).post('/api/expenses').set('Cookie', auth.cookie)
+      .send({ name: 'Miete', amount: 640, categoryId: testCategoryId, month: '2026-09' });
+    const res = await buchen(r.body.expense.id, { amount: 10 });
+    assert.equal(res.status, 400);
+  });
+
+  it('lehnt ungültige Buchungen ab', async () => {
+    const { body } = await anlegen();
+    const id = body.expense.id;
+    assert.equal((await buchen(id, { amount: 0 })).status, 400);
+    assert.equal((await buchen(id, { amount: -5 })).status, 400);
+    assert.equal((await buchen(id, { amount: 'abc' })).status, 400);
+    assert.equal((await buchen(id, { amount: 10, bookedOn: '2026-10-05' })).status, 400, 'Datum ausserhalb des Monats');
+    assert.equal((await buchen(id, { amount: 10, bookedOn: '2026-09-31' })).status, 400, 'Tag gibt es nicht');
+  });
+
+  it('Buchungen fremder Nutzer sind nicht erreichbar', async () => {
+    const { body } = await anlegen();
+    const fremd = createTestAuth(mockPrisma);
+    const res = await request(app).get(`/api/expenses/${body.expense.id}/bookings`)
+      .set('Cookie', fremd.cookie);
+    assert.equal(res.status, 404);
+  });
+
+  it('Umschalten auf normale Ausgabe entfernt die Buchungen', async () => {
+    const { body } = await anlegen();
+    await buchen(body.expense.id, { amount: 90 });
+
+    const res = await request(app).put(`/api/expenses/${body.expense.id}`).set('Cookie', auth.cookie)
+      .send({ name: 'Rewe', amount: 400, categoryId: testCategoryId, month: '2026-09', isRecurring: true, isCollector: false });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.expense.isCollector, false);
+    assert.equal(res.body.expense.amount, '400');
+    assert.equal(mockPrisma._store.expenseBookings.length, 0);
   });
 });

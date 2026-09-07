@@ -167,3 +167,70 @@ describe('GET /api/export/json', () => {
     assert.equal(res.status, 401);
   });
 });
+
+// ============================================================
+// SAMMELPOSTEN IM DSGVO-EXPORT (2026-09-07)
+// ============================================================
+// Art. 20 verlangt Vollständigkeit: Bei einem Sammelposten ist `betrag` nur
+// die Summe — die Einzelbuchungen und das Budget gehören mit dazu.
+describe('GET /api/export/json — Sammelposten', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+  });
+
+  after(() => cleanupAuth());
+
+  it('liefert Budget und alle Einzelbuchungen mit', async () => {
+    const key = auth.encryptionKey;
+    const catId = crypto.randomUUID();
+    const expId = crypto.randomUUID();
+
+    mockPrisma._store.categories.push({
+      id: catId, userId: auth.userId, name: encrypt('Lebensmittel', key), color: encrypt('#30D158', key), createdAt: new Date(),
+    });
+    mockPrisma._store.expenses.push({
+      id: expId, userId: auth.userId, categoryId: catId,
+      name: encrypt('Rewe', key), amount: encrypt('140.43', key),
+      plannedAmount: encrypt('450', key), isCollector: true,
+      tags: '', month: '2026-09', spentOn: null, isRecurring: true, createdAt: new Date(),
+    });
+    mockPrisma._store.expenseBookings.push(
+      { id: crypto.randomUUID(), userId: auth.userId, expenseId: expId, amount: encrypt('86.32', key), note: encrypt('Wocheneinkauf', key), bookedOn: '2026-09-03', createdAt: new Date() },
+      { id: crypto.randomUUID(), userId: auth.userId, expenseId: expId, amount: encrypt('54.11', key), note: '', bookedOn: '2026-09-11', createdAt: new Date() },
+    );
+
+    const res = await request(app).get('/api/export/json').set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+
+    const a = res.body.ausgaben[0];
+    assert.equal(a.sammelposten, true);
+    assert.equal(a.geplant, '450');
+    assert.equal(a.betrag, '140.43');
+    assert.equal(a.buchungen.length, 2);
+    assert.equal(a.buchungen[0].betrag, '86.32');
+    assert.equal(a.buchungen[0].notiz, 'Wocheneinkauf');
+    assert.equal(a.buchungen[0].tag, '2026-09-03');
+    assert.equal(a.buchungen[1].notiz, '');
+  });
+
+  it('normale Ausgaben bleiben ohne Budget und ohne Buchungen', async () => {
+    const key = auth.encryptionKey;
+    const catId = crypto.randomUUID();
+    mockPrisma._store.categories.push({
+      id: catId, userId: auth.userId, name: encrypt('Wohnen', key), color: encrypt('#FF9500', key), createdAt: new Date(),
+    });
+    mockPrisma._store.expenses.push({
+      id: crypto.randomUUID(), userId: auth.userId, categoryId: catId,
+      name: encrypt('Miete', key), amount: encrypt('640', key),
+      tags: '', month: '2026-09', spentOn: '2026-09-01', isRecurring: true, createdAt: new Date(),
+    });
+
+    const res = await request(app).get('/api/export/json').set('Cookie', auth.cookie);
+    const a = res.body.ausgaben[0];
+    assert.equal(a.sammelposten, undefined === a.sammelposten ? undefined : false);
+    assert.equal(a.geplant, null);
+    assert.deepEqual(a.buchungen, []);
+    assert.equal(a.tag, '2026-09-01');
+  });
+});

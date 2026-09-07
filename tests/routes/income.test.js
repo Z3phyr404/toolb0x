@@ -32,6 +32,7 @@ function resetStore() {
   mockPrisma._store.monthInits.length = 0;
   mockPrisma._store.categories.length = 0;
   mockPrisma._store.users.length = 0;
+  mockPrisma._store.expenseBookings.length = 0;
 }
 
 function seedIncome({ name, amount, month, isRecurring = true }) {

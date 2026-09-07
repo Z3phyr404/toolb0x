@@ -59,6 +59,14 @@ const RELATION_TABELLE = {
   expense: 'expenses',
 };
 
+// Rückwärts-Relationen (1:n): { bookings: true } auf einer Ausgabe lädt alle
+// expenseBookings, deren expenseId auf diesen Datensatz zeigt. Der generische
+// Weg unten kann nur die Gegenrichtung (Kind -> Eltern über <relation>Id).
+const RUECKWAERTS_RELATION = {
+  bookings: { tabelle: 'expenseBookings', fremdschluessel: 'expenseId' },
+  reminders: { tabelle: 'reminders', fremdschluessel: 'expenseId' },
+};
+
 // Generisches include: { vault: {...} } lädt store.vaults über record.vaultId.
 // Bewusst generisch, damit neue Relationen nicht jedes Mal den Mock brechen.
 function applyInclude(record, include, store) {
@@ -67,6 +75,16 @@ function applyInclude(record, include, store) {
 
   for (const [relation, optionen] of Object.entries(include)) {
     if (!optionen) continue;
+
+    const rueck = RUECKWAERTS_RELATION[relation];
+    if (rueck) {
+      const kinder = (store[rueck.tabelle] || [])
+        .filter(k => k[rueck.fremdschluessel] === record.id)
+        .map(k => ({ ...k }));
+      result[relation] = kinder;
+      continue;
+    }
+
     const tabelle = RELATION_TABELLE[relation] || relation + 's';
     const fk = relation + 'Id';
     if (!store[tabelle] || record[fk] === undefined || record[fk] === null) continue;
@@ -235,6 +253,7 @@ function createMockPrisma() {
     vaultMembers: [],
     servers: [],
     shares: [],
+    expenseBookings: [],
   };
 
   return {
@@ -251,6 +270,7 @@ function createMockPrisma() {
     vaultMember: createCollection(store, 'vaultMembers'),
     server: createCollection(store, 'servers'),
     share: createCollection(store, 'shares'),
+    expenseBooking: createCollection(store, 'expenseBookings'),
   };
 }
 

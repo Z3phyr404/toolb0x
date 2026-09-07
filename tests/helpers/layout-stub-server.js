@@ -57,9 +57,10 @@ const API = {
     { id: 'e1', name: 'Miete', amount: '1180', categoryId: 'c1', spentOn: '2026-08-01', tags: ['Fixkosten'], isRecurring: true },
     { id: 'e2', name: 'Strom (Grundversorger)', amount: '84.50', categoryId: 'c1', spentOn: '2026-08-05', tags: ['Fixkosten'], isRecurring: true },
     { id: 'e3', name: 'Internet & Festnetz', amount: '44.99', categoryId: 'c1', spentOn: '2026-08-03', tags: ['Fixkosten'], isRecurring: true },
-    { id: 'e4', name: 'Wocheneinkauf Rewe', amount: '86.32', categoryId: 'c2', spentOn: '2026-08-08', tags: [], isRecurring: false },
-    { id: 'e5', name: 'Wocheneinkauf Aldi', amount: '54.11', categoryId: 'c2', spentOn: '2026-08-15', tags: [], isRecurring: false },
-    { id: 'e6', name: 'Tanken', amount: '72.40', categoryId: 'c3', spentOn: '2026-08-11', tags: ['Auto'], isRecurring: false },
+    // Sammelposten: amount = Summe der Buchungen, plannedAmount = Budget
+    { id: 'e4', name: 'Lebensmittel', amount: '140.43', plannedAmount: '450', isCollector: true, categoryId: 'c2', spentOn: null, tags: [], isRecurring: true, bookingCount: 2 },
+    { id: 'e5', name: 'Tanken', amount: '72.40', plannedAmount: '160', isCollector: true, categoryId: 'c3', spentOn: null, tags: ['Auto'], isRecurring: true, bookingCount: 1 },
+    { id: 'e6', name: 'Kleidung', amount: '0', plannedAmount: '60', isCollector: true, categoryId: 'c5', spentOn: null, tags: [], isRecurring: true, bookingCount: 0 },
     { id: 'e7', name: 'KFZ-Versicherung', amount: '61.20', categoryId: 'c3', spentOn: '2026-08-02', tags: ['Auto', 'Fixkosten'], isRecurring: true },
     { id: 'e8', name: 'Kino + Essen', amount: '58', categoryId: 'c4', spentOn: '2026-08-16', tags: ['Nicole'], isRecurring: false },
     { id: 'e9', name: 'Fitnessstudio', amount: '29.90', categoryId: 'c4', spentOn: '2026-08-01', tags: ['Abo'], isRecurring: true },
@@ -72,6 +73,14 @@ const API = {
     { id: 'i2', name: 'Ebay-Verkauf Objektiv', amount: '180', isRecurring: false },
   ] },
   // Verlauf-Seite (2026-08-22): 12 Monate mit plausiblen Schwankungen
+  '/api/expenses/e4/bookings': { bookings: [
+    { id: 'b1', expenseId: 'e4', amount: '86.32', note: 'Rewe Wocheneinkauf', bookedOn: '2026-08-08' },
+    { id: 'b2', expenseId: 'e4', amount: '54.11', note: 'Aldi', bookedOn: '2026-08-15' },
+  ] },
+  '/api/expenses/e5/bookings': { bookings: [
+    { id: 'b3', expenseId: 'e5', amount: '72.40', note: '', bookedOn: '2026-08-11' },
+  ] },
+  '/api/expenses/e6/bookings': { bookings: [] },
   '/api/expenses/history': { months: (function() {
     const out = [];
     let y = 2025, m = 9;

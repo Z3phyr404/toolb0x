@@ -54,6 +54,7 @@ model User {
   incomes          Income[]
   monthInits       MonthInit[]
   reminders        Reminder[]
+  bookings         ExpenseBooking[]
   notes            Note[]
   storedPasswords  StoredPassword[]
   servers          Server[]
@@ -99,13 +100,47 @@ model Expense {
   spentOn     String?
   isRecurring Boolean @default(true)
 
+  // SAMMELPOSTEN (2026-09-07) — für schwankende Ausgaben wie Lebensmittel.
+  // isCollector = true: `amount` ist NICHT frei editierbar, sondern die vom
+  // Server gepflegte Summe der Buchungen dieses Monats. plannedAmount ist der
+  // Budgetwert, gegen den gebucht wird ("geplant / gebucht").
+  // Beim Kopieren in den nächsten Monat wandert plannedAmount mit, amount
+  // startet bei 0 und die Buchungen bleiben zurück.
+  isCollector   Boolean @default(false)
+  plannedAmount String? // VERSCHLÜSSELT, nur bei isCollector gesetzt
+
   reminders Reminder[]
+  bookings  ExpenseBooking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, month])
   @@map("expenses")
+}
+
+// Einzelbuchung auf einen Sammelposten (z.B. ein Einkauf bei Rewe).
+// Buchungen werden NIE in Folgemonate kopiert — nur der Posten selbst.
+model ExpenseBooking {
+  id     String @id @default(uuid())
+  amount String // VERSCHLÜSSELT
+  note   String @default("") // VERSCHLÜSSELT, optional
+
+  // Tagesdatum "YYYY-MM-DD", NICHT verschlüsselt (wie Expense.spentOn).
+  bookedOn String?
+
+  expenseId String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expenseId])
+  @@index([userId])
+  @@map("expense_bookings")
 }
 
 model Income {

@@ -159,6 +159,48 @@ function validateExpense(data, startDay = 1) {
 }
 
 // --------------------------------------------------------
+// Buchung auf einen Sammelposten validieren
+// --------------------------------------------------------
+// Anders als eine Ausgabe hat eine Buchung keinen eigenen Namen und keine
+// Kategorie — die kommen vom Posten. `bookedOn` muss in der Periode des
+// Postens liegen, deshalb kommt der Monat von der Route.
+function validateBooking(data, month, startDay = 1) {
+  const errors = [];
+  const start = normalizeStartDay(startDay);
+
+  const amount = parseFloat(data.amount);
+  if (isNaN(amount) || amount <= 0) {
+    errors.push('Bitte gib einen gültigen Betrag größer als 0 ein.');
+  }
+  if (amount > 999999.99) {
+    errors.push('Der Betrag darf maximal 999.999,99 € sein.');
+  }
+
+  if (data.note !== undefined && data.note !== null && data.note !== '') {
+    if (!istText(data.note)) {
+      errors.push('Die Notiz muss Text sein.');
+    } else if (data.note.length > 100) {
+      errors.push('Die Notiz darf maximal 100 Zeichen lang sein.');
+    }
+  }
+
+  if (data.bookedOn !== undefined && data.bookedOn !== null && data.bookedOn !== '') {
+    if (!istText(data.bookedOn) || !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(data.bookedOn)) {
+      errors.push('Ungültiges Datum. Erwartet: YYYY-MM-DD (z.B. 2026-08-22).');
+    } else if (!istEchtesDatum(data.bookedOn)) {
+      errors.push('Dieses Datum gibt es nicht.');
+    } else if (month && !isInPeriod(data.bookedOn, month, start)) {
+      const { start: von, end: bis } = periodRange(month, start);
+      errors.push(start === 1
+        ? 'Das Datum muss im gewählten Monat liegen.'
+        : `Das Datum muss im Zeitraum ${fmtTag(von)} bis ${fmtTag(bis)} liegen.`);
+    }
+  }
+
+  return errors;
+}
+
+// --------------------------------------------------------
 // Einnahme validieren
 // --------------------------------------------------------
 function validateIncome(data) {
@@ -397,6 +439,7 @@ module.exports = {
   validateRegistration,
   validateLogin,
   validateExpense,
+  validateBooking,
   validateIncome,
   validateCategory,
   validateReminder,

@@ -61,6 +61,36 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; position:relative; }
 .month-btn { width:30px; height:30px; border:none; border-radius:8px; background:rgba(255,255,255,0.06); color:rgba(238,241,246,0.7); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s; font-family:inherit; }
 .month-btn:hover { background:rgba(255,255,255,0.14); }
 .month-display { font-size:14px; font-weight:600; min-width:120px; text-align:center; }
+/* ===== GEPLANT / GEBUCHT ===== */
+.plan-card { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:18px 20px; margin-bottom:22px; }
+.plan-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.plan-title { font-size:13px; font-weight:600; }
+.plan-note { font-size:12px; color:var(--text-3); }
+.plan-bar { height:8px; border-radius:4px; background:rgba(255,255,255,0.07); overflow:hidden; margin-bottom:10px; }
+.plan-bar-fill { display:block; height:100%; border-radius:4px; background:#38bdf8; transition:width 0.4s; }
+.plan-bar-fill.over { background:#fb7185; }
+.plan-legend { display:flex; flex-wrap:wrap; gap:6px 22px; font-size:12px; color:var(--text-2); }
+.plan-legend b { font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--text); }
+.plan-items { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.plan-chip { font-size:11px; padding:4px 9px; border-radius:9px; background:rgba(255,255,255,0.05); border:1px solid var(--border); cursor:pointer; }
+.plan-chip:hover { border-color:#38bdf8; }
+.plan-chip b { font-family:'JetBrains Mono',monospace; }
+.plan-chip.over b { color:#fb7185; }
+
+/* ===== SAMMELPOSTEN ===== */
+.coll-badge { display:inline-block; font-size:9px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:0.06em; padding:2px 6px; border-radius:6px; background:rgba(56,189,248,0.14); color:#38bdf8; margin-left:6px; vertical-align:middle; }
+.coll-cell { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+.coll-plan { font-size:11px; color:var(--text-3); font-family:'JetBrains Mono',monospace; white-space:nowrap; }
+.coll-bar { width:78px; height:4px; border-radius:2px; background:rgba(255,255,255,0.09); overflow:hidden; }
+.coll-bar-fill { display:block; height:100%; border-radius:2px; background:#38bdf8; transition:width 0.3s; }
+.coll-bar-fill.over { background:#fb7185; }
+.booking-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+.booking-row:last-child { border-bottom:none; }
+.booking-amt { font-family:'JetBrains Mono',monospace; font-weight:600; min-width:88px; text-align:right; }
+.booking-meta { flex:1; font-size:12px; color:var(--text-3); overflow:hidden; text-overflow:ellipsis; }
+.booking-sum { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.booking-sum-big { font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+.booking-empty { padding:22px 0; text-align:center; color:var(--text-3); font-size:13px; }
 .month-range { font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text-3); text-align:center; margin-top:1px; letter-spacing:0.02em; }
 
 /* ===== PAGE HEADER ===== */
@@ -433,6 +463,8 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
         </button>
       </div>
       <div class="kpi-row" id="kpiRow"></div>
+      <!-- Geplant / gebucht der Sammelposten. Nur sichtbar, wenn es welche gibt. -->
+      <div class="plan-card" id="planCard" style="display:none"></div>
       <div class="dash-reminders" id="dashReminders" style="display:none">
         <div class="dash-reminders-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg>
@@ -503,6 +535,10 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
             <input type="text" class="search-input" id="searchExpenses" placeholder="Suche nach Name, Kategorie oder Tag..." autocomplete="off">
             <button class="search-clear" id="clearSearchExpenses" style="display:none">&times;</button>
           </div>
+          <button class="btn" id="quickBookBtn" title="Schnell auf einen Sammelposten buchen" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>
+            Buchen
+          </button>
           <button class="btn btn-primary" id="addExpenseBtn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Hinzufügen
@@ -600,10 +636,21 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Bezeichnung</label><input class="form-input" id="fExpName" placeholder="z.B. Miete, Spotify, ..."></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Betrag (&euro;)</label><input class="form-input" id="fExpAmt" type="number" step="0.01" min="0" placeholder="0.00"></div>
+        <div class="form-group"><label class="form-label" id="fExpAmtLabel">Betrag (&euro;)</label><input class="form-input" id="fExpAmt" type="number" step="0.01" min="0" placeholder="0.00"></div>
         <div class="form-group"><label class="form-label">Kategorie</label><select class="form-select" id="fExpCat"></select></div>
       </div>
-      <div class="form-group">
+      <!-- Sammelposten: für schwankende Ausgaben wie Lebensmittel. Der Betrag
+           oben wird dann zum Budget, der Ist-Wert entsteht aus Buchungen. -->
+      <div class="form-check-row">
+        <input type="checkbox" class="form-check" id="fExpCollector">
+        <label class="form-check-label" for="fExpCollector">Sammelposten &mdash; Betrag schwankt, ich buche einzeln</label>
+      </div>
+      <div class="form-hint" id="collectorHint" style="display:none;font-size:12px;color:var(--text-3);line-height:1.55;margin:-4px 0 14px 0;">
+        Der Betrag oben ist dein <strong>Budget</strong>. Den Ist-Wert buchst du
+        über den Knopf &bdquo;Buchen&ldquo;. Jeder Monat startet wieder bei null
+        Buchungen, das Budget wandert mit.
+      </div>
+      <div class="form-group" id="expDateGroup">
         <label class="form-label">Datum (im gewählten Monat)</label>
         <input class="form-input" id="fExpDate" type="date" title="Tag der Ausgabe — leer lassen, wenn nur der Monat bekannt ist">
       </div>
@@ -657,6 +704,62 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-cancel" data-close-modal="mExpense">Abbrechen</button><button class="btn btn-primary" id="saveExpenseBtn">Speichern</button></div>
+  </div>
+</div>
+
+<!-- SCHNELLBUCHUNG: Posten wählen, Betrag eingeben, fertig. Der Dialog
+     bleibt nach dem Speichern offen, damit mehrere Belege am Stück
+     eingetippt werden können. -->
+<div class="modal-overlay" id="mBooking">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Buchen</h3><button class="modal-close" data-close-modal="mBooking">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="fBookPos">Position</label>
+        <select class="form-select" id="fBookPos"></select>
+      </div>
+      <div class="booking-sum" id="bookSum" style="display:none">
+        <span class="form-label" style="margin:0">Bisher gebucht</span>
+        <span><span class="booking-sum-big" id="bookSumValue">&mdash;</span> <span class="coll-plan" id="bookSumPlan"></span></span>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="fBookAmt">Betrag (&euro;)</label><input class="form-input" id="fBookAmt" type="number" step="0.01" min="0" placeholder="0.00"></div>
+        <div class="form-group"><label class="form-label" for="fBookDate">Datum</label><input class="form-input" id="fBookDate" type="date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="fBookNote">Notiz (optional)</label>
+        <input class="form-input" id="fBookNote" placeholder="z.B. Wocheneinkauf" maxlength="100">
+      </div>
+      <div class="form-hint" style="font-size:12px;color:var(--text-3);margin-top:-4px">
+        Enter speichert und lässt den Dialog offen &mdash; mehrere Belege am Stück.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" data-close-modal="mBooking">Fertig</button>
+      <button class="btn btn-primary" id="saveBookingBtn">Buchen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Buchungen eines Postens ansehen und einzeln entfernen -->
+<div class="modal-overlay" id="mBookingList">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="mBookingListTitle">Buchungen</h3><button class="modal-close" data-close-modal="mBookingList">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="booking-sum">
+        <span class="form-label" style="margin:0">Gebucht</span>
+        <span><span class="booking-sum-big" id="blSum">&mdash;</span> <span class="coll-plan" id="blPlan"></span></span>
+      </div>
+      <div id="blList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" data-close-modal="mBookingList">Schließen</button>
+      <button class="btn btn-primary" id="blAddBtn">Buchung hinzufügen</button>
+    </div>
   </div>
 </div>
 
@@ -902,7 +1005,7 @@ document.getElementById('sidebarUser').addEventListener('click', function(e) {
 // EVENT DELEGATION
 // ============================================================
 document.addEventListener('click', function(e) {
-  var target = e.target.closest('[data-page], [data-close-modal], #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  var target = e.target.closest('[data-page], [data-close-modal], #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #quickBookBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
   if (!target) return;
 
   // Navigation
@@ -929,6 +1032,7 @@ document.addEventListener('click', function(e) {
     return;
   }
   if (target.id === 'addExpenseBtn') { openExpenseModal(); return; }
+  if (target.id === 'quickBookBtn') { openBookingModal(); return; }
   if (target.id === 'addIncomeBtn') { openIncomeModal(); return; }
   if (target.id === 'addCatBtn') { openCatModal(); return; }
   if (target.id === 'saveExpenseBtn') { saveExpense(); return; }
@@ -1334,6 +1438,16 @@ setupSearch('searchCategories','clearSearchCategories','categories',renderCats);
 // ============================================================
 // EXPENSE MODAL & CRUD
 // ============================================================
+// Formular auf "Sammelposten" umstellen: aus dem Betrag wird ein Budget,
+// das Tagesdatum verschwindet (die Tage stecken in den Buchungen).
+function updateCollectorUi() {
+  var an = document.getElementById('fExpCollector').checked;
+  document.getElementById('fExpAmtLabel').innerHTML = an ? 'Budget pro Monat (&euro;)' : 'Betrag (&euro;)';
+  document.getElementById('collectorHint').style.display = an ? '' : 'none';
+  document.getElementById('expDateGroup').style.display = an ? 'none' : '';
+}
+document.getElementById('fExpCollector').addEventListener('change', updateCollectorUi);
+
 function openExpenseModal(id) {
   editExpId = id || null;
   editReminderId = null;
@@ -1361,6 +1475,11 @@ function openExpenseModal(id) {
     document.getElementById('fExpCat').value = e.categoryId || (e.category && e.category.id);
     dateInput.value = e.spentOn || '';
     document.getElementById('fExpRecurring').checked = e.isRecurring;
+    // Bei einem Sammelposten zeigt das Betragsfeld das BUDGET, nicht die
+    // gebuchte Summe — sonst würde ein erneutes Speichern das Budget
+    // stillschweigend auf den Ist-Wert setzen.
+    document.getElementById('fExpCollector').checked = !!e.isCollector;
+    if (e.isCollector) document.getElementById('fExpAmt').value = parseFloat(e.plannedAmount || 0);
     currentTags = (e.tags || []).slice();
     var rem = reminders.find(function(r) { return r.expenseId === id && r.status === 'pending'; });
     if (rem) {
@@ -1381,8 +1500,10 @@ function openExpenseModal(id) {
     dateInput.value = periodOf(today) === currentMonth ? today : '';
     // Bewusst NICHT vorausgewählt (häufigster Fall: einmalige Ausgabe).
     document.getElementById('fExpRecurring').checked = false;
+    document.getElementById('fExpCollector').checked = false;
     currentTags = [];
   }
+  updateCollectorUi();
   renderTagBadges();
   document.getElementById('fExpTags').value = '';
   closeTagSuggestions();
@@ -1396,7 +1517,10 @@ async function saveExpense() {
   var amount = parseFloat(document.getElementById('fExpAmt').value);
   var categoryId = document.getElementById('fExpCat').value;
   var isRecurring = document.getElementById('fExpRecurring').checked;
-  var spentOn = document.getElementById('fExpDate').value || null;
+  var isCollector = document.getElementById('fExpCollector').checked;
+  // Ein Sammelposten hat kein eigenes Tagesdatum — die Tage stehen an den
+  // einzelnen Buchungen.
+  var spentOn = isCollector ? null : (document.getElementById('fExpDate').value || null);
   var tags = currentTags.slice();
   if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
   if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
@@ -1432,9 +1556,9 @@ async function saveExpense() {
   var savedExpenseId = editExpId;
   try {
     if (editExpId) {
-      await api('/expenses/' + editExpId, { method: 'PUT', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring }) });
+      await api('/expenses/' + editExpId, { method: 'PUT', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring, isCollector: isCollector }) });
     } else {
-      var res = await api('/expenses', { method: 'POST', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring }) });
+      var res = await api('/expenses', { method: 'POST', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring, isCollector: isCollector }) });
       savedExpenseId = res.expense.id;
     }
   } catch(err) {
@@ -1481,6 +1605,144 @@ async function saveExpense() {
   }
   renderCurrentPage();
 }
+
+// ============================================================
+// SAMMELPOSTEN: BUCHEN
+// ============================================================
+var bookPosId = null;
+
+function sammelposten() {
+  return expenses.filter(function(e) { return e.isCollector; });
+}
+
+// Sichtbarkeit des "Buchen"-Knopfs: nur wenn es überhaupt Sammelposten gibt.
+function updateQuickBookBtn() {
+  document.getElementById('quickBookBtn').style.display = sammelposten().length ? '' : 'none';
+}
+
+function openBookingModal(posId) {
+  var liste = sammelposten();
+  if (!liste.length) { toast('Lege zuerst einen Sammelposten an', 'error'); return; }
+  var sel = document.getElementById('fBookPos');
+  sel.innerHTML = liste.map(function(e) {
+    return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.name) + '</option>';
+  }).join('');
+  sel.value = posId && liste.some(function(e) { return e.id === posId; }) ? posId : liste[0].id;
+  document.getElementById('fBookAmt').value = '';
+  document.getElementById('fBookNote').value = '';
+  // Heute vorbelegen, wenn heute in der gewählten Periode liegt.
+  var spanne = periodRange(currentMonth);
+  var d = document.getElementById('fBookDate');
+  d.min = spanne.start; d.max = spanne.end;
+  var today = heute();
+  d.value = periodOf(today) === currentMonth ? today : '';
+  updateBookSum();
+  openM('mBooking');
+  setTimeout(function() { document.getElementById('fBookAmt').focus(); }, 120);
+}
+
+function updateBookSum() {
+  var id = document.getElementById('fBookPos').value;
+  var e = expenses.find(function(x) { return x.id === id; });
+  var box = document.getElementById('bookSum');
+  if (!e) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  document.getElementById('bookSumValue').textContent = fmt(parseFloat(e.amount));
+  var plan = parseFloat(e.plannedAmount);
+  document.getElementById('bookSumPlan').textContent = isNaN(plan) ? '' : 'von ' + fmt(plan);
+}
+document.getElementById('fBookPos').addEventListener('change', updateBookSum);
+
+async function saveBooking() {
+  var id = document.getElementById('fBookPos').value;
+  var betrag = parseFloat(document.getElementById('fBookAmt').value);
+  var datum = document.getElementById('fBookDate').value || null;
+  var notiz = document.getElementById('fBookNote').value.trim();
+  if (!id) { toast('Bitte eine Position wählen', 'error'); return; }
+  if (isNaN(betrag) || betrag <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
+  if (datum && periodOf(datum) !== currentMonth) {
+    toast('Das Datum muss im gewählten Monat liegen', 'error'); return;
+  }
+  try {
+    await api('/expenses/' + id + '/bookings', {
+      method: 'POST',
+      body: JSON.stringify({ amount: betrag, bookedOn: datum, note: notiz }),
+    });
+    toast('Gebucht: ' + fmt(betrag));
+    // Dialog bleibt offen: Betrag und Notiz leeren, damit der nächste Beleg
+    // sofort eingetippt werden kann.
+    document.getElementById('fBookAmt').value = '';
+    document.getElementById('fBookNote').value = '';
+    document.getElementById('fBookAmt').focus();
+    await loadAllData(['expenses']);
+    updateBookSum();
+    renderCurrentPage();
+  } catch(err) {
+    toast((err.errors ? err.errors.join(', ') : null) || 'Buchung fehlgeschlagen', 'error');
+  }
+}
+
+async function openBookingList(posId) {
+  var e = expenses.find(function(x) { return x.id === posId; });
+  if (!e) return;
+  bookPosId = posId;
+  document.getElementById('mBookingListTitle').textContent = 'Buchungen: ' + e.name;
+  document.getElementById('blSum').textContent = fmt(parseFloat(e.amount));
+  var plan = parseFloat(e.plannedAmount);
+  document.getElementById('blPlan').textContent = isNaN(plan) ? '' : 'von ' + fmt(plan);
+  document.getElementById('blList').innerHTML = '<div class="booking-empty">Wird geladen…</div>';
+  openM('mBookingList');
+  try {
+    var res = await api('/expenses/' + posId + '/bookings');
+    renderBookingList(res.bookings || []);
+  } catch(err) {
+    document.getElementById('blList').innerHTML = '<div class="booking-empty">Buchungen konnten nicht geladen werden.</div>';
+  }
+}
+
+function renderBookingList(bookings) {
+  var el = document.getElementById('blList');
+  if (!bookings.length) {
+    el.innerHTML = '<div class="booking-empty">Noch nichts gebucht.</div>';
+    return;
+  }
+  el.innerHTML = bookings.map(function(b) {
+    var meta = [];
+    if (b.bookedOn) meta.push(fmtDay(b.bookedOn));
+    if (b.note) meta.push(b.note);
+    return '<div class="booking-row">' +
+      '<span class="booking-amt">' + escapeHtml(fmt(parseFloat(b.amount))) + '</span>' +
+      '<span class="booking-meta">' + escapeHtml(meta.join(' · ')) + '</span>' +
+      '<button class="icon-btn danger" data-del-booking="' + escapeHtml(b.id) + '" title="Buchung löschen">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+      '</button></div>';
+  }).join('');
+}
+
+document.getElementById('blList').addEventListener('click', async function(ev) {
+  var btn = ev.target.closest('[data-del-booking]');
+  if (!btn || !bookPosId) return;
+  try {
+    await api('/expenses/' + bookPosId + '/bookings/' + btn.dataset.delBooking, { method: 'DELETE' });
+    toast('Buchung gelöscht');
+    await loadAllData(['expenses']);
+    renderCurrentPage();
+    await openBookingList(bookPosId);
+  } catch(err) { toast('Fehler beim Löschen', 'error'); }
+});
+
+document.getElementById('saveBookingBtn').addEventListener('click', saveBooking);
+document.getElementById('fBookAmt').addEventListener('keydown', function(ev) {
+  if (ev.key === 'Enter') { ev.preventDefault(); saveBooking(); }
+});
+document.getElementById('fBookNote').addEventListener('keydown', function(ev) {
+  if (ev.key === 'Enter') { ev.preventDefault(); saveBooking(); }
+});
+document.getElementById('blAddBtn').addEventListener('click', function() {
+  var id = bookPosId;
+  closeM('mBookingList');
+  openBookingModal(id);
+});
 
 async function delExpense(id) {
   try {
@@ -1687,7 +1949,54 @@ function updateSidebar() {
 // ============================================================
 // RENDER: DASHBOARD
 // ============================================================
-function renderDash() { renderKPIs(); renderDashReminders(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
+function renderDash() { renderKPIs(); renderPlanCard(); renderDashReminders(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
+
+// "Geplant / gebucht": was von den Budgets der Sammelposten schon verbraucht
+// ist und was noch offen aussteht. Der offene Rest ist der Grund, warum
+// "Verbleibend" am Monatsanfang zu optimistisch aussieht — deshalb steht er
+// hier ausdrücklich dabei.
+function renderPlanCard() {
+  var card = document.getElementById('planCard');
+  var posten = sammelposten();
+  if (!posten.length) { card.style.display = 'none'; card.innerHTML = ''; return; }
+
+  var geplant = 0, gebucht = 0, offen = 0;
+  posten.forEach(function(e) {
+    var p = parseFloat(e.plannedAmount); if (isNaN(p)) p = 0;
+    var g = parseFloat(e.amount); if (isNaN(g)) g = 0;
+    geplant += p; gebucht += g; offen += Math.max(0, p - g);
+  });
+  var anteil = geplant > 0 ? Math.min(100, gebucht / geplant * 100) : 0;
+  var drueber = gebucht > geplant;
+
+  card.style.display = '';
+  card.innerHTML =
+    '<div class="plan-head">' +
+      '<span class="plan-title">Geplant und gebucht</span>' +
+      '<span class="plan-note">' + (offen > 0
+        ? 'Noch eingeplant: ' + escapeHtml(fmt(offen)) + ' \u00b7 danach bleiben ' + escapeHtml(fmt(balance() - offen))
+        : 'Alle Budgets ausgeschöpft') + '</span>' +
+    '</div>' +
+    '<div class="plan-bar"><span class="plan-bar-fill' + (drueber ? ' over' : '') +
+      '" style="width:' + anteil.toFixed(1) + '%"></span></div>' +
+    '<div class="plan-legend">' +
+      '<span>Gebucht <b>' + escapeHtml(fmt(gebucht)) + '</b></span>' +
+      '<span>Geplant <b>' + escapeHtml(fmt(geplant)) + '</b></span>' +
+      '<span>Offen <b>' + escapeHtml(fmt(offen)) + '</b></span>' +
+    '</div>' +
+    '<div class="plan-items">' + posten.map(function(e) {
+      var p = parseFloat(e.plannedAmount); if (isNaN(p)) p = 0;
+      var g = parseFloat(e.amount); if (isNaN(g)) g = 0;
+      return '<button type="button" class="plan-chip' + (g > p ? ' over' : '') +
+        '" data-book-pos="' + escapeHtml(e.id) + '" title="Auf diese Position buchen">' +
+        escapeHtml(e.name) + ' <b>' + escapeHtml(fmt(g)) + '</b> / ' + escapeHtml(fmt(p)) + '</button>';
+    }).join('') + '</div>';
+}
+
+document.getElementById('planCard').addEventListener('click', function(ev) {
+  var chip = ev.target.closest('[data-book-pos]');
+  if (chip) openBookingModal(chip.dataset.bookPos);
+});
 
 function grouped() {
   var m = {};
@@ -1944,6 +2253,7 @@ function renderCatFilter() {
 }
 
 function renderTable() {
+  updateQuickBookBtn();
   renderCatFilter();
   renderSortArrows();
   var filtered = getFilteredExpenses();
@@ -1966,11 +2276,12 @@ function renderTable() {
     var tagHtml = (e.tags || []).map(function(t2) { return '<span class="tag-mini">' + escapeHtml(t2) + '</span>'; }).join('');
     return '<tr>' +
       '<td class="date-cell" title="' + (e.spentOn ? escapeHtml(e.spentOn) : 'Kein Tagesdatum hinterlegt') + '">' + (fmtDay(e.spentOn) || '—') + '</td>' +
-      '<td style="font-weight:600">' + escapeHtml(e.name) + bellIcon + '</td>' +
+      '<td style="font-weight:600">' + escapeHtml(e.name) + bellIcon +
+        (e.isCollector ? '<span class="coll-badge">Sammelposten</span>' : '') + '</td>' +
       '<td><span class="cat-badge"><span class="cd" style="background:' + escapeHtml(c.color) + '"></span>' + escapeHtml(c.name) + '</span>' + tagHtml + '</td>' +
       // Betrag neutral: die Kategoriefarbe trägt schon der Punkt daneben,
       // eingefärbte Zahlen lasen sich wie eine (nicht vorhandene) Bewertung.
-      '<td class="amount-cell" style="text-align:right">' + fmt(a) + '</td>' +
+      '<td class="amount-cell" style="text-align:right">' + (e.isCollector ? collectorCell(e, a) : fmt(a)) + '</td>' +
       '<td style="text-align:right;color:var(--text-3);font-size:13px">' + p + '%</td>' +
       '<td style="text-align:center"><span class="recurring-badge ' + (e.isRecurring ? 'yes' : 'no') + '">' + (e.isRecurring ? '\u21bb Fest' : '\u25c7 Einmalig') + '</span></td>' +
       '<td><div class="row-actions">' +
@@ -1978,6 +2289,21 @@ function renderTable() {
         '<button class="icon-btn danger" data-del-expense="' + e.id + '" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>' +
       '</div></td></tr>';
   }).join('');
+}
+
+// Sammelposten in der Betragsspalte: gebucht, darunter "von <Budget>" und
+// ein Balken. Über dem Budget wird der Balken rot.
+function collectorCell(e, gebucht) {
+  var plan = parseFloat(e.plannedAmount);
+  if (isNaN(plan) || plan <= 0) return fmt(gebucht);
+  var anteil = Math.min(100, gebucht / plan * 100);
+  var drueber = gebucht > plan;
+  return '<span class="coll-cell">' +
+    '<span>' + escapeHtml(fmt(gebucht)) + '</span>' +
+    '<span class="coll-plan">von ' + escapeHtml(fmt(plan)) + '</span>' +
+    '<span class="coll-bar"><span class="coll-bar-fill' + (drueber ? ' over' : '') +
+      '" style="width:' + anteil.toFixed(1) + '%"></span></span>' +
+    '</span>';
 }
 
 // Sortier-Spaltenköpfe: Klick wechselt die Spalte bzw. dreht die Richtung.
@@ -1990,6 +2316,15 @@ document.getElementById('thSortAmount').addEventListener('click', function() {
   renderTable();
 });
 // Kategorie-Chips (Event-Delegation, die Chips werden je Monat neu gebaut)
+// Klick auf die Betragszelle eines Sammelpostens zeigt seine Buchungen.
+document.getElementById('expTbody').addEventListener('click', function(ev) {
+  var zelle = ev.target.closest('.coll-cell');
+  if (!zelle) return;
+  var zeile = zelle.closest('tr');
+  var btn = zeile && zeile.querySelector('[data-edit-expense]');
+  if (btn) openBookingList(btn.dataset.editExpense);
+});
+
 document.getElementById('catFilterRow').addEventListener('click', function(e) {
   var chip = e.target.closest('[data-cat-filter]');
   if (!chip) return;

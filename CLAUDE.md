@@ -195,8 +195,19 @@ spentOn (YYYY-MM-DD oder null, nicht enc — Tagesdatum, seit 2026-08-22;
   muss im month liegen, Bestandsdaten sind null; Auto-Copy/Propagation
   übertragen den Tag in den Zielmonat, gekappt auf Monatslänge (carryDay))
 isRecurring (Boolean), userId → User (Cascade Delete)
+isCollector (Boolean, default false) + plannedAmount (enc, optional)
+  → Sammelposten: `amount` ist die vom Server gepflegte Summe der Buchungen,
+    plannedAmount das Budget daneben. Siehe eigenen Abschnitt.
 Index: [userId, month]
-→ hat: reminders[]
+→ hat: reminders[], bookings[]
+```
+
+### ExpenseBooking
+```
+id (UUID), amount (enc), note (enc, optional), bookedOn (YYYY-MM-DD oder null, nicht enc)
+expenseId → Expense (Cascade Delete), userId → User (Cascade Delete)
+Index: [expenseId], [userId]
+Zweck: Einzelbuchung auf einen Sammelposten. Wird NIE in Folgemonate kopiert.
 ```
 
 ### Income
@@ -296,7 +307,11 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
   Ausgaben-/Einnahmensumme + Kategoriesummen übers Fenster (N 3–24, Default 12,
   Ende = month oder aktueller Monat). Entschlüsselt serverseitig, gibt NUR
   Summen zurück, keine Einzelposten. MUSS vor /:id registriert bleiben.
-- POST `/` — Neue Ausgabe (optional `spentOn`)
+- POST `/` — Neue Ausgabe (optional `spentOn`, `isCollector`)
+- GET `/:id/bookings` — Buchungen eines Sammelpostens
+- POST `/:id/bookings` — auf einen Sammelposten buchen (`amount`, `bookedOn?`, `note?`)
+- PUT `/:id/bookings/:bookingId` — Buchung ändern
+- DELETE `/:id/bookings/:bookingId` — Buchung löschen
 - PUT `/:id` — Ausgabe bearbeiten (`spentOn` mitschicken, sonst bleibt alt; leer = entfernen)
 - DELETE `/:id` — Ausgabe löschen
 
@@ -785,6 +800,51 @@ würden dabei verfälscht.
 **Einschränkung:** Wer wirklich die Zeichenfolge `&amp;` als Text speichert,
 bekommt sie als `&` zurück. Das ist der Preis dafür, Bestandsdaten ohne
 Migration zu reparieren.
+
+## Sammelposten — schwankende Beträge (2026-09-07)
+
+Fixkosten wie Miete haben jeden Monat denselben Betrag. Lebensmittel oder
+Tanken nicht. Für die gibt es **Sammelposten**: ein Posten mit einem Budget,
+auf den einzeln gebucht wird.
+
+**Das zentrale Prinzip: `Expense.amount` bleibt die eine Wahrheit.** Nach
+jeder Buchungsänderung rechnet `summeNeuBerechnen()` in `expenses.js` die
+Summe neu und schreibt sie zurück. Dadurch lesen Dashboard, Donut, Verlauf,
+Budget-Balken sowie PDF- und JSON-Export **unverändert** weiter — an keiner
+der rund 30 Lesestellen musste etwas geändert werden.
+
+| Feld | Bedeutung bei einem Sammelposten |
+|------|----------------------------------|
+| `amount` | Summe der Buchungen dieses Monats (Ist). Nie aus dem Formular überschrieben. |
+| `plannedAmount` | Budget (Plan). Diesen Wert zeigt der Dialog im Betragsfeld. |
+| `spentOn` | immer `null` — die Tage stehen an den einzelnen Buchungen |
+
+**Regeln, die man beim Anfassen kennen muss:**
+- **Monatswechsel:** Der Posten wird kopiert, `plannedAmount` wandert mit,
+  `amount` startet bei `0`, die Buchungen bleiben im alten Monat. Damit ist
+  das Problem gelöst, dass eine Korrektur im September den Oktober
+  überschrieb.
+- **PUT-Propagation** reicht bei Sammelposten NUR den Plan weiter, niemals
+  `amount` — der gebuchte Ist-Wert gehört seinem Monat.
+- **Dialog erneut speichern** darf den gebuchten Betrag nicht plätten:
+  `bleibtSammelposten` in der PUT-Route behält `existing.amount` bei.
+- **Umschalten auf normale Ausgabe** löscht die Buchungen (sie hätten keinen
+  Bezug mehr), der eingegebene Betrag wird wieder der Ist-Wert.
+- **`/summary`** liefert zusätzlich `collectors: { planned, booked, open }`
+  und `remainingAfterPlan`. `open` ist die Summe aus `max(0, Plan − Gebucht)`.
+  Ohne diesen Wert sähe der Monatsanfang so aus, als wäre noch alles Geld da.
+- **Historie bleibt ehrlich:** `amount` ist immer das echte Gebuchte, nie der
+  Plan. Ein September mit 137 gebucht bei 400 Plan zeigt im Verlauf 137.
+
+**Frontend:** Häkchen „Sammelposten" im Ausgaben-Dialog (aus dem Betragsfeld
+wird „Budget pro Monat"), Knopf „Buchen" in der Ausgabenleiste (nur sichtbar,
+wenn es Sammelposten gibt), Dialog `mBooking` bleibt nach dem Speichern offen
+für den nächsten Beleg (Enter bucht), `mBookingList` zeigt und löscht einzelne
+Buchungen, Karte „Geplant und gebucht" auf dem Dashboard.
+
+**Mock-Prisma:** `RUECKWAERTS_RELATION` in `tests/helpers/mockPrisma.js`
+löst 1:n-Includes auf (`include: { bookings: true }`). Der generische Weg
+kann nur die Gegenrichtung über `<relation>Id`.
 
 ## Wichtige Designentscheidungen
 

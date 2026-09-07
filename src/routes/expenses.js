@@ -5,7 +5,7 @@
 const express = require('express');
 const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
-const { validateExpense, sanitize } = require('../utils/validation');
+const { validateExpense, validateBooking, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 const { prevMonth, currentPeriod, carryDayToPeriod } = require('../utils/budgetPeriod');
@@ -23,13 +23,46 @@ function decryptExpense(exp, key) {
     ...exp,
     name: entschaerfe(decrypt(exp.name, key)),
     amount: decrypt(exp.amount, key),
+    // Bei Sammelposten ist `amount` die Summe der Buchungen, plannedAmount
+    // der Budgetwert daneben ("geplant / gebucht").
+    plannedAmount: exp.plannedAmount ? decrypt(exp.plannedAmount, key) : null,
     tags: entschaerfeListe(tags),
+    bookings: exp.bookings ? exp.bookings.map(b => decryptBooking(b, key)) : undefined,
+    bookingCount: exp.bookings ? exp.bookings.length : undefined,
     category: exp.category ? {
       ...exp.category,
       name: entschaerfe(decrypt(exp.category.name, key)),
       color: decrypt(exp.category.color, key),
     } : undefined,
   };
+}
+
+function decryptBooking(b, key) {
+  return {
+    id: b.id,
+    expenseId: b.expenseId,
+    amount: decrypt(b.amount, key),
+    note: b.note ? entschaerfe(decrypt(b.note, key)) : '',
+    bookedOn: b.bookedOn || null,
+    createdAt: b.createdAt,
+  };
+}
+
+// Summe der Buchungen eines Sammelpostens neu berechnen und in `amount`
+// zurückschreiben. Dadurch bleibt `amount` überall die eine Wahrheit —
+// Dashboard, Donut, Verlauf, PDF- und JSON-Export lesen unverändert weiter.
+async function summeNeuBerechnen(expenseId, key) {
+  const buchungen = await prisma.expenseBooking.findMany({ where: { expenseId } });
+  const summe = buchungen.reduce((s, b) => {
+    const n = parseFloat(decrypt(b.amount, key));
+    return s + (isNaN(n) ? 0 : n);
+  }, 0);
+  const gerundet = Math.round(summe * 100) / 100;
+  await prisma.expense.update({
+    where: { id: expenseId },
+    data: { amount: encrypt(String(gerundet), key) },
+  });
+  return gerundet;
 }
 
 // prevMonth, currentPeriod und carryDayToPeriod liegen in
@@ -51,7 +84,10 @@ router.get('/summary', async (req, res) => {
 
     const rawExpenses = await prisma.expense.findMany({
       where: { userId: req.userId, month },
-      include: { category: { select: { id: true, name: true, color: true } } },
+      include: {
+        category: { select: { id: true, name: true, color: true } },
+        bookings: true,
+      },
     });
 
     const rawIncomes = await prisma.income.findMany({
@@ -68,6 +104,23 @@ router.get('/summary', async (req, res) => {
 
     const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
     const totalIncome = incomes.reduce((s, i) => s + parseFloat(i.amount), 0);
+
+    // Sammelposten: was vom Budget noch NICHT gebucht ist. `totalExpenses`
+    // zählt nur echte Buchungen — ohne diesen Rest sähe der Monatsanfang so
+    // aus, als wäre noch alles Geld da, obwohl es längst eingeplant ist.
+    let plannedOpen = 0;
+    let plannedTotal = 0;
+    let bookedTotal = 0;
+    for (const e of expenses) {
+      if (!e.isCollector) continue;
+      const plan = parseFloat(e.plannedAmount);
+      const gebucht = parseFloat(e.amount);
+      const p = isNaN(plan) ? 0 : plan;
+      const g = isNaN(gebucht) ? 0 : gebucht;
+      plannedTotal += p;
+      bookedTotal += g;
+      plannedOpen += Math.max(0, p - g);
+    }
 
     const byCategory = {};
     for (const expense of expenses) {
@@ -105,6 +158,14 @@ router.get('/summary', async (req, res) => {
       totalExpenses: Math.round(totalExpenses * 100) / 100,
       totalIncome: Math.round(totalIncome * 100) / 100,
       remaining: Math.round((totalIncome - totalExpenses) * 100) / 100,
+      // "geplant / gebucht" der Sammelposten und was davon noch offen ist.
+      collectors: {
+        planned: Math.round(plannedTotal * 100) / 100,
+        booked: Math.round(bookedTotal * 100) / 100,
+        open: Math.round(plannedOpen * 100) / 100,
+      },
+      // Verbleibend, wenn man den noch nicht gebuchten Planrest schon abzieht.
+      remainingAfterPlan: Math.round((totalIncome - totalExpenses - plannedOpen) * 100) / 100,
       byCategory: Object.values(byCategory).sort((a, b) => b.total - a.total),
       byTag: Object.values(byTag).sort((a, b) => b.total - a.total),
       comparison: {
@@ -212,7 +273,10 @@ router.get('/', async (req, res) => {
 
     let rawExpenses = await prisma.expense.findMany({
       where: { userId: req.userId, month },
-      include: { category: { select: { id: true, name: true, color: true } } },
+      include: {
+        category: { select: { id: true, name: true, color: true } },
+        bookings: true,
+      },
     });
 
     // Wenn keine Ausgaben: nur kopieren wenn der Monat noch NICHT initialisiert wurde
@@ -254,20 +318,27 @@ router.get('/', async (req, res) => {
         await prisma.expense.createMany({
           data: sourceExpenses.map(e => ({
             name: e.name,           // bleibt verschlüsselt
-            amount: e.amount,       // bleibt verschlüsselt
             categoryId: e.categoryId,
             tags: e.tags,           // bleibt verschlüsselt
             userId: e.userId,
             month,
-            spentOn: carryDayToPeriod(e.spentOn, month, req.budgetStartDay),
+            spentOn: e.isCollector ? null : carryDayToPeriod(e.spentOn, month, req.budgetStartDay),
             isRecurring: true,
+            // Sammelposten fangen jeden Monat bei null Buchungen an; der
+            // Budgetwert wandert mit, die Buchungen bleiben im alten Monat.
+            isCollector: e.isCollector,
+            plannedAmount: e.plannedAmount,
+            amount: e.isCollector ? encrypt('0', req.encryptionKey) : e.amount,
           })),
         });
 
         // Neu erstellte laden
         rawExpenses = await prisma.expense.findMany({
           where: { userId: req.userId, month },
-          include: { category: { select: { id: true, name: true, color: true } } },
+          include: {
+            category: { select: { id: true, name: true, color: true } },
+            bookings: true,
+          },
         });
       }
 
@@ -331,15 +402,22 @@ router.post('/', async (req, res) => {
       : [];
     const encryptedTags = tags.length > 0 ? encrypt(JSON.stringify(tags), key) : '';
 
+    // Sammelposten: der eingegebene Betrag ist der PLAN, nicht der Ist-Wert.
+    // Gebucht wird nachher einzeln, `amount` startet deshalb bei 0.
+    const istSammelposten = req.body.isCollector === true;
+    const betrag = String(parseFloat(req.body.amount));
+
     const expense = await prisma.expense.create({
       data: {
         name: encrypt(sanitize(req.body.name), key),
-        amount: encrypt(String(parseFloat(req.body.amount)), key),
+        amount: encrypt(istSammelposten ? '0' : betrag, key),
+        plannedAmount: istSammelposten ? encrypt(betrag, key) : null,
+        isCollector: istSammelposten,
         categoryId: req.body.categoryId,
         tags: encryptedTags,
         userId: req.userId,
         month,
-        spentOn: readSpentOn(req.body),
+        spentOn: istSammelposten ? null : readSpentOn(req.body),
         isRecurring: req.body.isRecurring !== false,
       },
       include: { category: { select: { id: true, name: true, color: true } } },
@@ -355,12 +433,14 @@ router.post('/', async (req, res) => {
         await prisma.expense.createMany({
           data: futureInits.map(fi => ({
             name: expense.name,
-            amount: expense.amount,
+            amount: expense.amount, // bei Sammelposten bereits '0'
+            plannedAmount: expense.plannedAmount,
+            isCollector: expense.isCollector,
             categoryId: expense.categoryId,
             tags: expense.tags,
             userId: expense.userId,
             month: fi.month,
-            spentOn: carryDayToPeriod(expense.spentOn, fi.month, req.budgetStartDay),
+            spentOn: expense.isCollector ? null : carryDayToPeriod(expense.spentOn, fi.month, req.budgetStartDay),
             isRecurring: true,
           })),
         });
@@ -403,15 +483,40 @@ router.put('/:id', async (req, res) => {
       : [];
     const encryptedTags = tags.length > 0 ? encrypt(JSON.stringify(tags), key) : '';
 
+    // Sammelposten-Umschaltung:
+    //   normal -> Sammelposten: der eingegebene Betrag wird zum PLAN,
+    //     `amount` fällt auf 0 zurück (es gibt noch keine Buchungen).
+    //   Sammelposten -> normal: die Buchungen verlieren ihren Sinn und
+    //     werden entfernt, der eingegebene Betrag wird wieder der Ist-Wert.
+    const willSammelposten = req.body.isCollector !== undefined
+      ? req.body.isCollector === true
+      : existing.isCollector;
+    const betrag = String(parseFloat(req.body.amount));
+
+    if (existing.isCollector && !willSammelposten) {
+      await prisma.expenseBooking.deleteMany({ where: { expenseId: existing.id } });
+    }
+
+    // Bei einem Sammelposten ist `amount` die Summe der Buchungen und darf
+    // NICHT aus dem Formular überschrieben werden — sonst wäre der Ist-Wert
+    // beim nächsten Speichern des Dialogs wieder weg.
+    const bleibtSammelposten = existing.isCollector && willSammelposten;
+
     const expense = await prisma.expense.update({
       where: { id: req.params.id },
       data: {
         name: encrypt(sanitize(req.body.name), key),
-        amount: encrypt(String(parseFloat(req.body.amount)), key),
+        amount: bleibtSammelposten
+          ? existing.amount
+          : encrypt(willSammelposten ? '0' : betrag, key),
+        plannedAmount: willSammelposten ? encrypt(betrag, key) : null,
+        isCollector: willSammelposten,
         categoryId: req.body.categoryId,
         tags: encryptedTags,
         month: req.body.month || existing.month,
-        spentOn: req.body.spentOn !== undefined ? readSpentOn(req.body) : existing.spentOn,
+        spentOn: willSammelposten
+          ? null
+          : (req.body.spentOn !== undefined ? readSpentOn(req.body) : existing.spentOn),
         isRecurring: req.body.isRecurring ?? existing.isRecurring,
       },
       include: { category: { select: { id: true, name: true, color: true } } },
@@ -439,10 +544,17 @@ router.put('/:id', async (req, res) => {
           where: { id: kopie.id },
           data: {
             name: expense.name,
-            amount: expense.amount,
+            // Bei Sammelposten wandert nur der PLAN weiter. Der gebuchte
+            // Ist-Wert gehört dem jeweiligen Monat und darf von einer
+            // Korrektur im September nicht in den Oktober geschrieben werden.
+            ...(expense.isCollector ? {} : { amount: expense.amount }),
+            plannedAmount: expense.plannedAmount,
+            isCollector: expense.isCollector,
             categoryId: expense.categoryId,
             tags: expense.tags,
-            spentOn: carryDayToPeriod(expense.spentOn, kopie.month, req.budgetStartDay),
+            spentOn: expense.isCollector
+              ? null
+              : carryDayToPeriod(expense.spentOn, kopie.month, req.budgetStartDay),
           },
         });
       }
@@ -504,6 +616,138 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Ausgabe löschen fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Ausgabe konnte nicht gelöscht werden.' });
+  }
+});
+
+// ============================================================
+// BUCHUNGEN AUF SAMMELPOSTEN
+// ============================================================
+// Ein Sammelposten ("Rewe") sammelt Einzelbuchungen ein. Nach jeder
+// Änderung wird die Summe neu berechnet und in Expense.amount geschrieben —
+// dadurch lesen Dashboard, Verlauf und Export unverändert weiter.
+// Buchungen werden NIE in Folgemonate kopiert.
+// ============================================================
+
+// Posten laden und prüfen, dass er dem Nutzer gehört und Buchungen annimmt.
+async function ladeSammelposten(req, res) {
+  const posten = await prisma.expense.findFirst({
+    where: { id: req.params.id, userId: req.userId },
+  });
+  if (!posten) {
+    res.status(404).json({ error: 'Ausgabe nicht gefunden.' });
+    return null;
+  }
+  if (!posten.isCollector) {
+    res.status(400).json({ error: 'Auf diese Ausgabe kann nicht gebucht werden. Sie ist kein Sammelposten.' });
+    return null;
+  }
+  return posten;
+}
+
+// GET /api/expenses/:id/bookings — Buchungen eines Postens
+router.get('/:id/bookings', async (req, res) => {
+  try {
+    const posten = await ladeSammelposten(req, res);
+    if (!posten) return;
+
+    const buchungen = await prisma.expenseBooking.findMany({
+      where: { expenseId: posten.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ bookings: buchungen.map(b => decryptBooking(b, req.encryptionKey)) });
+
+  } catch (error) {
+    console.error('Buchungen laden fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Buchungen konnten nicht geladen werden.' });
+  }
+});
+
+// POST /api/expenses/:id/bookings — schnell etwas auf den Posten buchen
+router.post('/:id/bookings', async (req, res) => {
+  try {
+    const posten = await ladeSammelposten(req, res);
+    if (!posten) return;
+
+    const errors = validateBooking(req.body, posten.month, req.budgetStartDay);
+    if (errors.length > 0) return res.status(400).json({ errors });
+
+    const key = req.encryptionKey;
+    const buchung = await prisma.expenseBooking.create({
+      data: {
+        amount: encrypt(String(parseFloat(req.body.amount)), key),
+        note: req.body.note ? encrypt(sanitize(req.body.note), key) : '',
+        bookedOn: req.body.bookedOn ? req.body.bookedOn : null,
+        expenseId: posten.id,
+        userId: req.userId,
+      },
+    });
+
+    const summe = await summeNeuBerechnen(posten.id, key);
+
+    res.status(201).json({
+      booking: decryptBooking(buchung, key),
+      total: summe,
+    });
+
+  } catch (error) {
+    console.error('Buchung anlegen fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Die Buchung konnte nicht gespeichert werden.' });
+  }
+});
+
+// PUT /api/expenses/:id/bookings/:bookingId
+router.put('/:id/bookings/:bookingId', async (req, res) => {
+  try {
+    const posten = await ladeSammelposten(req, res);
+    if (!posten) return;
+
+    const vorhanden = await prisma.expenseBooking.findFirst({
+      where: { id: req.params.bookingId, expenseId: posten.id, userId: req.userId },
+    });
+    if (!vorhanden) return res.status(404).json({ error: 'Buchung nicht gefunden.' });
+
+    const errors = validateBooking(req.body, posten.month, req.budgetStartDay);
+    if (errors.length > 0) return res.status(400).json({ errors });
+
+    const key = req.encryptionKey;
+    const buchung = await prisma.expenseBooking.update({
+      where: { id: vorhanden.id },
+      data: {
+        amount: encrypt(String(parseFloat(req.body.amount)), key),
+        note: req.body.note ? encrypt(sanitize(req.body.note), key) : '',
+        bookedOn: req.body.bookedOn ? req.body.bookedOn : null,
+      },
+    });
+
+    const summe = await summeNeuBerechnen(posten.id, key);
+    res.json({ booking: decryptBooking(buchung, key), total: summe });
+
+  } catch (error) {
+    console.error('Buchung ändern fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Die Buchung konnte nicht geändert werden.' });
+  }
+});
+
+// DELETE /api/expenses/:id/bookings/:bookingId
+router.delete('/:id/bookings/:bookingId', async (req, res) => {
+  try {
+    const posten = await ladeSammelposten(req, res);
+    if (!posten) return;
+
+    const vorhanden = await prisma.expenseBooking.findFirst({
+      where: { id: req.params.bookingId, expenseId: posten.id, userId: req.userId },
+    });
+    if (!vorhanden) return res.status(404).json({ error: 'Buchung nicht gefunden.' });
+
+    await prisma.expenseBooking.delete({ where: { id: vorhanden.id } });
+    const summe = await summeNeuBerechnen(posten.id, req.encryptionKey);
+
+    res.json({ message: 'Buchung gelöscht.', total: summe });
+
+  } catch (error) {
+    console.error('Buchung löschen fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Die Buchung konnte nicht gelöscht werden.' });
   }
 });
 
