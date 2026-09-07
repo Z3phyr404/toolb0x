@@ -321,23 +321,29 @@ describe('PUT /api/expenses — Edit-Propagation', () => {
     assert.equal(decrypt(janAfter.name, key), 'Miete');
   });
 
-  it('KEINE Propagation wenn isRecurring auf false gesetzt wird', async () => {
+  it('isRecurring auf false → Auto-Kopien in Zukunftsmonaten werden entfernt', async () => {
+    const feb = seedExpense({ name: 'Miete', amount: 640, month: '2026-02' });
     const march = seedExpense({ name: 'Miete', amount: 640, month: '2026-03' });
+    // Auto-Kopie in April (identischer Ciphertext wie März)
     mockPrisma._store.expenses.push({
       id: crypto.randomUUID(), name: march.name, amount: march.amount,
       categoryId: testCategoryId, userId: auth.userId, month: '2026-04',
       isRecurring: true, createdAt: new Date(), updatedAt: new Date(),
     });
 
-    await request(app)
+    const res = await request(app)
       .put(`/api/expenses/${march.id}`)
       .set('Cookie', auth.cookie)
       .send({ name: 'Kaltmiete', amount: 580, categoryId: testCategoryId, isRecurring: false });
+    assert.equal(res.status, 200);
 
-    // April darf NICHT geändert sein
+    const months = mockPrisma._store.expenses.map(e => e.month).sort();
+    assert.deepEqual(months, ['2026-02', '2026-03'], 'April-Kopie muss weg sein, Februar bleibt');
+    assert.ok(mockPrisma._store.expenses.find(e => e.id === feb.id));
     const key = auth.encryptionKey;
-    const april = mockPrisma._store.expenses.find(e => e.month === '2026-04');
-    assert.equal(decrypt(april.name, key), 'Miete');
+    const edited = mockPrisma._store.expenses.find(e => e.id === march.id);
+    assert.equal(decrypt(edited.name, key), 'Kaltmiete');
+    assert.equal(edited.isRecurring, false);
   });
 
   it('unabhängig geänderte Kopien werden NICHT überschrieben', async () => {
@@ -410,6 +416,68 @@ describe('DELETE /api/expenses — Löschschutz', () => {
       .get('/api/expenses?month=2026-03')
       .set('Cookie', auth.cookie);
     assert.equal(res.body.expenses.length, 0, 'Gelöschte Ausgabe darf nicht zurückkommen');
+  });
+
+  it('löscht Auto-Kopien in bereits initialisierten Zukunftsmonaten mit', async () => {
+    // Der gemeldete Fehler: April wurde schon einmal geöffnet (Kopie existiert),
+    // dann wird die Ausgabe im März gelöscht → sie darf im April nicht bleiben.
+    seedExpense({ name: 'Netflix', amount: 12.99, month: '2026-03' });
+
+    let res = await request(app).get('/api/expenses?month=2026-04').set('Cookie', auth.cookie);
+    assert.equal(res.body.expenses.length, 1, 'April bekommt zunächst die Auto-Kopie');
+    res = await request(app).get('/api/expenses?month=2026-05').set('Cookie', auth.cookie);
+    assert.equal(res.body.expenses.length, 1, 'Mai ebenfalls');
+
+    const marchId = mockPrisma._store.expenses.find(e => e.month === '2026-03').id;
+    res = await request(app).delete(`/api/expenses/${marchId}`).set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+
+    assert.equal(mockPrisma._store.expenses.length, 0, 'März, April und Mai müssen leer sein');
+
+    res = await request(app).get('/api/expenses?month=2026-04').set('Cookie', auth.cookie);
+    assert.equal(res.body.expenses.length, 0, 'April darf die Ausgabe nicht mehr zeigen');
+    res = await request(app).get('/api/expenses?month=2026-05').set('Cookie', auth.cookie);
+    assert.equal(res.body.expenses.length, 0, 'Mai darf die Ausgabe nicht mehr zeigen');
+  });
+
+  it('lässt Vormonate, unabhängig bearbeitete Kopien und fremde Nutzer unangetastet', async () => {
+    const key = auth.encryptionKey;
+    const feb = seedExpense({ name: 'Netflix', amount: 12.99, month: '2026-02' });
+    const march = seedExpense({ name: 'Netflix', amount: 12.99, month: '2026-03' });
+    // Auto-Kopie im April (gleicher Ciphertext) → soll weg
+    const aprilCopy = {
+      id: crypto.randomUUID(), name: march.name, amount: march.amount,
+      categoryId: testCategoryId, userId: auth.userId, month: '2026-04',
+      isRecurring: true, createdAt: new Date(), updatedAt: new Date(),
+    };
+    // Im Mai unabhängig neu angelegt (eigener Ciphertext) → bleibt
+    const mayOwn = seedExpense({ name: 'Netflix', amount: 12.99, month: '2026-05' });
+    // Einmalige Ausgabe gleichen Namens im April → bleibt
+    const aprilOnce = seedExpense({ name: 'Netflix', amount: 12.99, month: '2026-04', isRecurring: false });
+    // Fremder Nutzer mit identischem Ciphertext (theoretisch) → bleibt
+    const foreign = { ...aprilCopy, id: crypto.randomUUID(), userId: crypto.randomUUID() };
+    mockPrisma._store.expenses.push(aprilCopy, foreign);
+
+    const res = await request(app).delete(`/api/expenses/${march.id}`).set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+
+    const ids = mockPrisma._store.expenses.map(e => e.id).sort();
+    assert.deepEqual(ids, [feb.id, mayOwn.id, aprilOnce.id, foreign.id].sort());
+    assert.equal(decrypt(mockPrisma._store.expenses.find(e => e.id === feb.id).name, key), 'Netflix');
+  });
+
+  it('nicht-wiederkehrende Ausgabe löscht nichts in Zukunftsmonaten', async () => {
+    const march = seedExpense({ name: 'Kino', amount: 15, month: '2026-03', isRecurring: false });
+    const april = {
+      id: crypto.randomUUID(), name: march.name, amount: march.amount,
+      categoryId: testCategoryId, userId: auth.userId, month: '2026-04',
+      isRecurring: true, createdAt: new Date(), updatedAt: new Date(),
+    };
+    mockPrisma._store.expenses.push(april);
+
+    await request(app).delete(`/api/expenses/${march.id}`).set('Cookie', auth.cookie);
+
+    assert.deepEqual(mockPrisma._store.expenses.map(e => e.id), [april.id]);
   });
 });
 

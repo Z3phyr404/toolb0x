@@ -230,7 +230,8 @@ describe('PUT /api/income — Edit-Propagation', () => {
     assert.equal(decrypt(janAfter.name, key), 'Gehalt');
   });
 
-  it('KEINE Propagation wenn isRecurring auf false gesetzt wird', async () => {
+  it('isRecurring auf false → Auto-Kopien in Zukunftsmonaten werden entfernt', async () => {
+    const feb = seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-02' });
     const march = seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-03' });
     mockPrisma._store.incomes.push({
       id: crypto.randomUUID(), name: march.name, amount: march.amount,
@@ -238,14 +239,17 @@ describe('PUT /api/income — Edit-Propagation', () => {
       isRecurring: true, createdAt: new Date(), updatedAt: new Date(),
     });
 
-    await request(app)
+    const res = await request(app)
       .put(`/api/income/${march.id}`)
       .set('Cookie', auth.cookie)
       .send({ name: 'Neues Gehalt', amount: 3500, isRecurring: false });
+    assert.equal(res.status, 200);
 
+    const months = mockPrisma._store.incomes.map(i => i.month).sort();
+    assert.deepEqual(months, ['2026-02', '2026-03'], 'April-Kopie muss weg sein, Februar bleibt');
+    assert.ok(mockPrisma._store.incomes.find(i => i.id === feb.id));
     const key = auth.encryptionKey;
-    const april = mockPrisma._store.incomes.find(i => i.month === '2026-04');
-    assert.equal(decrypt(april.name, key), 'Gehalt');
+    assert.equal(decrypt(mockPrisma._store.incomes.find(i => i.id === march.id).name, key), 'Neues Gehalt');
   });
 });
 
@@ -295,5 +299,35 @@ describe('DELETE /api/income — Löschschutz', () => {
       .get('/api/income?month=2026-03')
       .set('Cookie', auth.cookie);
     assert.equal(res.body.incomes.length, 0, 'Gelöschte Einnahme darf nicht zurückkommen');
+  });
+  it('löscht Auto-Kopien in bereits initialisierten Zukunftsmonaten mit', async () => {
+    seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-03' });
+
+    let res = await request(app).get('/api/income?month=2026-04').set('Cookie', auth.cookie);
+    assert.equal(res.body.incomes.length, 1, 'April bekommt zunächst die Auto-Kopie');
+
+    const marchId = mockPrisma._store.incomes.find(i => i.month === '2026-03').id;
+    res = await request(app).delete(`/api/income/${marchId}`).set('Cookie', auth.cookie);
+    assert.equal(res.status, 200);
+
+    assert.equal(mockPrisma._store.incomes.length, 0, 'März und April müssen leer sein');
+    res = await request(app).get('/api/income?month=2026-04').set('Cookie', auth.cookie);
+    assert.equal(res.body.incomes.length, 0, 'April darf die Einnahme nicht mehr zeigen');
+  });
+
+  it('lässt Vormonate und unabhängig angelegte Einträge unangetastet', async () => {
+    const feb = seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-02' });
+    const march = seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-03' });
+    const aprilCopy = {
+      id: crypto.randomUUID(), name: march.name, amount: march.amount,
+      userId: auth.userId, month: '2026-04',
+      isRecurring: true, createdAt: new Date(), updatedAt: new Date(),
+    };
+    mockPrisma._store.incomes.push(aprilCopy);
+    const mayOwn = seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-05' });
+
+    await request(app).delete(`/api/income/${march.id}`).set('Cookie', auth.cookie);
+
+    assert.deepEqual(mockPrisma._store.incomes.map(i => i.id).sort(), [feb.id, mayOwn.id].sort());
   });
 });

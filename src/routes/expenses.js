@@ -441,6 +441,17 @@ router.put('/:id', async (req, res) => {
           tags: expense.tags,
         },
       });
+    } else if (existing.isRecurring && !expense.isRecurring) {
+      // Wiederkehrend abgeschaltet → die Auto-Kopien in Zukunftsmonaten sind
+      // nur wegen "wiederkehrend" entstanden und müssen mit verschwinden.
+      await prisma.expense.deleteMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+      });
     }
 
     res.json({ expense: decryptExpense(expense, key) });
@@ -460,6 +471,21 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Ausgabe nicht gefunden.' });
 
     await prisma.expense.delete({ where: { id: req.params.id } });
+
+    // Auto-Kopien in bereits initialisierten Zukunftsmonaten mitlöschen — sonst
+    // taucht die Ausgabe im nächsten Monat wieder auf, sobald der schon einmal
+    // geöffnet wurde. Kopien erkennt man am identischen verschlüsselten Namen
+    // (unabhängig bearbeitete Kopien haben einen anderen Ciphertext und bleiben).
+    if (existing.isRecurring) {
+      await prisma.expense.deleteMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+      });
+    }
 
     // Monat als initialisiert markieren → verhindert Auto-Copy beim nächsten Laden
     await prisma.monthInit.upsert({

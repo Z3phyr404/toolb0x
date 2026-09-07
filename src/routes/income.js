@@ -196,6 +196,16 @@ router.put('/:id', async (req, res) => {
           amount: income.amount,
         },
       });
+    } else if (existing.isRecurring && !income.isRecurring) {
+      // Wiederkehrend abgeschaltet → Auto-Kopien in Zukunftsmonaten entfernen.
+      await prisma.income.deleteMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+      });
     }
 
     res.json({ income: decryptIncome(income, key) });
@@ -215,6 +225,19 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Einnahme nicht gefunden.' });
 
     await prisma.income.delete({ where: { id: req.params.id } });
+
+    // Auto-Kopien in bereits initialisierten Zukunftsmonaten mitlöschen
+    // (gleiche Logik wie bei Ausgaben, siehe expenses.js).
+    if (existing.isRecurring) {
+      await prisma.income.deleteMany({
+        where: {
+          userId: req.userId,
+          name: existing.name,
+          isRecurring: true,
+          month: { gt: existing.month },
+        },
+      });
+    }
 
     // Monat als initialisiert markieren → verhindert Auto-Copy beim nächsten Laden
     await prisma.monthInit.upsert({

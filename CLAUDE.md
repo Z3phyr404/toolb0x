@@ -728,6 +728,7 @@ Drei Pakete in `public/apps/finanzen/index.html` + Routen:
 - `tags` ist ein verschlüsselter JSON-Array-String (z.B. `'["Tag1","Tag2"]'`) — vor Speichern `JSON.stringify()`, nach Lesen `JSON.parse()`
 - `month` ist NICHT verschlüsselt (für DB-Queries nötig) — kein sensibles Datum
 - `MonthInit` verhindert, dass gelöschte `isRecurring`-Einträge bei Monatswechsel wieder entstehen
+- **Wiederkehrende Einträge sind pro Monat KOPIEN** (Ausgaben UND Einnahmen), verkettet nur über den identischen Ciphertext des Namens. Alle drei Operationen müssen deshalb in bereits initialisierte Zukunftsmonate durchgreifen: POST kopiert dorthin, PUT propagiert Änderungen, DELETE (und PUT mit `isRecurring:false`) löscht die Auto-Kopien dort (seit 2026-09-07 — vorher blieb ein gelöschter Eintrag im Folgemonat stehen, sobald der schon einmal geöffnet worden war). Vormonate, einmalige Einträge und unabhängig bearbeitete Kopien (eigener Ciphertext) bleiben unangetastet.
 - Bei Passwort-Änderung: ALLE Sessions des Users werden invalidiert (neu einloggen erforderlich)
 - Session-Store ist ein Singleton — `require('../utils/sessionStore')` gibt immer dieselbe Instanz zurück
 - PDF-Export nutzt `pdfkit` (server-seitig) — Decrypt-Helfer sind in `export.js` repliziert (gleiche Logik wie `expenses.js`/`income.js`)
