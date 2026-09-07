@@ -1250,7 +1250,11 @@
         if (!s) return '';
         var d = document.createElement('div');
         d.textContent = s;
-        return d.innerHTML;
+        // Serialisierung escaped in Textknoten nur &, < und >. Das Ergebnis
+        // landet aber auch in ATTRIBUTEN (title, style, data-*) — ohne
+        // Anführungszeichen-Escaping kann ein Wert dort ein eigenes
+        // Attribut aufmachen.
+        return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
 
       // --------------------------------------------------------
@@ -1476,7 +1480,7 @@
           var badge = p.vaultId
             ? '<span class="vault-badge" title="Geteilter Tresor">&#128101; ' + esc(p.vaultName || 'Tresor') + '</span>'
             : '';
-          var letter = (p.name || '?')[0].toUpperCase();
+          var letter = esc((p.name || '?')[0].toUpperCase());
           var tc = tileColor(p.name || '');
           var idx = revealIdx++;
           return '<div class="pw-card" data-reveal data-reveal-index="' + idx + '" data-glow-color="' + tc.bg.replace('0.14', '0.2') + '" data-id="' + p.id + '">' +

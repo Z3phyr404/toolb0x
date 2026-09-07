@@ -9,6 +9,7 @@ const { requireAuth } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
 const { unwrapMembershipKey } = require('../utils/vaultKeys');
 const { currentPeriod, periodRange, normalizeStartDay } = require('../utils/budgetPeriod');
+const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 
 const router = express.Router();
 
@@ -45,12 +46,12 @@ function decryptExpense(exp, key) {
   }
   return {
     ...exp,
-    name: decrypt(exp.name, key),
+    name: entschaerfe(decrypt(exp.name, key)),
     amount: decrypt(exp.amount, key),
-    tags,
+    tags: entschaerfeListe(tags),
     category: exp.category ? {
       ...exp.category,
-      name: decrypt(exp.category.name, key),
+      name: entschaerfe(decrypt(exp.category.name, key)),
       color: decrypt(exp.category.color, key),
     } : undefined,
   };
@@ -59,7 +60,7 @@ function decryptExpense(exp, key) {
 function decryptIncome(inc, key) {
   return {
     ...inc,
-    name: decrypt(inc.name, key),
+    name: entschaerfe(decrypt(inc.name, key)),
     amount: decrypt(inc.amount, key),
   };
 }
@@ -462,22 +463,30 @@ router.get('/pdf-all', async (req, res) => {
     const key = req.encryptionKey;
 
     // ---- Alle Daten laden & entschlüsseln ----
+    // Obergrenze je Tabelle, damit ein Export den 4-GB-Server nicht sprengt.
+    // Es wird EINE Zeile mehr geholt als angezeigt wird: nur so lässt sich
+    // erkennen, dass abgeschnitten wurde. Früher fehlten die ältesten Monate
+    // ohne jeden Hinweis — das PDF sah vollständig aus.
+    const MAX_ZEILEN = 20000;
     const [rawExpenses, rawIncomes] = await Promise.all([
       prisma.expense.findMany({
         where: { userId: req.userId },
         include: { category: { select: { id: true, name: true, color: true } } },
         orderBy: { month: 'desc' },
-        take: 10000,
+        take: MAX_ZEILEN + 1,
       }),
       prisma.income.findMany({
         where: { userId: req.userId },
         orderBy: { month: 'desc' },
-        take: 10000,
+        take: MAX_ZEILEN + 1,
       }),
     ]);
 
-    const expenses = rawExpenses.map(e => decryptExpense(e, key));
-    const incomes = rawIncomes.map(i => decryptIncome(i, key));
+    // Abgeschnitten? Dann die überzählige Zeile wieder wegnehmen und den
+    // Nutzer im PDF darauf hinweisen, statt stillschweigend Monate zu verlieren.
+    const abgeschnitten = rawExpenses.length > MAX_ZEILEN || rawIncomes.length > MAX_ZEILEN;
+    const expenses = rawExpenses.slice(0, MAX_ZEILEN).map(e => decryptExpense(e, key));
+    const incomes = rawIncomes.slice(0, MAX_ZEILEN).map(i => decryptIncome(i, key));
 
     // ---- Nach Monat gruppieren ----
     const expensesByMonth = {};
@@ -560,6 +569,15 @@ router.get('/pdf-all', async (req, res) => {
     // Breite hatte und umbrach. doc.save()/restore() stellt sie NICHT wieder her.
     doc.x = 50;
     doc.y = startY + boxHeight + 16;
+
+    if (abgeschnitten) {
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#C0392B')
+        .text(`Hinweis: Dieser Export enthält nur die neuesten ${MAX_ZEILEN.toLocaleString('de-DE')} Ausgaben bzw. Einnahmen. `
+          + 'Ältere Monate fehlen. Nutze für den vollständigen Bestand den Datenexport als JSON.',
+          { width: pageWidth });
+      doc.fillColor('#1a1a1a');
+      doc.moveDown(0.6);
+    }
 
     // ============ MONATSÜBERSICHT-TABELLE ============
     if (allMonths.length > 0) {
@@ -860,7 +878,7 @@ router.get('/json', async (req, res) => {
       },
       kategorien: kategorien.map(c => ({
         id: c.id,
-        name: decrypt(c.name, key),
+        name: entschaerfe(decrypt(c.name, key)),
         farbe: decrypt(c.color, key),
         erstelltAm: c.createdAt,
       })),
@@ -879,7 +897,7 @@ router.get('/json', async (req, res) => {
       }),
       einnahmen: einnahmen.map(i => ({
         id: i.id,
-        name: decrypt(i.name, key),
+        name: entschaerfe(decrypt(i.name, key)),
         betrag: decrypt(i.amount, key),
         monat: i.month,
         wiederkehrend: i.isRecurring,
@@ -887,7 +905,7 @@ router.get('/json', async (req, res) => {
       })),
       erinnerungen: erinnerungen.map(r => ({
         id: r.id,
-        notiz: r.note ? decrypt(r.note, key) : null,
+        notiz: r.note ? entschaerfe(decrypt(r.note, key)) : null,
         datum: r.reminderDate,
         tageVorher: r.daysBefore,
         status: r.status,
@@ -895,7 +913,7 @@ router.get('/json', async (req, res) => {
       })),
       notizen: notizen.map(n => ({
         id: n.id,
-        titel: decrypt(n.title, key),
+        titel: entschaerfe(decrypt(n.title, key)),
         inhaltHtml: n.content ? decrypt(n.content, key) : '',
         icon: n.icon,
         uebergeordneteSeite: n.parentId,
@@ -908,7 +926,7 @@ router.get('/json', async (req, res) => {
         const pk = p.vaultId ? vaultKeys[p.vaultId] : key;
         return {
           id: p.id,
-          name: decrypt(p.name, pk),
+          name: entschaerfe(decrypt(p.name, pk)),
           benutzername: p.username ? decrypt(p.username, pk) : '',
           passwort: decrypt(p.password, pk),
           website: p.website ? decrypt(p.website, pk) : '',

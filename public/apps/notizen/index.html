@@ -1505,7 +1505,7 @@
         archived.forEach(n => {
           const el = document.createElement('div');
           el.className = 'archive-item';
-          el.innerHTML = `<span class="tree-icon">${n.icon || '\u{1F4C4}'}</span>
+          el.innerHTML = `<span class="tree-icon">${esc(n.icon || '\u{1F4C4}')}</span>
             <span class="tree-label">${esc(n.title || 'Ohne Titel')}</span>
             <div class="archive-item-actions">
               <button class="tree-action-btn" data-restore="${n.id}" title="Wiederherstellen">
@@ -1555,7 +1555,7 @@
         : `<span class="tree-toggle invisible"></span>`;
 
       el.innerHTML = `${toggle}
-        <span class="tree-icon">${note.icon || '\u{1F4C4}'}</span>
+        <span class="tree-icon">${esc(note.icon || '\u{1F4C4}')}</span>
         <span class="tree-label">${esc(note.title || 'Ohne Titel')}</span>
         <div class="tree-actions">
           <button class="tree-action-btn" data-addchild="${note.id}" title="Unterseite">
@@ -1796,7 +1796,7 @@
           searchResults.innerHTML = results.length > 0
             ? `<div class="nav-group-label">ERGEBNISSE (${results.length})</div>` +
               results.map(r => `<div class="search-result" data-nav="${r.id}">
-                <div class="search-result-title"><span>${r.icon || '\u{1F4C4}'}</span> ${esc(r.title)}</div>
+                <div class="search-result-title"><span>${esc(r.icon || '\u{1F4C4}')}</span> ${esc(r.title)}</div>
                 ${r.snippet ? `<div class="search-result-snippet">${esc(r.snippet)}</div>` : ''}
               </div>`).join('')
             : '<div style="padding:16px;text-align:center;color:var(--text-3);font-size:13px">Keine Ergebnisse</div>';
@@ -1999,7 +1999,11 @@
     function esc(str) {
       const d = document.createElement('div');
       d.textContent = str;
-      return d.innerHTML;
+      // Serialisierung escaped in Textknoten nur &, < und >. Das Ergebnis
+      // landet aber auch in ATTRIBUTEN (title, style, data-*) — ohne
+      // Anführungszeichen-Escaping kann ein Wert dort ein eigenes
+      // Attribut aufmachen.
+      return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     // ============================================================

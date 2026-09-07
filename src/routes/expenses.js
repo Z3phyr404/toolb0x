@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateExpense, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 const { prevMonth, currentPeriod, carryDayToPeriod } = require('../utils/budgetPeriod');
 
 const router = express.Router();
@@ -20,12 +21,12 @@ function decryptExpense(exp, key) {
   }
   return {
     ...exp,
-    name: decrypt(exp.name, key),
+    name: entschaerfe(decrypt(exp.name, key)),
     amount: decrypt(exp.amount, key),
-    tags,
+    tags: entschaerfeListe(tags),
     category: exp.category ? {
       ...exp.category,
-      name: decrypt(exp.category.name, key),
+      name: entschaerfe(decrypt(exp.category.name, key)),
       color: decrypt(exp.category.color, key),
     } : undefined,
   };
@@ -61,7 +62,7 @@ router.get('/summary', async (req, res) => {
     const expenses = rawExpenses.map(e => decryptExpense(e, key));
     const incomes = rawIncomes.map(i => ({
       ...i,
-      name: decrypt(i.name, key),
+      name: entschaerfe(decrypt(i.name, key)),
       amount: decrypt(i.amount, key),
     }));
 
@@ -167,7 +168,7 @@ router.get('/history', async (req, res) => {
         if (!catNames[e.category.id]) {
           catNames[e.category.id] = {
             id: e.category.id,
-            name: decrypt(e.category.name, key),
+            name: entschaerfe(decrypt(e.category.name, key)),
             color: decrypt(e.category.color, key),
           };
         }
@@ -282,7 +283,7 @@ router.get('/', async (req, res) => {
     expenses.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
     const total = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
 
-    res.json({ expenses, total, month });
+    res.json({ expenses, total: Math.round(total * 100) / 100, month });
 
   } catch (error) {
     console.error('Ausgaben laden fehlgeschlagen:', error.message);
@@ -420,20 +421,31 @@ router.put('/:id', async (req, res) => {
     // Kopien werden anhand des alten verschlüsselten Namens gefunden
     // (beim Kopieren werden die verschlüsselten Werte 1:1 übernommen).
     if (expense.isRecurring && existing.isRecurring) {
-      await prisma.expense.updateMany({
+      const kopien = await prisma.expense.findMany({
         where: {
           userId: req.userId,
           name: existing.name,
           isRecurring: true,
           month: { gt: existing.month },
         },
-        data: {
-          name: expense.name,
-          amount: expense.amount,
-          categoryId: expense.categoryId,
-          tags: expense.tags,
-        },
+        select: { id: true, month: true },
       });
+      // Einzeln statt updateMany, weil das Tagesdatum je Zielmonat anders
+      // ausfällt (carryDayToPeriod). Vorher blieb spentOn in den Kopien auf
+      // dem alten Tag stehen: wer den Zahltag einer Abbuchung änderte, hatte
+      // ihn in allen Folgemonaten weiter auf dem alten Wert.
+      for (const kopie of kopien) {
+        await prisma.expense.update({
+          where: { id: kopie.id },
+          data: {
+            name: expense.name,
+            amount: expense.amount,
+            categoryId: expense.categoryId,
+            tags: expense.tags,
+            spentOn: carryDayToPeriod(expense.spentOn, kopie.month, req.budgetStartDay),
+          },
+        });
+      }
     } else if (existing.isRecurring && !expense.isRecurring) {
       // Wiederkehrend abgeschaltet → die Auto-Kopien in Zukunftsmonaten sind
       // nur wegen "wiederkehrend" entstanden und müssen mit verschwinden.

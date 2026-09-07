@@ -36,15 +36,28 @@ function initGlow(scopeOrId) {
     });
   });
 
-  // Farb-Wechsel bei Karten-Hover
-  scope.querySelectorAll('[data-glow-color]').forEach(function(card) {
-    var c = card.getAttribute('data-glow-color');
-    card.addEventListener('mouseenter', function() {
-      if (primary) primary.style.background = 'radial-gradient(circle,' + c + ',transparent 70%)';
-    });
-    card.addEventListener('mouseleave', function() {
-      if (primary) primary.style.background = baseBg;
-    });
+  // Farb-Wechsel bei Karten-Hover — per Delegation statt pro Element.
+  // Vorher bekam jede Karte ihren eigenen mouseenter-Handler; Listen, die
+  // per innerHTML neu gebaut werden (z.B. die KPI-Kacheln der Finanz-App),
+  // verloren ihn beim ersten Neu-Rendern und reagierten nicht mehr.
+  // mouseenter/leave steigen nicht auf, deshalb mouseover/mouseout mit
+  // relatedTarget-Prüfung (sonst flackert es beim Wechsel zwischen
+  // Kindelementen derselben Karte).
+  function glowKarte(e) {
+    if (!e.target || !e.target.closest) return null;
+    var card = e.target.closest('[data-glow-color]');
+    if (!card) return null;
+    if (e.relatedTarget && card.contains(e.relatedTarget)) return null;
+    return card;
+  }
+  scope.addEventListener('mouseover', function(e) {
+    var card = glowKarte(e);
+    if (card && primary) {
+      primary.style.background = 'radial-gradient(circle,' + card.getAttribute('data-glow-color') + ',transparent 70%)';
+    }
+  });
+  scope.addEventListener('mouseout', function(e) {
+    if (glowKarte(e) && primary) primary.style.background = baseBg;
   });
 }
 

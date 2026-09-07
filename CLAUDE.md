@@ -31,6 +31,7 @@ toolb0x/
 │   │   ├── vaultKeys.js                 # Tresor-Schlüssel entpacken (geteilte Tresore)
 │   │   ├── prisma.js                    # Zentrale Prisma-Instanz (ein Pool)
 │   │   ├── budgetPeriod.js             # Finanz-Perioden (verschiebbarer Monatsanfang)
+│   │   ├── legacyText.js               # Doppeltes HTML-Escaping aus Altdaten lösen
 │   │   └── validation.js               # Eingabe-Validierung & Sanitization
 │   ├── middleware/
 │   │   ├── auth.js                      # requireAuth + requireAdmin: JWT prüfen + Enc-Key aus RAM holen
@@ -754,6 +755,37 @@ nach, der Client ist reiner Komfort.
 - **Stub-Server:** `STUB_START_DAY=15 node tests/helpers/layout-stub-server.js`
   serviert die Frontends mit verschobenem Monatsanfang.
 
+## XSS-Schutz gehört an die AUSGABE, nicht an die Eingabe (2026-09-07)
+
+Bis dahin escapte `sanitize()` Nutzertext mit `validator.escape()`, BEVOR er
+verschlüsselt in die DB ging. Das war doppelt gemoppelt (die Frontends
+escapen beim Anzeigen ohnehin) und sichtbar falsch: eine Kategorie
+„Haushalt & Garten" erschien dem Nutzer als „Haushalt &amp;amp; Garten",
+„Müller's" als „Müller&amp;#x27;s" — in der App, im PDF und im DSGVO-Export.
+
+**Die neue Aufteilung:**
+- `sanitize()` entfernt nur noch Steuerzeichen und trimmt. Kein Escaping.
+- **Jedes Frontend escaped beim Anzeigen — inklusive Anführungszeichen.**
+  Die Funktionen `escapeHtml`/`esc` bauen auf `textContent`→`innerHTML`; das
+  escaped von Haus aus NUR `&`, `<`, `>`. Weil die Werte auch in ATTRIBUTEN
+  landen (`title`, `style`, `data-*`), hängen alle ein
+  `.replace(/"/g,'&quot;').replace(/'/g,'&#39;')` an. **Wer eine solche
+  Funktion anfasst oder neu schreibt, muss das mitnehmen** — sonst kann ein
+  Name wie `Test" onmouseover="…` ein eigenes Attribut aufmachen.
+- **Bestandsdaten** werden beim LESEN entschärft: `src/utils/legacyText.js`
+  (`entschaerfe`, `entschaerfeListe`). Verschlüsselte Felder lassen sich per
+  SQL nicht migrieren, deshalb dieser Weg.
+
+**NUR auf ehemals sanitizte Felder anwenden:** `Category.name`,
+`Expense.name`, `Expense.tags`, `Income.name`, `Reminder.note`,
+`StoredPassword.name`, `Note.title`. NICHT auf Passwörter, Notiz-Inhalte,
+Server-Felder oder Tresornamen — die liefen nie durch `sanitize()` und
+würden dabei verfälscht.
+
+**Einschränkung:** Wer wirklich die Zeichenfolge `&amp;` als Text speichert,
+bekommt sie als `&` zurück. Das ist der Preis dafür, Bestandsdaten ohne
+Migration zu reparieren.
+
 ## Wichtige Designentscheidungen
 
 - **Kein Frontend-Framework** — reines Vanilla JS, alles in einer HTML-Datei pro Tool
@@ -773,6 +805,10 @@ nach, der Client ist reiner Komfort.
 - `MonthInit` verhindert, dass gelöschte `isRecurring`-Einträge bei Monatswechsel wieder entstehen
 - **Wiederkehrende Einträge sind pro Monat KOPIEN** (Ausgaben UND Einnahmen), verkettet nur über den identischen Ciphertext des Namens. Alle drei Operationen müssen deshalb in bereits initialisierte Zukunftsmonate durchgreifen: POST kopiert dorthin, PUT propagiert Änderungen, DELETE (und PUT mit `isRecurring:false`) löscht die Auto-Kopien dort (seit 2026-09-07 — vorher blieb ein gelöschter Eintrag im Folgemonat stehen, sobald der schon einmal geöffnet worden war). Vormonate, einmalige Einträge und unabhängig bearbeitete Kopien (eigener Ciphertext) bleiben unangetastet.
 - Bei Passwort-Änderung: ALLE Sessions des Users werden invalidiert (neu einloggen erforderlich)
+- **Dashboard-Erinnerungen respektieren `daysBefore`** (seit 2026-09-07): Die Finanz-App filtert wie `/api/reminders/upcoming` auf `alertDate <= heute`. Vorher wurde `alertDate` berechnet und nie benutzt — eine Erinnerung mit einem Monat Vorlauf stand ab sofort dauerhaft im Dashboard.
+- **`initGlow` arbeitet mit Delegation** (seit 2026-09-07): Vorher bekam jede Karte einen eigenen `mouseenter`-Handler. Listen, die per `innerHTML` neu gebaut werden (KPI-Kacheln), verloren ihn beim ersten Neu-Rendern. Gleiche Falle bei jedem eigenen Handler auf neu gerenderten Elementen.
+- **KPI-Kacheln zeigen bewusst ganze Euro** — mit Nachkommastellen wachsen sie bei mittleren Fensterbreiten über ihre Spalte. Dadurch können die drei gerundeten Zahlen um bis zu einem Euro auseinandergehen; der exakte Wert steht im `title`-Tooltip.
+- **Der Gesamt-Export ist bei 20.000 Zeilen je Tabelle gedeckelt** und weist im PDF darauf hin, statt die ältesten Monate stillschweigend wegzulassen. Für den vollständigen Bestand ist `/api/export/json` gedacht.
 - **`decrypt()` wirft NICHT** — bei defektem Ciphertext liefert es den String `[Entschlüsselung fehlgeschlagen]`, bei leerem Input `null`. `parseFloat` davon ist `NaN`, und ein einziges `NaN` macht jede Summe darüber zu `NaN`. Jede Aggregation über entschlüsselte Beträge braucht deshalb einen Guard. In `export.js` gibt es dafür den Helfer `betrag()`, in `expenses.js` steht der Guard inline. Vor 2026-09-07 fehlte er im PDF-Export: eine kaputte Zeile machte ALLE Beträge im PDF zu „NaN €", ohne Fehler und ohne Log.
 - **Zweistufige Speichervorgänge dürfen den Dialog nicht offen lassen** (Muster, seit 2026-09-07): `saveExpense` legt erst die Ausgabe an, dann die Erinnerung. Scheiterte nur der zweite Schritt, blieb der Dialog offen und die Liste ungeladen — der Nutzer hielt die Ausgabe für fehlgeschlagen, klickte erneut und legte sie ein ZWEITES Mal an (bei wiederkehrenden Ausgaben samt Kopien in allen Folgemonaten). Regel: Sobald der erste Schritt erfolgreich war, wird der Dialog geschlossen und neu geladen; ein Fehler im zweiten Schritt wird nur als Toast gemeldet. Eingaben des zweiten Schritts VOR dem ersten prüfen.
 - **Ladefehler ≠ abgemeldet** (seit 2026-09-07): `initApp` leitet nur bei fehlender/abgelaufener Anmeldung auf `/portal` um. Früher hing `loadAllData()` im selben catch — ein 429 oder 500 warf den angemeldeten Nutzer ins Portal, von wo aus ihn der nächste Klick erneut hinauswarf (wirkte wie eine Endlosschleife).

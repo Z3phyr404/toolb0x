@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateIncome, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 const { prevMonth, currentPeriod } = require('../utils/budgetPeriod');
 
 const router = express.Router();
@@ -16,7 +17,7 @@ router.use(requireAuth);
 function decryptIncome(inc, key) {
   return {
     ...inc,
-    name: decrypt(inc.name, key),
+    name: entschaerfe(decrypt(inc.name, key)),
     amount: decrypt(inc.amount, key),
   };
 }
@@ -102,7 +103,7 @@ router.get('/', async (req, res) => {
     incomes.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount));
     const total = incomes.reduce((s, i) => s + parseFloat(i.amount), 0);
 
-    res.json({ incomes, total, month });
+    res.json({ incomes, total: Math.round(total * 100) / 100, month });
 
   } catch (error) {
     console.error('Einnahmen laden fehlgeschlagen:', error.message);

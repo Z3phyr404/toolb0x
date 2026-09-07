@@ -12,6 +12,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateStoredPassword, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe } = require('../utils/legacyText');
 const { getVaultKeyForUser, unwrapMembershipKey } = require('../utils/vaultKeys');
 
 const router = express.Router();
@@ -21,7 +22,7 @@ router.use(requireAuth);
 function decryptStoredPassword(entry, key) {
   return {
     id: entry.id,
-    name: decrypt(entry.name, key),
+    name: entschaerfe(decrypt(entry.name, key)),
     username: entry.username ? decrypt(entry.username, key) : '',
     password: decrypt(entry.password, key),
     website: entry.website ? decrypt(entry.website, key) : '',

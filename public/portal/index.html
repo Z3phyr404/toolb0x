@@ -420,7 +420,11 @@ function showRecoveryCode(code, onDone) {
 function escapeHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
-  return d.innerHTML;
+  // Serialisierung escaped in Textknoten nur &, < und >. Das Ergebnis
+  // landet aber auch in ATTRIBUTEN (title, style, data-*) — ohne
+  // Anführungszeichen-Escaping kann ein Wert dort ein eigenes
+  // Attribut aufmachen.
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function getCsrfToken() {

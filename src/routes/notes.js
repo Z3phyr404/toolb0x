@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateNote, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe } = require('../utils/legacyText');
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const largeBody = express.json({ limit: '500kb' });
 function decryptNote(note, key) {
   return {
     ...note,
-    title: decrypt(note.title, key),
+    title: entschaerfe(decrypt(note.title, key)),
     content: note.content ? decrypt(note.content, key) : '',
   };
 }
@@ -29,7 +30,7 @@ function decryptNote(note, key) {
 function decryptNoteMeta(note, key) {
   return {
     ...note,
-    title: decrypt(note.title, key),
+    title: entschaerfe(decrypt(note.title, key)),
   };
 }
 
@@ -111,7 +112,7 @@ router.get('/search', async (req, res) => {
 
     const results = [];
     for (const note of notes) {
-      const title = decrypt(note.title, req.encryptionKey);
+      const title = entschaerfe(decrypt(note.title, req.encryptionKey));
       const content = note.content ? decrypt(note.content, req.encryptionKey) : '';
       // HTML-Tags entfernen für Textsuche
       const plainContent = content.replace(/<[^>]*>/g, '');

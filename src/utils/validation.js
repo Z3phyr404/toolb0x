@@ -62,6 +62,13 @@ function validateLogin(data) {
   return errors;
 }
 
+// Ein Nicht-String im Namensfeld ({"name": 123} oder {"name": ["x"]}) lief
+// früher in `data.name.trim()` und damit in einen TypeError — die Route
+// antwortete mit 500 statt mit einer verständlichen 400.
+function istText(v) {
+  return typeof v === 'string';
+}
+
 // "2026-02-31" besteht den Ziffern-Regex, existiert aber nicht.
 function istEchtesDatum(ymd) {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -84,10 +91,9 @@ function validateExpense(data, startDay = 1) {
   const start = normalizeStartDay(startDay);
 
   // Name der Ausgabe
-  if (!data.name || data.name.trim().length === 0) {
+  if (!istText(data.name) || data.name.trim().length === 0) {
     errors.push('Bitte gib einen Namen für die Ausgabe ein.');
-  }
-  if (data.name && data.name.length > 100) {
+  } else if (data.name.length > 100) {
     errors.push('Der Name darf maximal 100 Zeichen lang sein.');
   }
 
@@ -107,7 +113,7 @@ function validateExpense(data, startDay = 1) {
   }
 
   // Monat (Format: YYYY-MM)
-  if (data.month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.month)) {
+  if (data.month && (!istText(data.month) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.month))) {
     errors.push('Ungültiges Monatsformat. Erwartet: YYYY-MM (z.B. 2026-02).');
   }
 
@@ -115,7 +121,7 @@ function validateExpense(data, startDay = 1) {
   // Bei Starttag 1 ist das der Kalendermonat, bei Starttag 15 z.B. der
   // Zeitraum 15.09.-14.10. Die Periode heißt nach ihrem Startmonat.
   if (data.spentOn !== undefined && data.spentOn !== null && data.spentOn !== '') {
-    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(data.spentOn)) {
+    if (!istText(data.spentOn) || !/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(data.spentOn)) {
       errors.push('Ungültiges Datum. Erwartet: YYYY-MM-DD (z.B. 2026-08-22).');
     } else if (!istEchtesDatum(data.spentOn)) {
       // Der Regex prüft nur die Ziffernform: der 31.02. käme sonst durch.
@@ -158,10 +164,9 @@ function validateExpense(data, startDay = 1) {
 function validateIncome(data) {
   const errors = [];
 
-  if (!data.name || data.name.trim().length === 0) {
+  if (!istText(data.name) || data.name.trim().length === 0) {
     errors.push('Bitte gib einen Namen für die Einnahme ein.');
-  }
-  if (data.name && data.name.length > 100) {
+  } else if (data.name.length > 100) {
     errors.push('Der Name darf maximal 100 Zeichen lang sein.');
   }
 
@@ -173,7 +178,7 @@ function validateIncome(data) {
     errors.push('Der Betrag darf maximal 999.999,99 € sein.');
   }
 
-  if (data.month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.month)) {
+  if (data.month && (!istText(data.month) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(data.month))) {
     errors.push('Ungültiges Monatsformat. Erwartet: YYYY-MM (z.B. 2026-02).');
   }
 
@@ -186,15 +191,14 @@ function validateIncome(data) {
 function validateCategory(data) {
   const errors = [];
 
-  if (!data.name || data.name.trim().length === 0) {
+  if (!istText(data.name) || data.name.trim().length === 0) {
     errors.push('Bitte gib einen Namen für die Kategorie ein.');
-  }
-  if (data.name && data.name.length > 50) {
+  } else if (data.name.length > 50) {
     errors.push('Der Kategorie-Name darf maximal 50 Zeichen lang sein.');
   }
 
   // Farbe muss ein gültiger Hex-Code sein
-  if (data.color && !/^#[0-9A-Fa-f]{6}$/.test(data.color)) {
+  if (data.color && (!istText(data.color) || !/^#[0-9A-Fa-f]{6}$/.test(data.color))) {
     errors.push('Ungültige Farbe. Erwartet: Hex-Code wie #FF5733.');
   }
 
@@ -202,18 +206,30 @@ function validateCategory(data) {
 }
 
 // --------------------------------------------------------
-// Text bereinigen (XSS-Schutz)
+// Text bereinigen
 // --------------------------------------------------------
-// XSS = Cross-Site Scripting. Jemand gibt als Ausgaben-Name
-// ein: <script>stealCookies()</script>
-// Ohne Bereinigung würde das als HTML ausgeführt werden.
+// Früher stand hier validator.escape(): Nutzertext wurde in HTML-Entities
+// umgewandelt, BEVOR er verschlüsselt gespeichert wurde. Das war Escaping
+// auf der falschen Ebene und hat mehr kaputtgemacht als geschützt:
+//
+//   - Der Server rendert nie HTML, die Frontends escapen beim Anzeigen
+//     ohnehin selbst. Der Schutz war also doppelt gemoppelt ...
+//   - ... und dadurch sichtbar falsch: aus "Haushalt & Garten" wurde für den
+//     Nutzer "Haushalt &amp; Garten", aus "Mueller's" wurde "Mueller&#x27;s".
+//     Im PDF- und im DSGVO-Export stand derselbe Unsinn.
+//
+// XSS-Schutz gehört an die Ausgabe, nicht an die Eingabe: alle Frontends
+// escapen inklusive Anführungszeichen (siehe escapeHtml/esc dort).
+// Hier bleibt nur, was wirklich in die Datenbank gehört: keine
+// Steuerzeichen, keine führenden/abschließenden Leerzeichen.
+// Zeilenumbrüche bleiben erhalten - mehrzeilige Notizen laufen ebenfalls
+// hier durch.
+// Bestandsdaten werden beim LESEN entschärft, siehe src/utils/legacyText.js.
+const STEUERZEICHEN = new RegExp('[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]', 'g');
+
 function sanitize(text) {
   if (typeof text !== 'string') return text;
-  return validator.escape(text.trim());
-  // escape() wandelt < > " ' & in ungefährliche HTML-Entities um:
-  // < wird zu &lt;
-  // > wird zu &gt;
-  // Das Script wird dann nur als Text angezeigt, nicht ausgeführt.
+  return text.replace(STEUERZEICHEN, '').trim();
 }
 
 // --------------------------------------------------------

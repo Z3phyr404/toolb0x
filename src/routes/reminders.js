@@ -11,6 +11,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateReminder, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 
 const router = express.Router();
 
@@ -20,14 +21,14 @@ router.use(requireAuth);
 function decryptReminder(rem, key) {
   let note = '';
   if (rem.note) {
-    try { note = decrypt(rem.note, key); } catch { note = ''; }
+    try { note = entschaerfe(decrypt(rem.note, key)); } catch { note = ''; }
   }
   return {
     ...rem,
     note,
     expense: rem.expense ? {
       ...rem.expense,
-      name: decrypt(rem.expense.name, key),
+      name: entschaerfe(decrypt(rem.expense.name, key)),
       amount: decrypt(rem.expense.amount, key),
     } : null,
   };

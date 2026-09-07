@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateCategory, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.use(requireAuth);
 function decryptCategory(cat, key) {
   return {
     ...cat,
-    name: decrypt(cat.name, key),
+    name: entschaerfe(decrypt(cat.name, key)),
     color: decrypt(cat.color, key),
   };
 }
@@ -50,7 +51,7 @@ router.post('/', async (req, res) => {
 
     // Duplikat-Prüfung
     const existing = await prisma.category.findMany({ where: { userId: req.userId } });
-    const decrypted = existing.map(c => ({ ...c, decName: decrypt(c.name, req.encryptionKey) }));
+    const decrypted = existing.map(c => ({ ...c, decName: entschaerfe(decrypt(c.name, req.encryptionKey)) }));
     if (decrypted.some(c => c.decName.toLowerCase() === name.toLowerCase())) {
       return res.status(400).json({ errors: ['Eine Kategorie mit diesem Namen existiert bereits.'] });
     }
@@ -86,7 +87,7 @@ router.put('/:id', async (req, res) => {
 
     // Duplikat-Prüfung
     const all = await prisma.category.findMany({ where: { userId: req.userId } });
-    const dup = all.find(c => c.id !== req.params.id && decrypt(c.name, req.encryptionKey).toLowerCase() === name.toLowerCase());
+    const dup = all.find(c => c.id !== req.params.id && entschaerfe(decrypt(c.name, req.encryptionKey)).toLowerCase() === name.toLowerCase());
     if (dup) return res.status(400).json({ errors: ['Eine Kategorie mit diesem Namen existiert bereits.'] });
 
     // Fix #9: Nur neu verschlüsseln wenn sich der Wert ändert
@@ -122,7 +123,13 @@ router.delete('/:id', async (req, res) => {
 
     if (category._count.expenses > 0) {
       const allCats = await prisma.category.findMany({ where: { userId: req.userId } });
-      let fallback = allCats.find(c => decrypt(c.name, req.encryptionKey) === 'Sonstiges');
+      // Gross-/Kleinschreibung ignorieren: Anlegen und Umbenennen prüfen
+      // ebenfalls case-insensitiv auf Duplikate. Wer seine Kategorie
+      // "sonstiges" genannt hat, bekam sonst eine ZWEITE namens "Sonstiges"
+      // und konnte danach keine der beiden mehr umbenennen.
+      let fallback = allCats.find(
+        c => entschaerfe(decrypt(c.name, req.encryptionKey))?.toLowerCase() === 'sonstiges',
+      );
 
       if (!fallback) {
         fallback = await prisma.category.create({

@@ -733,3 +733,86 @@ describe('Ausgaben mit verschobenem Monatsanfang (Starttag 15)', () => {
     assert.equal(res.status, 400);
   });
 });
+
+// ============================================================
+// ALTDATEN AUS DER ESCAPE-ÄRA (2026-09-07)
+// ============================================================
+// Bis dahin schrieb sanitize() HTML-Entities in die Datenbank. Beim Lesen
+// werden genau die früher sanitizten Felder wieder entschärft, damit
+// bestehende Einträge nicht dauerhaft als "Haushalt &amp; Garten" erscheinen.
+describe('Ausgaben — doppelt escapte Altdaten', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+    seedCategory();
+  });
+
+  after(() => cleanupAuth());
+
+  it('liefert Name, Tags und Kategorie wieder im Klartext', () => {
+    const key = auth.encryptionKey;
+    // So sah ein Datensatz vor der Änderung in der DB aus:
+    mockPrisma._store.categories[0].name = encrypt('Haushalt &amp; Garten', key);
+    mockPrisma._store.expenses.push({
+      id: crypto.randomUUID(),
+      name: encrypt('Müller&#x27;s Baumarkt', key),
+      amount: encrypt('42.5', key),
+      tags: encrypt(JSON.stringify(['Haus &amp; Hof']), key),
+      categoryId: testCategoryId,
+      userId: auth.userId,
+      month: '2026-03',
+      isRecurring: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return request(app)
+      .get('/api/expenses?month=2026-03')
+      .set('Cookie', auth.cookie)
+      .then((res) => {
+        assert.equal(res.status, 200);
+        const e = res.body.expenses[0];
+        assert.equal(e.name, "Müller's Baumarkt");
+        assert.deepEqual(e.tags, ['Haus & Hof']);
+        assert.equal(e.category.name, 'Haushalt & Garten');
+      });
+  });
+
+  it('löst NUR die von escape() erzeugten Entities auf, keine beliebigen', () => {
+    const key = auth.encryptionKey;
+    // &#xFC; hat sanitize() nie erzeugt (escape() lässt Nicht-ASCII in Ruhe).
+    // Wer das als Text eintippt, soll es auch zurückbekommen.
+    mockPrisma._store.expenses.push({
+      id: crypto.randomUUID(),
+      name: encrypt('Code &#xFC; literal', key),
+      amount: encrypt('1', key),
+      tags: '',
+      categoryId: testCategoryId,
+      userId: auth.userId,
+      month: '2026-03',
+      isRecurring: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return request(app)
+      .get('/api/expenses?month=2026-03')
+      .set('Cookie', auth.cookie)
+      .then((res) => {
+        assert.equal(res.body.expenses[0].name, 'Code &#xFC; literal');
+      });
+  });
+
+  it('neue Einträge werden gar nicht erst escaped gespeichert', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Haushalt & Garten', amount: 10, categoryId: testCategoryId, month: '2026-03' });
+
+    assert.equal(res.status, 201);
+    assert.equal(res.body.expense.name, 'Haushalt & Garten');
+    // Auch in der DB steht der Klartext (verschlüsselt), keine Entities
+    const roh = decrypt(mockPrisma._store.expenses[0].name, auth.encryptionKey);
+    assert.equal(roh, 'Haushalt & Garten');
+  });
+});

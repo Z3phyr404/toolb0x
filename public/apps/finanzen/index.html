@@ -848,8 +848,20 @@ async function api(path, options = {}) {
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), ...options.headers },
     ...options,
   });
-  const data = await res.json();
-  if (!res.ok) throw { status: res.status, ...data };
+  // Der Body ist nicht immer JSON: ein Proxy-Fehler liefert HTML, ein
+  // 204 gar nichts. Vorher warf res.json() dann, noch bevor res.status
+  // ausgewertet war — der Aufrufer sah einen Fehler ohne status.
+  let data = {};
+  try { data = await res.json(); } catch (e) { data = {}; }
+  if (!res.ok) {
+    // Abgelaufene Sitzung: der Nutzer soll sich neu anmelden können statt
+    // in einer scheinbar kaputten App zu sitzen, in der nichts mehr geht.
+    if (res.status === 401) {
+      SessionTimeout.stop();
+      window.location.href = '/portal';
+    }
+    throw { status: res.status, ...data };
+  }
   return data;
 }
 
@@ -857,7 +869,11 @@ async function api(path, options = {}) {
 function escapeHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
-  return d.innerHTML;
+  // Die HTML-Serialisierung escaped in Textknoten nur &, < und >.
+  // Das Ergebnis landet hier aber auch in ATTRIBUTEN (title, style) —
+  // ohne Anführungszeichen-Escaping konnte ein Name wie
+  // Test" onmouseover="… dort ein eigenes Attribut aufmachen.
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ============ TOAST ============
@@ -1004,7 +1020,7 @@ var LADER = {
 async function loadAllData(bereiche) {
   var was = bereiche || Object.keys(LADER);
   // Jede Datenänderung macht auch den Verlauf-Cache ungültig.
-  if (was.indexOf('expenses') !== -1 || was.indexOf('income') !== -1) histData = null;
+  if (was.indexOf('expenses') !== -1 || was.indexOf('income') !== -1) { histData = null; histLaeuft = null; }
   await Promise.all(was.map(function (b) { return LADER[b](); }));
 }
 
@@ -1020,7 +1036,7 @@ function changeMonth(delta) {
   currentMonth = newY + '-' + String(newM).padStart(2, '0');
   resetSearch();
   activeCatFilter = null;
-  histData = null; // Verlauf endet am gewählten Monat -> Cache verwerfen
+  histData = null; histLaeuft = null; // Verlauf endet am gewählten Monat -> Cache verwerfen
   updateMonthDisplay();
   loadAllData().then(function() { renderCurrentPage(); }).catch(function() {
     // Ohne diesen Zweig blieb bei einem Ladefehler (z.B. 429) die Überschrift
@@ -1469,8 +1485,11 @@ async function saveExpense() {
 async function delExpense(id) {
   try {
     await api('/expenses/' + id, { method: 'DELETE' });
-    expenses = expenses.filter(function(e) { return e.id !== id; });
     toast('Ausgabe gelöscht');
+    // Neu laden statt nur lokal filtern: sonst blieb der Verlauf-Cache auf
+    // dem alten Stand und eine Erinnerung an dieser Ausgabe zeigte im
+    // Dashboard weiter deren Namen (serverseitig ist die Verknüpfung weg).
+    await loadAllData(['expenses', 'reminders']);
     renderCurrentPage();
   } catch(err) { toast('Fehler beim Löschen', 'error'); }
 }
@@ -1493,7 +1512,9 @@ function openIncomeModal(id) {
     document.getElementById('mIncTitle').textContent = 'Einnahme hinzufügen';
     document.getElementById('fIncName').value = '';
     document.getElementById('fIncAmt').value = '';
-    document.getElementById('fIncRecurring').checked = true;
+    // Bewusst NICHT vorausgewählt — wie bei den Ausgaben. Eine übersehene
+    // Vorauswahl kopiert eine einmalige Zahlung in alle Folgemonate.
+    document.getElementById('fIncRecurring').checked = false;
   }
   openM('mIncome');
   setTimeout(function() { document.getElementById('fIncName').focus(); }, 120);
@@ -1535,8 +1556,8 @@ async function saveIncome() {
 async function delIncome(id) {
   try {
     await api('/income/' + id, { method: 'DELETE' });
-    incomes = incomes.filter(function(i) { return i.id !== id; });
     toast('Einnahme gelöscht');
+    await loadAllData(['income']);
     renderCurrentPage();
   } catch(err) { toast('Fehler beim Löschen', 'error'); }
 }
@@ -1684,18 +1705,24 @@ function renderKPIs() {
   var savCat = categories.find(function(c) { return c.name.toLowerCase().includes('spar'); });
   var savAmt = savCat ? expenses.filter(function(e2) { return (e2.categoryId || (e2.category && e2.category.id)) === savCat.id; }).reduce(function(s, e2) { return s + parseFloat(e2.amount); }, 0) : 0;
   var savRate = inc > 0 ? (savAmt / inc * 100).toFixed(1) : 0;
+  // Die Kacheln zeigen bewusst ganze Euro — mit Nachkommastellen wachsen sie
+  // bei mittleren Fensterbreiten über ihre Spalte hinaus. Dadurch können die
+  // drei gerundeten Zahlen um bis zu einem Euro auseinandergehen
+  // (2000,60 - 1200,30 = 800,30 zeigt 2001 - 1200 = 800). Der exakte Wert
+  // steht deshalb im Tooltip.
+  var genau = function(v) { return ' title="' + escapeHtml(fmt(v)) + '"'; };
   document.getElementById('kpiRow').innerHTML =
-    '<div class="kpi" data-reveal data-reveal-index="1" data-glow-color="rgba(52,211,153,0.24)">' +
+    '<div class="kpi"' + genau(inc) + ' data-reveal data-reveal-index="1" data-glow-color="rgba(52,211,153,0.24)">' +
       '<div class="kpi-icon" style="background:rgba(52,211,153,0.14);color:#34d399"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>' +
       '<div class="kpi-label">Einnahmen</div>' +
       '<div class="kpi-value" style="color:#34d399">' + fmtS(inc) + '</div>' +
     '</div>' +
-    '<div class="kpi" data-reveal data-reveal-index="2" data-glow-color="rgba(251,113,133,0.24)">' +
+    '<div class="kpi"' + genau(t) + ' data-reveal data-reveal-index="2" data-glow-color="rgba(251,113,133,0.24)">' +
       '<div class="kpi-icon" style="background:rgba(251,113,133,0.14);color:#fb7185"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg></div>' +
       '<div class="kpi-label">Ausgaben</div>' +
       '<div class="kpi-value" style="color:#fb7185">' + fmtS(t) + '</div>' +
     '</div>' +
-    '<div class="kpi" data-reveal data-reveal-index="3" data-glow-color="rgba(45,212,191,0.24)">' +
+    '<div class="kpi"' + genau(b) + ' data-reveal data-reveal-index="3" data-glow-color="rgba(45,212,191,0.24)">' +
       '<div class="kpi-icon" style="background:rgba(45,212,191,0.14);color:#2dd4bf"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.5" cy="13.5" r="1.3"/></svg></div>' +
       '<div class="kpi-label">Verbleibend</div>' +
       '<div class="kpi-value" style="color:' + (b >= 0 ? '#2dd4bf' : '#ff6b60') + '">' + fmtS(b) + '</div>' +
@@ -1718,8 +1745,14 @@ function renderDashReminders() {
     var alertDate = new Date(rd); alertDate.setDate(alertDate.getDate() - r.daysBefore);
     var daysLeft = Math.ceil((rd - today) / 86400000);
     return Object.assign({}, r, { daysLeft: daysLeft, alertDate: alertDate });
-  }).sort(function(a, b) { return a.daysLeft - b.daysLeft; });
+  })
+    // alertDate wurde bisher berechnet, aber nie benutzt: eine Erinnerung mit
+    // einem Monat Vorlauf stand ab sofort dauerhaft im Dashboard. Jetzt zählt
+    // sie erst ab ihrem Vorlauf — dieselbe Regel wie in /api/reminders/upcoming.
+    .filter(function(r) { return r.alertDate <= today; })
+    .sort(function(a, b) { return a.daysLeft - b.daysLeft; });
 
+  if (sorted.length === 0) { container.style.display = 'none'; return; }
   container.style.display = '';
   list.innerHTML = sorted.map(function(r) {
     var badge, cls;
@@ -1791,10 +1824,16 @@ function renderBars() {
 }
 
 function renderBudget() {
-  var grps = grouped(), inc = totalInc() || 1;
+  var grps = grouped(), inc = totalInc();
   var strip = document.getElementById('budgetStrip');
   var leg = document.getElementById('budgetLeg');
   strip.innerHTML = ''; leg.innerHTML = '';
+  // Ohne Einnahmen gibt es keinen Anteil. Der frühere Fallback "inc || 1"
+  // rechnete gegen 1 Euro und zeigte bei 850 Euro Miete "85000.0 %".
+  if (inc <= 0) {
+    leg.innerHTML = '<div class="budget-legend-item">Für einen Anteil fehlen die Einnahmen dieses Monats.</div>';
+    return;
+  }
   grps.forEach(function(g) {
     var p = g.amount / inc * 100;
     var s = document.createElement('div');
@@ -1886,7 +1925,15 @@ function renderCatFilter() {
   });
   var used = categories.filter(function(c) { return sums[c.id] > 0; })
     .sort(function(a, b) { return sums[b.id] - sums[a.id]; });
-  if (used.length < 2) { row.innerHTML = ''; return; }
+  // Zeigt eine gefilterte Kategorie in diesem Monat gar keine Posten mehr
+  // (gelöscht oder Monat gewechselt), fiele sie aus den Chips heraus — die
+  // Liste bliebe leer und der Filter unerreichbar. Dann lieber aufheben.
+  if (activeCatFilter && !used.some(function(c) { return c.id === activeCatFilter; })) {
+    activeCatFilter = null;
+  }
+  // Unter zwei Kategorien ist ein Filter sinnlos; die Chips würden aber auch
+  // den einzigen Weg zurück zu "Alle" verstecken.
+  if (used.length < 2) { activeCatFilter = null; row.innerHTML = ''; return; }
   var html = '<button type="button" class="cat-filter-chip' + (activeCatFilter ? '' : ' active') + '" data-cat-filter="">Alle</button>';
   html += used.map(function(c) {
     return '<button type="button" class="cat-filter-chip' + (activeCatFilter === c.id ? ' active' : '') + '" data-cat-filter="' + c.id + '">' +
@@ -1962,15 +2009,29 @@ document.getElementById('donutLeg').addEventListener('click', function(e) {
 // ============================================================
 // Ein Achsensystem, zwei Serien (Einnahmen/Ausgaben) als gruppierte Balken;
 // Werte stehen im Hover-Tooltip je Monat, nicht an jedem Balken.
+// Läuft gerade eine Verlaufs-Abfrage, und für welchen Monat?
+var histLaeuft = null;
+
 function renderHistory() {
   if (!histData) {
-    api('/expenses/history?months=12&month=' + currentMonth).then(function(r) {
-      histData = r;
-      if (currentPage === 'history') renderHistory();
-    }).catch(function() {
-      toast('Der Verlauf konnte nicht geladen werden.', 'error');
-    });
-    document.getElementById('histChart').innerHTML = '';
+    // Ohne diese beiden Absicherungen feuerte jeder Aufruf einen neuen
+    // Request, und bei schnellem Monatswechsel konnte die LANGSAMERE, ältere
+    // Antwort die neuere überschreiben — das Diagramm zeigte dann einen
+    // anderen Zeitraum als der Umschalter.
+    var gefragterMonat = currentMonth;
+    if (histLaeuft !== gefragterMonat) {
+      histLaeuft = gefragterMonat;
+      api('/expenses/history?months=12&month=' + gefragterMonat).then(function(r) {
+        if (gefragterMonat !== currentMonth) return; // Antwort ist überholt
+        histLaeuft = null;
+        histData = r;
+        if (currentPage === 'history') renderHistory();
+      }).catch(function() {
+        if (histLaeuft === gefragterMonat) histLaeuft = null;
+        if (gefragterMonat === currentMonth) toast('Der Verlauf konnte nicht geladen werden.', 'error');
+      });
+    }
+    document.getElementById('histChart').innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-3)">Wird geladen…</div>';
     document.getElementById('histMonths').innerHTML = '';
     document.getElementById('histKpis').innerHTML = '';
     document.getElementById('histCatChart').innerHTML = '';
