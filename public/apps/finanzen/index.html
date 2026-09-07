@@ -896,17 +896,28 @@ async function initApp() {
     document.getElementById('userName').textContent = res.user.name;
     document.getElementById('userEmail').textContent = res.user.email;
     document.getElementById('userAvatar').textContent = res.user.name.charAt(0).toUpperCase();
-    await loadAllData();
-    updateMonthDisplay();
-    go('dashboard');
-    SessionTimeout.start(function() { window.location.href = '/portal'; });
-    // Init glow + reveal
-    initGlow(document.body);
-    initReveal(document.querySelector('main'));
   } catch(err) {
+    // NUR eine fehlende/abgelaufene Anmeldung rechtfertigt den Sprung ins
+    // Portal. Früher hing das Laden der Daten im selben Zweig: ein 429 oder
+    // 500 warf den angemeldeten Nutzer ins Portal, von wo aus ihn der
+    // nächste Klick erneut hinauswarf (fühlte sich wie eine Schleife an).
     window.location.href = '/portal';
     return;
   } finally { hideLoading(); }
+
+  // Ab hier ist die Anmeldung gesichert — Ladefehler bleiben in der App.
+  try {
+    await loadAllData();
+  } catch(err) {
+    if (err && err.status === 401) { window.location.href = '/portal'; return; }
+    toast('Die Daten konnten nicht geladen werden. Bitte lade die Seite neu.', 'error');
+  }
+  updateMonthDisplay();
+  go('dashboard');
+  SessionTimeout.start(function() { window.location.href = '/portal'; });
+  // Init glow + reveal
+  initGlow(document.body);
+  initReveal(document.querySelector('main'));
 }
 
 // Lädt nur die angegebenen Bereiche neu (ohne Argument: alles).
@@ -931,6 +942,7 @@ async function loadAllData(bereiche) {
 // MONTH NAVIGATION
 // ============================================================
 function changeMonth(delta) {
+  var vorher = currentMonth;
   var parts = currentMonth.split('-').map(Number);
   var newM = parts[1] + delta, newY = parts[0];
   if (newM > 12) { newM = 1; newY++; }
@@ -940,7 +952,19 @@ function changeMonth(delta) {
   activeCatFilter = null;
   histData = null; // Verlauf endet am gewählten Monat -> Cache verwerfen
   updateMonthDisplay();
-  loadAllData().then(function() { renderCurrentPage(); });
+  loadAllData().then(function() { renderCurrentPage(); }).catch(function() {
+    // Ohne diesen Zweig blieb bei einem Ladefehler (z.B. 429) die Überschrift
+    // auf dem NEUEN Monat stehen, während Tabelle, Kacheln und Donut noch die
+    // Zahlen des alten zeigten — eine neue Ausgabe wäre dann im falschen
+    // Monat gelandet. Deshalb: zurück auf den Monat, dessen Daten wir haben.
+    currentMonth = vorher;
+    histData = null;
+    updateMonthDisplay();
+    toast('Der Monat konnte nicht geladen werden', 'error');
+    loadAllData().then(function() { renderCurrentPage(); }).catch(function() {
+      renderCurrentPage();
+    });
+  });
 }
 
 function updateMonthDisplay() {
@@ -1298,27 +1322,46 @@ async function saveExpense() {
       return;
     }
   }
+  var hasReminder = document.getElementById('fExpReminder').checked;
+  var reminderDate = document.getElementById('fExpReminderDate').value;
+  // Die Erinnerung VOR dem Speichern prüfen: früher lief die Prüfung erst,
+  // nachdem die Ausgabe schon angelegt war — der Nutzer las "Bitte
+  // Erinnerungsdatum eingeben", der Dialog schloss sich, und die Erinnerung
+  // war stillschweigend verworfen.
+  if (hasReminder && !reminderDate) {
+    toast('Bitte Erinnerungsdatum eingeben', 'error');
+    return;
+  }
+
+  // Schritt 1: die Ausgabe selbst. Nur hier darf der Dialog offen bleiben,
+  // damit der Nutzer es erneut versuchen kann.
+  var savedExpenseId = editExpId;
   try {
-    var savedExpenseId = editExpId;
     if (editExpId) {
       await api('/expenses/' + editExpId, { method: 'PUT', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring }) });
-      toast('Ausgabe aktualisiert');
     } else {
       var res = await api('/expenses', { method: 'POST', body: JSON.stringify({ name: name, amount: amount, categoryId: categoryId, tags: tags, month: currentMonth, spentOn: spentOn, isRecurring: isRecurring }) });
       savedExpenseId = res.expense.id;
-      toast('Ausgabe hinzugefügt');
     }
-    var hasReminder = document.getElementById('fExpReminder').checked;
+  } catch(err) {
+    toast((err.errors ? err.errors.join(', ') : null) || 'Fehler beim Speichern', 'error');
+    return;
+  }
+
+  // Ab hier IST die Ausgabe gespeichert. Ein Fehler bei der Erinnerung darf
+  // den Dialog nicht offen lassen — sonst hielt der Nutzer die Ausgabe für
+  // fehlgeschlagen, klickte erneut und legte sie ein zweites Mal an (bei
+  // wiederkehrenden Ausgaben samt Kopien in allen Folgemonaten).
+  var erinnerungFehler = false;
+  try {
     if (hasReminder) {
       var reminderPayload = {
-        reminderDate: document.getElementById('fExpReminderDate').value,
+        reminderDate: reminderDate,
         daysBefore: parseInt(document.getElementById('fExpReminderDays').value),
         note: document.getElementById('fExpReminderNote').value.trim(),
         expenseId: savedExpenseId,
       };
-      if (!reminderPayload.reminderDate) {
-        toast('Bitte Erinnerungsdatum eingeben', 'error');
-      } else if (editReminderId) {
+      if (editReminderId) {
         await api('/reminders/' + editReminderId, { method: 'PUT', body: JSON.stringify(reminderPayload) });
       } else {
         await api('/reminders', { method: 'POST', body: JSON.stringify(reminderPayload) });
@@ -1326,14 +1369,23 @@ async function saveExpense() {
     } else if (editReminderId) {
       await api('/reminders/' + editReminderId, { method: 'DELETE' });
     }
-    closeM('mExpense');
-    document.getElementById('saveExpenseBtn').textContent = 'Speichern';
-    // Ausgabe + evtl. Erinnerung geändert — Kategorien/Einnahmen nicht
-    await loadAllData(['expenses', 'reminders']);
-    renderCurrentPage();
   } catch(err) {
-    toast((err.errors ? err.errors.join(', ') : null) || 'Fehler beim Speichern', 'error');
+    erinnerungFehler = true;
   }
+
+  toast(editExpId ? 'Ausgabe aktualisiert' : 'Ausgabe hinzugefügt');
+  closeM('mExpense');
+  document.getElementById('saveExpenseBtn').textContent = 'Speichern';
+  if (erinnerungFehler) {
+    toast('Die Ausgabe wurde gespeichert, die Erinnerung nicht.', 'error');
+  }
+  // Ausgabe + evtl. Erinnerung geändert — Kategorien/Einnahmen nicht
+  try {
+    await loadAllData(['expenses', 'reminders']);
+  } catch(err) {
+    toast('Die Liste konnte nicht aktualisiert werden', 'error');
+  }
+  renderCurrentPage();
 }
 
 async function delExpense(id) {

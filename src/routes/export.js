@@ -25,6 +25,17 @@ function fmtEuro(n) {
   }) + ' €';
 }
 
+// Betrag aus einem entschlüsselten Feld lesen.
+// WICHTIG: decrypt() wirft bei einem defekten Ciphertext nicht, sondern gibt
+// '[Entschlüsselung fehlgeschlagen]' zurück — parseFloat davon ist NaN, und
+// ein einziges NaN macht jede Summe darüber zu NaN. Im PDF stand dann
+// überall "NaN €", ohne Fehler und ohne Log. Deshalb: defekte Werte zählen
+// als 0, damit der Rest des Exports benutzbar bleibt.
+function betrag(value) {
+  const num = parseFloat(value);
+  return isNaN(num) ? 0 : num;
+}
+
 // --- Decrypt-Helfer (gleiche Logik wie expenses.js / income.js) ---
 function decryptExpense(exp, key) {
   let tags = [];
@@ -121,15 +132,15 @@ router.get('/pdf', async (req, res) => {
     const incomes = rawIncomes.map(i => decryptIncome(i, key));
 
     // ---- Aggregationen ----
-    const totalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-    const totalIncome = incomes.reduce((s, i) => s + parseFloat(i.amount), 0);
+    const totalExpenses = expenses.reduce((s, e) => s + betrag(e.amount), 0);
+    const totalIncome = incomes.reduce((s, i) => s + betrag(i.amount), 0);
     const remaining = totalIncome - totalExpenses;
 
     // Sparquote
     const sparExpenses = expenses.filter(e =>
       e.category?.name?.toLowerCase().includes('spar')
     );
-    const sparAmount = sparExpenses.reduce((s, e) => s + parseFloat(e.amount), 0);
+    const sparAmount = sparExpenses.reduce((s, e) => s + betrag(e.amount), 0);
     const sparquote = totalIncome > 0 ? (sparAmount / totalIncome * 100) : 0;
 
     // Nach Kategorie
@@ -140,7 +151,7 @@ router.get('/pdf', async (req, res) => {
       if (!byCategory[catId]) {
         byCategory[catId] = { category: expense.category, total: 0, count: 0 };
       }
-      byCategory[catId].total += parseFloat(expense.amount);
+      byCategory[catId].total += betrag(expense.amount);
       byCategory[catId].count += 1;
     }
     const categoryGroups = Object.values(byCategory).sort((a, b) => b.total - a.total);
@@ -150,7 +161,7 @@ router.get('/pdf', async (req, res) => {
     for (const expense of expenses) {
       for (const tag of (expense.tags || [])) {
         if (!byTag[tag]) byTag[tag] = { tag, total: 0, count: 0 };
-        byTag[tag].total += parseFloat(expense.amount);
+        byTag[tag].total += betrag(expense.amount);
         byTag[tag].count += 1;
       }
     }
@@ -162,8 +173,7 @@ router.get('/pdf', async (req, res) => {
       where: { userId: req.userId, month: pm },
     });
     const prevTotal = prevRaw.reduce((s, e) => {
-      const num = parseFloat(decrypt(e.amount, key));
-      return s + (isNaN(num) ? 0 : num);
+      return s + betrag(decrypt(e.amount, key));
     }, 0);
     const change = Math.round((totalExpenses - prevTotal) * 100) / 100;
     const changePercent = prevTotal > 0
@@ -292,7 +302,7 @@ router.get('/pdf', async (req, res) => {
       sectionTitle(doc, 'Top 10 Ausgaben');
 
       const sorted = [...expenses]
-        .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+        .sort((a, b) => betrag(b.amount) - betrag(a.amount))
         .slice(0, 10);
 
       const colTop = [50, 68, 280, 400];
@@ -318,7 +328,7 @@ router.get('/pdf', async (req, res) => {
         doc.fillColor('#888888')
           .text(cat.name, colTop[2], rowY, { width: 110 });
         doc.fillColor('#333333').font('Helvetica-Bold')
-          .text(fmtEuro(parseFloat(expense.amount)), colTop[3], rowY, { width: 80, align: 'right' });
+          .text(fmtEuro(betrag(expense.amount)), colTop[3], rowY, { width: 80, align: 'right' });
 
         doc.y = rowY + 18;
       });
@@ -348,7 +358,7 @@ router.get('/pdf', async (req, res) => {
         doc.fillColor('#888888')
           .text(typ, colInc[1], rowY, { width: 90 });
         doc.fillColor('#30D158').font('Helvetica-Bold')
-          .text(fmtEuro(parseFloat(income.amount)), colInc[2], rowY, { width: 80, align: 'right' });
+          .text(fmtEuro(betrag(income.amount)), colInc[2], rowY, { width: 80, align: 'right' });
 
         doc.y = rowY + 18;
       }
@@ -465,8 +475,8 @@ router.get('/pdf-all', async (req, res) => {
     ])].sort().reverse();
 
     // ---- Gesamtsummen ----
-    const grandTotalExpenses = expenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-    const grandTotalIncome = incomes.reduce((s, i) => s + parseFloat(i.amount), 0);
+    const grandTotalExpenses = expenses.reduce((s, e) => s + betrag(e.amount), 0);
+    const grandTotalIncome = incomes.reduce((s, i) => s + betrag(i.amount), 0);
     const grandBalance = grandTotalIncome - grandTotalExpenses;
 
     // ---- PDF erstellen ----
@@ -543,8 +553,8 @@ router.get('/pdf-all', async (req, res) => {
       for (const m of allMonths) {
         checkPageBreak(doc, 20);
         const [yy, mm] = m.split('-');
-        const mExpenses = (expensesByMonth[m] || []).reduce((s, e) => s + parseFloat(e.amount), 0);
-        const mIncome = (incomesByMonth[m] || []).reduce((s, i) => s + parseFloat(i.amount), 0);
+        const mExpenses = (expensesByMonth[m] || []).reduce((s, e) => s + betrag(e.amount), 0);
+        const mIncome = (incomesByMonth[m] || []).reduce((s, i) => s + betrag(i.amount), 0);
         const mSaldo = mIncome - mExpenses;
         const rowY = doc.y;
 
@@ -582,8 +592,8 @@ router.get('/pdf-all', async (req, res) => {
       const monthName = `${MONTHS_DE[parseInt(mm) - 1]} ${yy}`;
       const mExpenses = expensesByMonth[m] || [];
       const mIncomes = incomesByMonth[m] || [];
-      const mTotalExp = mExpenses.reduce((s, e) => s + parseFloat(e.amount), 0);
-      const mTotalInc = mIncomes.reduce((s, i) => s + parseFloat(i.amount), 0);
+      const mTotalExp = mExpenses.reduce((s, e) => s + betrag(e.amount), 0);
+      const mTotalInc = mIncomes.reduce((s, i) => s + betrag(i.amount), 0);
       const mRemaining = mTotalInc - mTotalExp;
 
       // Monatstitel
@@ -626,7 +636,7 @@ router.get('/pdf-all', async (req, res) => {
           if (!byCategory[catId]) {
             byCategory[catId] = { category: expense.category, total: 0, count: 0 };
           }
-          byCategory[catId].total += parseFloat(expense.amount);
+          byCategory[catId].total += betrag(expense.amount);
           byCategory[catId].count += 1;
         }
         const categoryGroups = Object.values(byCategory).sort((a, b) => b.total - a.total);
@@ -701,7 +711,7 @@ router.get('/pdf-all', async (req, res) => {
           doc.fillColor('#888888')
             .text(typ, colInc[1], rowY, { width: 90 });
           doc.fillColor('#30D158').font('Helvetica-Bold')
-            .text(fmtEuro(parseFloat(income.amount)), colInc[2], rowY, { width: 80, align: 'right' });
+            .text(fmtEuro(betrag(income.amount)), colInc[2], rowY, { width: 80, align: 'right' });
 
           doc.y = rowY + 18;
         }

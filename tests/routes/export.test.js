@@ -9,6 +9,7 @@
 const { describe, it, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const request = require('supertest');
 
 // --- Mock-Prisma injizieren BEVOR die Route geladen wird ---
@@ -81,6 +82,37 @@ function seedIncome({ name, amount, month, isRecurring = true }) {
   };
   mockPrisma._store.incomes.push(record);
   return record;
+}
+
+// PDF-Rohbytes in lesbaren Text zurückverwandeln: PDFKit komprimiert die
+// Content-Streams (Flate) und schreibt Text darin als Hex-Strings.
+function pdfText(buf) {
+  let out = '';
+  let i = 0;
+  for (;;) {
+    const s = buf.indexOf('stream', i);
+    if (s === -1) break;
+    let a = s + 6;
+    if (buf[a] === 13) a++;
+    if (buf[a] === 10) a++;
+    const e = buf.indexOf('endstream', a);
+    if (e === -1) break;
+    try {
+      const roh = zlib.inflateSync(buf.subarray(a, e)).toString('latin1');
+      out += roh.replace(/<([0-9a-fA-F]+)>/g, (_, h) => Buffer.from(h, 'hex').toString('latin1'));
+    } catch { /* Nicht-Text-Stream (Bild, Font) — überspringen */ }
+    i = e + 9;
+  }
+  return out;
+}
+
+// Antwort als Buffer einlesen (supertest parst application/pdf sonst als Text).
+function alsBuffer(req) {
+  return req.buffer().parse((res, cb) => {
+    const teile = [];
+    res.on('data', (d) => teile.push(d));
+    res.on('end', () => cb(null, Buffer.concat(teile)));
+  });
 }
 
 // =================================================================
@@ -274,5 +306,69 @@ describe('GET /api/export/pdf-all — Gesamt-Export', () => {
       .set('Cookie', auth.cookie);
 
     assert.equal(res.status, 200);
+  });
+});
+
+// =================================================================
+// DEFEKTE CIPHERTEXTE — dürfen die Summen nicht vergiften
+// =================================================================
+// decrypt() wirft NICHT, sondern liefert '[Entschlüsselung fehlgeschlagen]'.
+// parseFloat davon ist NaN, und ein einziges NaN in einer Summe machte früher
+// ALLE Beträge im PDF zu "NaN €" — ohne Fehler und ohne Log.
+describe('Export — defekter Betrag macht die Summen nicht kaputt', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma);
+    seedCategory();
+  });
+
+  after(() => cleanupAuth());
+
+  // Ausgabe, deren amount mit einem FREMDEN Schlüssel verschlüsselt ist.
+  function seedKaputteAusgabe(month) {
+    const fremderKey = crypto.randomBytes(32);
+    const record = {
+      id: crypto.randomUUID(),
+      name: encrypt('Kaputt', auth.encryptionKey),
+      amount: encrypt('99', fremderKey),
+      tags: '',
+      categoryId: testCategoryId,
+      userId: auth.userId,
+      month,
+      isRecurring: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    mockPrisma._store.expenses.push(record);
+    return record;
+  }
+
+  it('Monats-PDF: kein "NaN" im Dokument, gute Beträge bleiben lesbar', async () => {
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-03' });
+    seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-03' });
+    seedKaputteAusgabe('2026-03');
+
+    const res = await alsBuffer(
+      request(app).get('/api/export/pdf?month=2026-03').set('Cookie', auth.cookie),
+    );
+
+    assert.equal(res.status, 200);
+    const text = pdfText(res.body);
+    assert.ok(!text.includes('NaN'), 'PDF darf kein NaN enthalten');
+    assert.ok(text.includes('640,00'), 'Der intakte Betrag muss weiterhin auftauchen');
+    assert.ok(text.includes('3.000,00'), 'Die Einnahme muss weiterhin auftauchen');
+  });
+
+  it('Gesamt-PDF: kein "NaN" im Dokument', async () => {
+    seedExpense({ name: 'Miete', amount: 640, month: '2026-03' });
+    seedIncome({ name: 'Gehalt', amount: 3000, month: '2026-03' });
+    seedKaputteAusgabe('2026-02');
+
+    const res = await alsBuffer(
+      request(app).get('/api/export/pdf-all').set('Cookie', auth.cookie),
+    );
+
+    assert.equal(res.status, 200);
+    assert.ok(!pdfText(res.body).includes('NaN'), 'Gesamt-PDF darf kein NaN enthalten');
   });
 });
