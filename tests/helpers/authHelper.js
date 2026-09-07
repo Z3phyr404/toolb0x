@@ -22,9 +22,11 @@ process.env.JWT_SECRET = TEST_JWT_SECRET;
  * (sonst 403 "Konto gesperrt" bei jedem Request).
  *
  * @param {object} [mockPrisma] - Mock aus createMockPrisma()
- * @returns {{ userId, encryptionKey, token, cookie }}
+ * @param {object} [opts] - z.B. { budgetStartDay: 15 } für einen
+ *   verschobenen Monatsanfang (Default 1 = Kalendermonat)
+ * @returns {{ userId, encryptionKey, token, cookie, budgetStartDay }}
  */
-function createTestAuth(mockPrisma) {
+function createTestAuth(mockPrisma, opts = {}) {
   const userId = crypto.randomUUID();
   const encryptionKey = generateEncryptionKey();
   const sessionId = sessionStore.create(userId, encryptionKey);
@@ -41,6 +43,7 @@ function createTestAuth(mockPrisma) {
       name: 'Test-User',
       role: 'user',
       suspended: false,
+      budgetStartDay: opts.budgetStartDay || 1,
       createdAt: new Date(),
     });
   }
@@ -50,6 +53,7 @@ function createTestAuth(mockPrisma) {
     encryptionKey,
     token,
     cookie: `auth_token=${token}`,
+    budgetStartDay: opts.budgetStartDay || 1,
   };
 }
 

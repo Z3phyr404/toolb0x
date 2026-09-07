@@ -8,6 +8,7 @@
 const jwt = require('jsonwebtoken');
 const sessionStore = require('../utils/sessionStore');
 const prisma = require('../utils/prisma');
+const { normalizeStartDay } = require('../utils/budgetPeriod');
 
 async function requireAuth(req, res, next) {
   try {
@@ -39,7 +40,7 @@ async function requireAuth(req, res, next) {
     // Suspended-Check: gesperrte Nutzer sofort abweisen
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { suspended: true },
+      select: { suspended: true, budgetStartDay: true },
     });
     if (!user || user.suspended) {
       sessionStore.delete(decoded.sid);
@@ -51,6 +52,9 @@ async function requireAuth(req, res, next) {
     req.userId = decoded.userId;
     req.sessionId = decoded.sid;
     req.encryptionKey = session.encryptionKey; // Buffer aus dem RAM
+    // Erster Tag des Finanzmonats (1-28). Hängt an der ohnehin nötigen
+    // Suspended-Abfrage, kostet also keine zusätzliche Query.
+    req.budgetStartDay = normalizeStartDay(user.budgetStartDay);
 
     // Sliding Session: Token bei jeder Anfrage erneuern
     // → Die 20-Minuten-Uhr startet bei jeder Aktion neu

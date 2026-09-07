@@ -11,6 +11,7 @@
 // ============================================================
 
 const validator = require('validator');
+const { isInPeriod, periodRange, normalizeStartDay } = require('./budgetPeriod');
 
 // --------------------------------------------------------
 // Registrierung validieren
@@ -61,11 +62,26 @@ function validateLogin(data) {
   return errors;
 }
 
+// "2026-02-31" besteht den Ziffern-Regex, existiert aber nicht.
+function istEchtesDatum(ymd) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+// "2026-10-14" -> "14.10.2026" (nur für Fehlermeldungen)
+function fmtTag(ymd) {
+  return `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}.${ymd.slice(0, 4)}`;
+}
+
 // --------------------------------------------------------
 // Ausgabe validieren
 // --------------------------------------------------------
-function validateExpense(data) {
+// startDay = erster Tag des Finanzmonats (1-28). Bei 1 ist die Periode der
+// Kalendermonat — das bisherige Verhalten.
+function validateExpense(data, startDay = 1) {
   const errors = [];
+  const start = normalizeStartDay(startDay);
 
   // Name der Ausgabe
   if (!data.name || data.name.trim().length === 0) {
@@ -95,12 +111,20 @@ function validateExpense(data) {
     errors.push('Ungültiges Monatsformat. Erwartet: YYYY-MM (z.B. 2026-02).');
   }
 
-  // Tagesdatum (optional, Format: YYYY-MM-DD) — muss im angegebenen Monat liegen
+  // Tagesdatum (optional, YYYY-MM-DD) — muss in der PERIODE liegen.
+  // Bei Starttag 1 ist das der Kalendermonat, bei Starttag 15 z.B. der
+  // Zeitraum 15.09.-14.10. Die Periode heißt nach ihrem Startmonat.
   if (data.spentOn !== undefined && data.spentOn !== null && data.spentOn !== '') {
     if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(data.spentOn)) {
       errors.push('Ungültiges Datum. Erwartet: YYYY-MM-DD (z.B. 2026-08-22).');
-    } else if (data.month && !data.spentOn.startsWith(data.month + '-')) {
-      errors.push('Das Datum muss im gewählten Monat liegen.');
+    } else if (!istEchtesDatum(data.spentOn)) {
+      // Der Regex prüft nur die Ziffernform: der 31.02. käme sonst durch.
+      errors.push('Dieses Datum gibt es nicht.');
+    } else if (data.month && !isInPeriod(data.spentOn, data.month, start)) {
+      const { start: von, end: bis } = periodRange(data.month, start);
+      errors.push(start === 1
+        ? 'Das Datum muss im gewählten Monat liegen.'
+        : `Das Datum muss im Zeitraum ${fmtTag(von)} bis ${fmtTag(bis)} liegen.`);
     }
   }
 

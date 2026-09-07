@@ -19,7 +19,11 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..', '..', 'public');
 const PORT = 3999;
 
-const USER = { id: 'stub-user-id', email: 'michael@test.de', name: 'Michael Test', role: 'admin', createdAt: '2026-01-01T00:00:00.000Z' };
+// Erster Tag des Finanzmonats zum Ausprobieren umstellbar:
+//   STUB_START_DAY=15 node tests/helpers/layout-stub-server.js
+const STUB_START_DAY = Number(process.env.STUB_START_DAY) || 1;
+
+const USER = { id: 'stub-user-id', email: 'michael@test.de', name: 'Michael Test', role: 'admin', createdAt: '2026-01-01T00:00:00.000Z', budgetStartDay: STUB_START_DAY };
 
 const API = {
   '/api/auth/me': { user: { ...USER, hasRecoveryCode: true } },
@@ -27,6 +31,7 @@ const API = {
   '/api/auth/reset-password': { message: 'Passwort zurückgesetzt.' },
   '/api/auth/reset-with-token': { message: 'Passwort zurückgesetzt.', recoveryCode: 'AB2C-DE3F-GH4J-KM5N-PQ6R-ST7U' },
   '/api/auth/recovery-code': { message: 'Neuer Recovery-Code erstellt.', recoveryCode: 'AB2C-DE3F-GH4J-KM5N-PQ6R-ST7U' },
+  '/api/auth/budget-start-day': { budgetStartDay: STUB_START_DAY, message: 'Monatsbeginn gespeichert.' },
   '/api/vaults': { vaults: [] },
   '/api/passwords': { passwords: Array.from({ length: 14 }, (_, i) => ({
     id: 'p' + i,
@@ -242,4 +247,4 @@ http.createServer((req, res) => {
   if (ext === '.html') content = content.toString().replaceAll('__CSP_NONCE__', 'dev');
   res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
   res.end(content);
-}).listen(PORT, () => console.log('Layout-Stub läuft auf http://localhost:' + PORT));
+}).listen(PORT, () => console.log('Layout-Stub läuft auf http://localhost:' + PORT + ' (Monatsbeginn: ' + STUB_START_DAY + '.)'));

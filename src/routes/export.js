@@ -8,6 +8,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { decrypt } = require('../utils/encryption');
 const { unwrapMembershipKey } = require('../utils/vaultKeys');
+const { currentPeriod, periodRange, normalizeStartDay } = require('../utils/budgetPeriod');
 
 const router = express.Router();
 
@@ -94,6 +95,20 @@ function drawLine(doc) {
     .moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).stroke();
 }
 
+// Beschriftung einer Periode. Bei Starttag 1 (Kalendermonat) bleibt es beim
+// bisherigen "September 2026"; bei verschobenem Monatsbeginn kommt der
+// tatsächliche Zeitraum dazu, damit das PDF nicht mehr verspricht, als es
+// enthält.
+function periodLabel(month, startDay) {
+  const [y, m] = month.split('-');
+  const basis = `${MONTHS_DE[parseInt(m, 10) - 1]} ${y}`;
+  const tag = normalizeStartDay(startDay);
+  if (tag === 1) return basis;
+  const { start, end } = periodRange(month, tag);
+  const kurz = (d) => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
+  return `${basis} (${kurz(start)} - ${kurz(end)})`;
+}
+
 // --- Abschnitts-Titel ---
 function sectionTitle(doc, text) {
   checkPageBreak(doc, 100);
@@ -108,7 +123,7 @@ function sectionTitle(doc, text) {
 // ============================================================
 router.get('/pdf', async (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || currentPeriod(req.budgetStartDay);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
@@ -116,6 +131,7 @@ router.get('/pdf', async (req, res) => {
     const key = req.encryptionKey;
     const [y, m] = month.split('-');
     const monthName = MONTHS_DE[parseInt(m) - 1];
+    const zeitraum = periodLabel(month, req.budgetStartDay);
 
     // ---- Daten laden & entschlüsseln ----
     const [rawExpenses, rawIncomes] = await Promise.all([
@@ -202,7 +218,7 @@ router.get('/pdf', async (req, res) => {
     doc.fontSize(22).font('Helvetica-Bold').fillColor('#1a1a1a')
       .text('Finanzübersicht', { align: 'center' });
     doc.fontSize(13).font('Helvetica').fillColor('#666666')
-      .text(`${monthName} ${y}`, { align: 'center' });
+      .text(zeitraum, { align: 'center' });
     doc.moveDown(1.5);
 
     // ============ KPI-BOXEN ============
@@ -236,12 +252,18 @@ router.get('/pdf', async (req, res) => {
       doc.restore();
     }
 
+    // PDFKit merkt sich die zuletzt benutzte X-Position; nach den KPI-Boxen
+    // stand sie am rechten Rand, wodurch jeder folgende Text nur noch ~110pt
+    // Breite hatte und umbrach. doc.save()/restore() stellt sie NICHT wieder her.
+    doc.x = 50;
     doc.y = startY + boxHeight + 8;
 
     // ============ VORMONATSVERGLEICH ============
     if (prevTotal > 0 || totalExpenses > 0) {
       doc.fontSize(9).font('Helvetica').fillColor('#888888');
-      const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '—';
+      // Helvetica kann U+25B2/U+25BC nicht darstellen (Breite 0) — die Pfeile
+      // fehlten im PDF ersatzlos. ASCII-Zeichen sind hier die sichere Wahl.
+      const arrow = change > 0 ? '+' : change < 0 ? '-' : '=';
       const changeColor = change > 0 ? '#FF3B30' : change < 0 ? '#30D158' : '#888888';
       const pctText = changePercent !== null ? ` (${changePercent > 0 ? '+' : ''}${changePercent} %)` : '';
       doc.fillColor(changeColor)
@@ -407,7 +429,7 @@ router.get('/pdf', async (req, res) => {
     if (expenses.length === 0 && incomes.length === 0) {
       doc.moveDown(2);
       doc.fontSize(12).font('Helvetica').fillColor('#999999')
-        .text(`Keine Daten für ${monthName} ${y} vorhanden.`, { align: 'center' });
+        .text(`Keine Daten für ${zeitraum} vorhanden.`, { align: 'center' });
     }
 
     // ============ FOOTER (auf jeder Seite) ============
@@ -533,6 +555,10 @@ router.get('/pdf-all', async (req, res) => {
       doc.restore();
     }
 
+    // PDFKit merkt sich die zuletzt benutzte X-Position; nach den KPI-Boxen
+    // stand sie am rechten Rand, wodurch jeder folgende Text nur noch ~110pt
+    // Breite hatte und umbrach. doc.save()/restore() stellt sie NICHT wieder her.
+    doc.x = 50;
     doc.y = startY + boxHeight + 16;
 
     // ============ MONATSÜBERSICHT-TABELLE ============
@@ -588,8 +614,7 @@ router.get('/pdf-all', async (req, res) => {
 
     // ============ PRO MONAT: DETAILS ============
     for (const m of allMonths) {
-      const [yy, mm] = m.split('-');
-      const monthName = `${MONTHS_DE[parseInt(mm) - 1]} ${yy}`;
+      const monthName = periodLabel(m, req.budgetStartDay);
       const mExpenses = expensesByMonth[m] || [];
       const mIncomes = incomesByMonth[m] || [];
       const mTotalExp = mExpenses.reduce((s, e) => s + betrag(e.amount), 0);

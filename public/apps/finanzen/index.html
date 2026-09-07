@@ -61,6 +61,7 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; position:relative; }
 .month-btn { width:30px; height:30px; border:none; border-radius:8px; background:rgba(255,255,255,0.06); color:rgba(238,241,246,0.7); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s; font-family:inherit; }
 .month-btn:hover { background:rgba(255,255,255,0.14); }
 .month-display { font-size:14px; font-weight:600; min-width:120px; text-align:center; }
+.month-range { font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--text-3); text-align:center; margin-top:1px; letter-spacing:0.02em; }
 
 /* ===== PAGE HEADER ===== */
 .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:14px; clear:both; }
@@ -412,7 +413,10 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
     <!-- MONTH SELECTOR -->
     <div class="month-selector" id="monthSelector">
       <button class="month-btn" id="monthPrev">&#8249;</button>
-      <div class="month-display" id="monthDisplay">&mdash;</div>
+      <div>
+        <div class="month-display" id="monthDisplay">&mdash;</div>
+        <div class="month-range" id="monthRange" style="display:none"></div>
+      </div>
       <button class="month-btn" id="monthNext">&#8250;</button>
     </div>
 
@@ -743,7 +747,7 @@ let currentUser = null;
 let categories = [];
 let expenses = [];
 let incomes = [];
-let currentMonth = new Date().toISOString().slice(0, 7);
+let currentMonth = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0'); // wird in initApp auf die Periode gesetzt
 let editExpId = null;
 let editIncId = null;
 let editCatId = null;
@@ -767,6 +771,68 @@ const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','Augus
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
   return MONTHS_DE[parseInt(m) - 1] + ' ' + y;
+}
+
+// ============================================================
+// FINANZ-PERIODEN — verschiebbarer Monatsanfang
+// ============================================================
+// Spiegelt src/utils/budgetPeriod.js. Der Schlüssel bleibt "YYYY-MM"; eine
+// Periode heißt nach dem Monat, in dem sie BEGINNT. Bei Starttag 15 umfasst
+// "2026-09" also den 15.09. bis 14.10. Bei Starttag 1 ist alles wie bisher.
+// Wird beim Ändern hier IMMER auch serverseitig angepasst — die Route prüft
+// das Datum nochmals gegen die Periode.
+var budgetStartDay = 1;
+
+function normalizeStartDay(v) {
+  var n = parseInt(v, 10);
+  return (isNaN(n) || n < 1 || n > 28) ? 1 : n;
+}
+function ymNext(ym) {
+  var p = ym.split('-').map(Number);
+  return p[1] === 12 ? (p[0] + 1) + '-01' : p[0] + '-' + String(p[1] + 1).padStart(2, '0');
+}
+function ymPrev(ym) {
+  var p = ym.split('-').map(Number);
+  return p[1] === 1 ? (p[0] - 1) + '-12' : p[0] + '-' + String(p[1] - 1).padStart(2, '0');
+}
+function daysInMonth(ym) {
+  var p = ym.split('-').map(Number);
+  return new Date(p[0], p[1], 0).getDate();
+}
+function dateIn(ym, day) {
+  return ym + '-' + String(Math.min(day, daysInMonth(ym))).padStart(2, '0');
+}
+/** Zeitraum der Periode, beide Grenzen inklusive. */
+function periodRange(ym) {
+  var d = normalizeStartDay(budgetStartDay);
+  if (d === 1) return { start: ym + '-01', end: dateIn(ym, 31) };
+  var next = ymNext(ym);
+  var startNext = Math.min(d, daysInMonth(next));
+  return {
+    start: dateIn(ym, d),
+    end: startNext === 1 ? dateIn(ym, 31) : next + '-' + String(startNext - 1).padStart(2, '0'),
+  };
+}
+/** Zu welcher Periode gehört ein Tag "YYYY-MM-DD"? */
+function periodOf(ymd) {
+  var d = normalizeStartDay(budgetStartDay);
+  var ym = ymd.slice(0, 7);
+  if (d === 1) return ym;
+  return Number(ymd.slice(8, 10)) >= Math.min(d, daysInMonth(ym)) ? ym : ymPrev(ym);
+}
+/** Heute in LOKALER Zeit (toISOString wäre UTC und läge nachts daneben). */
+function heute() {
+  var n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+}
+/** Die Periode, in der heute liegt. */
+function currentPeriod() { return periodOf(heute()); }
+/** "2026-10-14" -> "14.10." */
+function fmtKurz(ymd) { return ymd.slice(8, 10) + '.' + ymd.slice(5, 7) + '.'; }
+/** "15.09. – 14.10.2026" — nur sinnvoll bei verschobenem Monatsbeginn. */
+function periodRangeLabel(ym) {
+  var r = periodRange(ym);
+  return fmtKurz(r.start) + ' \u2013 ' + fmtKurz(r.end) + r.end.slice(0, 4);
 }
 
 // ============ CSRF TOKEN ============
@@ -896,6 +962,10 @@ async function initApp() {
     document.getElementById('userName').textContent = res.user.name;
     document.getElementById('userEmail').textContent = res.user.email;
     document.getElementById('userAvatar').textContent = res.user.name.charAt(0).toUpperCase();
+    // Erster Tag des Finanzmonats. Erst ab hier steht fest, welche Periode
+    // "heute" ist — vorher wäre currentMonth nur der Kalendermonat.
+    budgetStartDay = normalizeStartDay(res.user.budgetStartDay);
+    currentMonth = currentPeriod();
   } catch(err) {
     // NUR eine fehlende/abgelaufene Anmeldung rechtfertigt den Sprung ins
     // Portal. Früher hing das Laden der Daten im selben Zweig: ein 429 oder
@@ -969,6 +1039,16 @@ function changeMonth(delta) {
 
 function updateMonthDisplay() {
   document.getElementById('monthDisplay').textContent = monthLabel(currentMonth);
+  // Bei verschobenem Monatsbeginn den echten Zeitraum darunter zeigen —
+  // sonst verspricht "September" mehr, als die Periode enthält.
+  var range = document.getElementById('monthRange');
+  if (normalizeStartDay(budgetStartDay) === 1) {
+    range.style.display = 'none';
+    range.textContent = '';
+  } else {
+    range.textContent = periodRangeLabel(currentMonth);
+    range.style.display = '';
+  }
 }
 
 // ============================================================
@@ -1238,12 +1318,6 @@ setupSearch('searchCategories','clearSearchCategories','categories',renderCats);
 // ============================================================
 // EXPENSE MODAL & CRUD
 // ============================================================
-/** Letzter Tag des Monats "YYYY-MM" als "YYYY-MM-DD". */
-function monthEnd(ym) {
-  var p = ym.split('-').map(Number);
-  return ym + '-' + String(new Date(p[0], p[1], 0).getDate()).padStart(2, '0');
-}
-
 function openExpenseModal(id) {
   editExpId = id || null;
   editReminderId = null;
@@ -1252,8 +1326,9 @@ function openExpenseModal(id) {
   // App aus dem Monats-Umschalter ab — ein Datum außerhalb würde den Eintrag
   // unsichtbar in einen anderen Monat verschieben).
   var dateInput = document.getElementById('fExpDate');
-  dateInput.min = currentMonth + '-01';
-  dateInput.max = monthEnd(currentMonth);
+  var spanne = periodRange(currentMonth);
+  dateInput.min = spanne.start;
+  dateInput.max = spanne.end;
   document.getElementById('dupWarnExpense').style.display = 'none';
   document.getElementById('saveExpenseBtn').textContent = 'Speichern';
   document.getElementById('fExpReminder').checked = false;
@@ -1284,10 +1359,10 @@ function openExpenseModal(id) {
     document.getElementById('mExpTitle').textContent = 'Ausgabe hinzufügen';
     document.getElementById('fExpName').value = '';
     document.getElementById('fExpAmt').value = '';
-    // Heute vorbelegen, wenn der gewählte Monat der aktuelle ist —
+    // Heute vorbelegen, wenn heute in der gewählten Periode liegt —
     // sonst leer lassen (nur der Monat ist bekannt).
-    var today = new Date().toISOString().slice(0, 10);
-    dateInput.value = today.slice(0, 7) === currentMonth ? today : '';
+    var today = heute();
+    dateInput.value = periodOf(today) === currentMonth ? today : '';
     // Bewusst NICHT vorausgewählt (häufigster Fall: einmalige Ausgabe).
     document.getElementById('fExpRecurring').checked = false;
     currentTags = [];
@@ -1309,8 +1384,11 @@ async function saveExpense() {
   var tags = currentTags.slice();
   if (!name) { toast('Bitte Bezeichnung eingeben', 'error'); return; }
   if (isNaN(amount) || amount <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
-  if (spentOn && spentOn.slice(0, 7) !== currentMonth) {
-    toast('Das Datum muss in ' + monthLabel(currentMonth) + ' liegen', 'error'); return;
+  if (spentOn && periodOf(spentOn) !== currentMonth) {
+    toast(normalizeStartDay(budgetStartDay) === 1
+      ? 'Das Datum muss in ' + monthLabel(currentMonth) + ' liegen'
+      : 'Das Datum muss im Zeitraum ' + periodRangeLabel(currentMonth) + ' liegen', 'error');
+    return;
   }
   if (!editExpId && !dupOverride.expense) {
     var dup = findDuplicateExpense(name, amount, null);

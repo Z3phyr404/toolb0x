@@ -632,3 +632,104 @@ describe('GET /api/expenses/history — Monatsverlauf', () => {
     assert.equal(bad.status, 400);
   });
 });
+
+// ============================================================
+// VERSCHOBENER MONATSANFANG (budgetStartDay, 2026-09-07)
+// ============================================================
+// Bei Starttag 15 läuft die Periode "2026-09" vom 15.09. bis zum 14.10.
+// Der DB-Schlüssel `month` bleibt "YYYY-MM" — nur die erlaubte Datumsspanne
+// und die Übertragung wiederkehrender Einträge richten sich danach.
+describe('Ausgaben mit verschobenem Monatsanfang (Starttag 15)', () => {
+  beforeEach(() => {
+    resetStore();
+    auth = createTestAuth(mockPrisma, { budgetStartDay: 15 });
+    seedCategory();
+  });
+
+  after(() => cleanupAuth());
+
+  const basis = () => ({
+    name: 'Miete',
+    amount: 640,
+    categoryId: testCategoryId,
+    month: '2026-09',
+  });
+
+  it('akzeptiert ein Datum aus dem FOLGEmonat, solange es in der Periode liegt', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ ...basis(), spentOn: '2026-10-05' });
+
+    assert.equal(res.status, 201);
+    assert.equal(res.body.expense.spentOn, '2026-10-05');
+    assert.equal(res.body.expense.month, '2026-09');
+  });
+
+  it('lehnt ein Datum VOR dem Periodenstart ab', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ ...basis(), spentOn: '2026-09-14' });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.errors.join(' '), /15\.09\.2026 bis 14\.10\.2026/);
+  });
+
+  it('lehnt ein Datum NACH dem Periodenende ab', async () => {
+    const res = await request(app)
+      .post('/api/expenses')
+      .set('Cookie', auth.cookie)
+      .send({ ...basis(), spentOn: '2026-10-15' });
+
+    assert.equal(res.status, 400);
+  });
+
+  it('Auto-Copy setzt den Tag in den richtigen Kalendermonat der Zielperiode', async () => {
+    // Zwei wiederkehrende Ausgaben in Periode 2026-09 (15.09.-14.10.):
+    // eine im ersten Monat der Periode, eine im zweiten.
+    await request(app).post('/api/expenses').set('Cookie', auth.cookie)
+      .send({ ...basis(), name: 'Miete', spentOn: '2026-09-20', isRecurring: true });
+    await request(app).post('/api/expenses').set('Cookie', auth.cookie)
+      .send({ ...basis(), name: 'Strom', spentOn: '2026-10-05', isRecurring: true });
+
+    // Periode 2026-10 (15.10.-14.11.) erstmals öffnen
+    const res = await request(app)
+      .get('/api/expenses?month=2026-10')
+      .set('Cookie', auth.cookie);
+
+    assert.equal(res.status, 200);
+    const nachName = Object.fromEntries(res.body.expenses.map(e => [e.name, e.spentOn]));
+    assert.equal(nachName.Miete, '2026-10-20', 'Tag 20 bleibt im ersten Monat der Periode');
+    assert.equal(nachName.Strom, '2026-11-05', 'Tag 5 wandert in den zweiten Monat der Periode');
+  });
+
+  it('das übertragene Datum liegt immer in der Zielperiode', async () => {
+    const { isInPeriod } = require('../../src/utils/budgetPeriod');
+    await request(app).post('/api/expenses').set('Cookie', auth.cookie)
+      .send({ ...basis(), spentOn: '2026-10-14', isRecurring: true });
+
+    for (const monat of ['2026-10', '2026-11', '2026-12']) {
+      const res = await request(app).get(`/api/expenses?month=${monat}`).set('Cookie', auth.cookie);
+      const kopie = res.body.expenses[0];
+      assert.ok(kopie, `Periode ${monat} sollte eine Kopie haben`);
+      assert.ok(
+        isInPeriod(kopie.spentOn, monat, 15),
+        `${kopie.spentOn} liegt nicht in Periode ${monat}`,
+      );
+    }
+  });
+
+  it('PUT prüft das Datum auch ohne mitgeschicktes month gegen die Periode', async () => {
+    const erstellt = await request(app).post('/api/expenses').set('Cookie', auth.cookie)
+      .send({ ...basis(), spentOn: '2026-09-20' });
+
+    // Ohne `month` im Body: früher wurde spentOn gar nicht geprüft.
+    const res = await request(app)
+      .put(`/api/expenses/${erstellt.body.expense.id}`)
+      .set('Cookie', auth.cookie)
+      .send({ name: 'Miete', amount: 640, categoryId: testCategoryId, spentOn: '2026-01-05' });
+
+    assert.equal(res.status, 400);
+  });
+});

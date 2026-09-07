@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateExpense, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { prevMonth, currentPeriod, carryDayToPeriod } = require('../utils/budgetPeriod');
 
 const router = express.Router();
 
@@ -30,23 +31,9 @@ function decryptExpense(exp, key) {
   };
 }
 
-// Hilfsfunktion: Vormonat berechnen
-function prevMonth(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  const newM = m === 1 ? 12 : m - 1;
-  const newY = m === 1 ? y - 1 : y;
-  return `${newY}-${String(newM).padStart(2, '0')}`;
-}
-
-// Tagesdatum in einen anderen Monat übertragen (Tag beibehalten, auf die
-// Monatslänge gekappt — aus "…-31" wird im Februar "…-28"/"…-29").
-function carryDay(spentOn, targetMonth) {
-  if (!spentOn) return null;
-  const day = Number(spentOn.slice(8, 10));
-  const [y, m] = targetMonth.split('-').map(Number);
-  const maxDay = new Date(y, m, 0).getDate();
-  return `${targetMonth}-${String(Math.min(day, maxDay)).padStart(2, '0')}`;
-}
+// prevMonth, currentPeriod und carryDayToPeriod liegen in
+// ../utils/budgetPeriod — dort steckt auch die Logik für einen
+// verschobenen Monatsanfang (z.B. 15. bis 14.).
 
 // spentOn aus dem Request lesen: leer/fehlend -> null (Validierung lief schon).
 function readSpentOn(body) {
@@ -56,7 +43,7 @@ function readSpentOn(body) {
 // GET /api/expenses/summary — MUSS vor /:id stehen!
 router.get('/summary', async (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || currentPeriod(req.budgetStartDay);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
@@ -145,7 +132,7 @@ router.get('/summary', async (req, res) => {
 router.get('/history', async (req, res) => {
   try {
     const n = Math.min(24, Math.max(3, parseInt(req.query.months, 10) || 12));
-    const endMonth = req.query.month || new Date().toISOString().slice(0, 7);
+    const endMonth = req.query.month || currentPeriod(req.budgetStartDay);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(endMonth)) {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
@@ -217,7 +204,7 @@ router.get('/history', async (req, res) => {
 // ============================================================
 router.get('/', async (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || currentPeriod(req.budgetStartDay);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
@@ -271,7 +258,7 @@ router.get('/', async (req, res) => {
             tags: e.tags,           // bleibt verschlüsselt
             userId: e.userId,
             month,
-            spentOn: carryDay(e.spentOn, month), // gleicher Tag im neuen Monat
+            spentOn: carryDayToPeriod(e.spentOn, month, req.budgetStartDay),
             isRecurring: true,
           })),
         });
@@ -324,15 +311,18 @@ router.get('/:id', async (req, res) => {
 // POST /api/expenses
 router.post('/', async (req, res) => {
   try {
-    const errors = validateExpense(req.body);
+    // Den Monat VOR der Validierung festlegen: sonst wird `spentOn` gegen
+    // gar nichts geprüft, wenn der Client kein `month` mitschickt — und ein
+    // Datum aus einem ganz anderen Monat rutscht durch.
+    const month = req.body.month || currentPeriod(req.budgetStartDay);
+
+    const errors = validateExpense({ ...req.body, month }, req.budgetStartDay);
     if (errors.length > 0) return res.status(400).json({ errors });
 
     const category = await prisma.category.findFirst({
       where: { id: req.body.categoryId, userId: req.userId },
     });
     if (!category) return res.status(400).json({ errors: ['Ungültige Kategorie.'] });
-
-    const month = req.body.month || new Date().toISOString().slice(0, 7);
     const key = req.encryptionKey;
 
     const tags = Array.isArray(req.body.tags)
@@ -369,7 +359,7 @@ router.post('/', async (req, res) => {
             tags: expense.tags,
             userId: expense.userId,
             month: fi.month,
-            spentOn: carryDay(expense.spentOn, fi.month),
+            spentOn: carryDayToPeriod(expense.spentOn, fi.month, req.budgetStartDay),
             isRecurring: true,
           })),
         });
@@ -387,13 +377,16 @@ router.post('/', async (req, res) => {
 // PUT /api/expenses/:id
 router.put('/:id', async (req, res) => {
   try {
-    const errors = validateExpense(req.body);
-    if (errors.length > 0) return res.status(400).json({ errors });
-
     const existing = await prisma.expense.findFirst({
       where: { id: req.params.id, userId: req.userId },
     });
     if (!existing) return res.status(404).json({ error: 'Ausgabe nicht gefunden.' });
+
+    // Erst laden, dann validieren: der effektive Monat (Body oder Bestand)
+    // wird für die Datumsprüfung gebraucht.
+    const zielMonat = req.body.month || existing.month;
+    const errors = validateExpense({ ...req.body, month: zielMonat }, req.budgetStartDay);
+    if (errors.length > 0) return res.status(400).json({ errors });
 
     if (req.body.categoryId !== existing.categoryId) {
       const cat = await prisma.category.findFirst({

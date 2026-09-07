@@ -9,6 +9,7 @@ const prisma = require('../utils/prisma');
 const { validateRegistration, validateLogin, sanitize } = require('../utils/validation');
 const { requireAuth } = require('../middleware/auth');
 const sessionStore = require('../utils/sessionStore');
+const { isValidStartDay, normalizeStartDay, MIN_START_DAY, MAX_START_DAY } = require('../utils/budgetPeriod');
 const crypto = require('crypto');
 const {
   generateEncryptionKey,
@@ -428,6 +429,7 @@ router.get('/me', requireAuth, async (req, res) => {
         role: true,
         createdAt: true,
         recoveryKey: true,
+        budgetStartDay: true,
       },
     });
 
@@ -443,12 +445,45 @@ router.get('/me', requireAuth, async (req, res) => {
         role: user.role,
         createdAt: user.createdAt,
         hasRecoveryCode: !!user.recoveryKey,
+        budgetStartDay: normalizeStartDay(user.budgetStartDay),
       },
     });
 
   } catch (error) {
     console.error('Nutzerabfrage fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Ein unerwarteter Fehler ist aufgetreten.' });
+  }
+});
+
+// ============================================================
+// PUT /api/auth/budget-start-day — Erster Tag des Finanzmonats
+// ============================================================
+// Wer sein Geld z.B. am 15. bekommt, rechnet vom 15. bis zum 14. des
+// Folgemonats. Es ändert sich NUR die Zuordnung neuer Tagesdaten und die
+// Beschriftung — bereits gebuchte Einträge bleiben in ihrem Monat stehen
+// (ihr Datum kann dann ausserhalb des angezeigten Zeitraums liegen).
+// Bewusst ohne Passwortabfrage: die Einstellung gibt keine Daten preis.
+// ============================================================
+router.put('/budget-start-day', requireAuth, async (req, res) => {
+  try {
+    const wert = req.body.budgetStartDay;
+    if (!isValidStartDay(wert)) {
+      return res.status(400).json({
+        errors: [`Der Starttag muss eine ganze Zahl zwischen ${MIN_START_DAY} und ${MAX_START_DAY} sein.`],
+      });
+    }
+
+    const budgetStartDay = normalizeStartDay(wert);
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: { budgetStartDay },
+    });
+
+    res.json({ budgetStartDay, message: 'Monatsbeginn gespeichert.' });
+
+  } catch (error) {
+    console.error('Monatsbeginn speichern fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Der Monatsbeginn konnte nicht gespeichert werden.' });
   }
 });
 

@@ -7,6 +7,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateIncome, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { prevMonth, currentPeriod } = require('../utils/budgetPeriod');
 
 const router = express.Router();
 
@@ -20,13 +21,8 @@ function decryptIncome(inc, key) {
   };
 }
 
-// Hilfsfunktion: Vormonat berechnen
-function prevMonth(ym) {
-  const [y, m] = ym.split('-').map(Number);
-  const newM = m === 1 ? 12 : m - 1;
-  const newY = m === 1 ? y - 1 : y;
-  return `${newY}-${String(newM).padStart(2, '0')}`;
-}
+// prevMonth und currentPeriod liegen in ../utils/budgetPeriod (dort steckt
+// auch die Logik für einen verschobenen Monatsanfang).
 
 // ============================================================
 // GET /api/income
@@ -36,7 +32,7 @@ function prevMonth(ym) {
 // ============================================================
 router.get('/', async (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || currentPeriod(req.budgetStartDay);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return res.status(400).json({ error: 'Ungültiges Monatsformat.' });
     }
@@ -121,7 +117,7 @@ router.post('/', async (req, res) => {
     if (errors.length > 0) return res.status(400).json({ errors });
 
     const key = req.encryptionKey;
-    const month = req.body.month || new Date().toISOString().slice(0, 7);
+    const month = req.body.month || currentPeriod(req.budgetStartDay);
 
     const income = await prisma.income.create({
       data: {

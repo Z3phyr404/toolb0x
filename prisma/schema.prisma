@@ -16,13 +16,18 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  password     String
-  name         String
-  role         String   @default("user")  // "user" | "admin"
-  suspended    Boolean  @default(false)   // Gesperrte Nutzer können sich nicht einloggen
-  encryptedKey String   // Encryption Key, verschlüsselt mit dem User-Passwort
+  id        String  @id @default(uuid())
+  email     String  @unique
+  password  String
+  name      String
+  role      String  @default("user") // "user" | "admin"
+  suspended Boolean @default(false) // Gesperrte Nutzer können sich nicht einloggen
+
+  // Erster Tag des Finanzmonats (1-28, Default 1 = Kalendermonat).
+  // Bei 15 läuft die Periode "2026-09" vom 15.09. bis zum 14.10.
+  // Der Schlüssel `month` bleibt "YYYY-MM" — siehe src/utils/budgetPeriod.js.
+  budgetStartDay Int    @default(1)
+  encryptedKey   String // Encryption Key, verschlüsselt mit dem User-Passwort
 
   // Schlüsselpaar für geteilte Tresore (RSA-OAEP).
   // publicKey ist öffentlich (Klartext-PEM) — damit können andere Nutzer
@@ -44,16 +49,16 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  categories  Category[]
-  expenses    Expense[]
-  incomes     Income[]
-  monthInits  MonthInit[]
-  reminders   Reminder[]
-  notes           Note[]
-  storedPasswords StoredPassword[]
-  servers         Server[]
-  shares          Share[]
-  ownedVaults      Vault[]       @relation("VaultOwner")
+  categories       Category[]
+  expenses         Expense[]
+  incomes          Income[]
+  monthInits       MonthInit[]
+  reminders        Reminder[]
+  notes            Note[]
+  storedPasswords  StoredPassword[]
+  servers          Server[]
+  shares           Share[]
+  ownedVaults      Vault[]          @relation("VaultOwner")
   vaultMemberships VaultMember[]
 
   @@map("users")
@@ -61,8 +66,8 @@ model User {
 
 model Category {
   id    String @id @default(uuid())
-  name  String   // VERSCHLÜSSELT
-  color String   // VERSCHLÜSSELT
+  name  String // VERSCHLÜSSELT
+  color String // VERSCHLÜSSELT
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -78,17 +83,17 @@ model Category {
 
 model Expense {
   id     String @id @default(uuid())
-  name   String   // VERSCHLÜSSELT
-  amount String   // VERSCHLÜSSELT (String weil Base64)
+  name   String // VERSCHLÜSSELT
+  amount String // VERSCHLÜSSELT (String weil Base64)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
-  tags       String   @default("")   // VERSCHLÜSSELT (JSON-Array als String, z.B. '["Wocheneinkauf","Online"]')
+  tags       String   @default("") // VERSCHLÜSSELT (JSON-Array als String, z.B. '["Wocheneinkauf","Online"]')
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  month       String  @default("2026-02")  // NICHT verschlüsselt (für DB-Queries)
+  month       String  @default("2026-02") // NICHT verschlüsselt (für DB-Queries)
   // Tagesdatum "YYYY-MM-DD" (optional; NICHT verschlüsselt, wie month —
   // Kalenderdaten ohne Betrags-/Namensbezug). Bestandsdaten bleiben null.
   spentOn     String?
@@ -105,8 +110,8 @@ model Expense {
 
 model Income {
   id     String @id @default(uuid())
-  name   String   // VERSCHLÜSSELT
-  amount String   // VERSCHLÜSSELT
+  name   String // VERSCHLÜSSELT
+  amount String // VERSCHLÜSSELT
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -127,8 +132,8 @@ model MonthInit {
   id     String @id @default(uuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  month  String  // Format: "YYYY-MM"
-  type   String  // "expense" | "income"
+  month  String // Format: "YYYY-MM"
+  type   String // "expense" | "income"
 
   createdAt DateTime @default(now())
 
@@ -146,16 +151,16 @@ model MonthInit {
 // ============================================================
 model Reminder {
   id           String   @id @default(uuid())
-  note         String   @default("")   // VERSCHLÜSSELT (optionale Notiz)
-  reminderDate DateTime                // NICHT verschlüsselt (für DB-Queries)
-  daysBefore   Int      @default(3)    // Tage vorher erinnern (0–90)
+  note         String   @default("") // VERSCHLÜSSELT (optionale Notiz)
+  reminderDate DateTime // NICHT verschlüsselt (für DB-Queries)
+  daysBefore   Int      @default(3) // Tage vorher erinnern (0–90)
   status       String   @default("pending") // "pending" | "done" | "dismissed"
 
   expenseId String?
   expense   Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,19 +180,19 @@ model Reminder {
 // onDelete: Cascade — Löschen einer Seite löscht alle Unterseiten.
 // ============================================================
 model Note {
-  id         String   @id @default(uuid())
-  title      String   // VERSCHLÜSSELT
-  content    String   @db.Text // VERSCHLÜSSELT (HTML aus WYSIWYG-Editor)
-  icon       String   @default("") // Emoji-Icon, NICHT verschlüsselt
+  id         String  @id @default(uuid())
+  title      String // VERSCHLÜSSELT
+  content    String  @db.Text // VERSCHLÜSSELT (HTML aus WYSIWYG-Editor)
+  icon       String  @default("") // Emoji-Icon, NICHT verschlüsselt
   parentId   String?
-  parent     Note?    @relation("NoteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children   Note[]   @relation("NoteHierarchy")
-  sortOrder  Int      @default(0)
-  isPinned   Boolean  @default(false)
-  isArchived Boolean  @default(false)
+  parent     Note?   @relation("NoteHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children   Note[]  @relation("NoteHierarchy")
+  sortOrder  Int     @default(0)
+  isPinned   Boolean @default(false)
+  isArchived Boolean @default(false)
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -276,25 +281,25 @@ model VaultMember {
 // label, authType sind NICHT verschlüsselt (für Anzeige/Queries).
 // ============================================================
 model Server {
-  id         String  @id @default(uuid())
-  label      String  // NICHT verschlüsselt — Anzeigename
-  host       String  // VERSCHLÜSSELT
-  port       String  @default("22") // VERSCHLÜSSELT (String weil verschlüsselt)
-  username   String  // VERSCHLÜSSELT
-  authType   String  @default("password") // "password" | "key" — NICHT verschlüsselt
+  id         String @id @default(uuid())
+  label      String // NICHT verschlüsselt — Anzeigename
+  host       String // VERSCHLÜSSELT
+  port       String @default("22") // VERSCHLÜSSELT (String weil verschlüsselt)
+  username   String // VERSCHLÜSSELT
+  authType   String @default("password") // "password" | "key" — NICHT verschlüsselt
   // "linux" | "storage" (Hetzner Storage Box: nur df, kein Update/Restart)
-  serverType String  @default("linux")
-  password   String  @default("") // VERSCHLÜSSELT
-  privateKey String  @default("") @db.Text // VERSCHLÜSSELT
-  passphrase String  @default("") // VERSCHLÜSSELT
-  notes      String  @default("") // VERSCHLÜSSELT
+  serverType String @default("linux")
+  password   String @default("") // VERSCHLÜSSELT
+  privateKey String @default("") @db.Text // VERSCHLÜSSELT
+  passphrase String @default("") // VERSCHLÜSSELT
+  notes      String @default("") // VERSCHLÜSSELT
 
   // SHA-256-Fingerprint des SSH-Host-Keys (Trust-on-first-use).
   // NICHT verschlüsselt — der Host-Key ist öffentlich, kein Geheimnis.
   hostKeyFingerprint String @default("")
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -328,7 +333,7 @@ model Share {
   expiresAt DateTime
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 

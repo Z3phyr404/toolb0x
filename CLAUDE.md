@@ -30,6 +30,7 @@ toolb0x/
 │   │   ├── sessionStore.js              # RAM-basierter Session-Store (Singleton, sliding)
 │   │   ├── vaultKeys.js                 # Tresor-Schlüssel entpacken (geteilte Tresore)
 │   │   ├── prisma.js                    # Zentrale Prisma-Instanz (ein Pool)
+│   │   ├── budgetPeriod.js             # Finanz-Perioden (verschiebbarer Monatsanfang)
 │   │   └── validation.js               # Eingabe-Validierung & Sanitization
 │   ├── middleware/
 │   │   ├── auth.js                      # requireAuth + requireAdmin: JWT prüfen + Enc-Key aus RAM holen
@@ -173,6 +174,7 @@ decryptFields(obj, key, fields)  // Objekt mit ausgewählten Feldern entschlüss
 ### User
 ```
 id (UUID), email (unique), password (bcrypt), name, role (default "user"), suspended (default false), encryptedKey
+budgetStartDay (Int, 1–28, default 1 — erster Tag des Finanzmonats)
 createdAt, updatedAt
 → hat: categories[], expenses[], incomes[], monthInits[], reminders[]
 ```
@@ -273,6 +275,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | POST | `/reset-password` | **Öffentlich.** Passwort-Reset per Recovery-Code (OHNE Datenverlust) |
 | POST | `/reset-with-token` | **Öffentlich.** Reset per Admin-Token (LÖSCHT alle Daten, neuer Key + Code) |
 | POST | `/recovery-code` | Recovery-Code (neu) erzeugen — braucht aktuelles Passwort, Code nur einmal sichtbar |
+| PUT | `/budget-start-day` | Erster Tag des Finanzmonats (1–28) setzen; bewusst OHNE Passwortabfrage |
 | POST | `/logout` | Session löschen, Cookie leeren |
 | GET | `/me` | Aktueller User inkl. `hasRecoveryCode` (`requireAuth`) |
 | PUT | `/password` | Passwort ändern (alle Sessions invalidieren) |
@@ -710,6 +713,46 @@ Drei Pakete in `public/apps/finanzen/index.html` + Routen:
   Kategoriefarbe + nowrap, `.bar-fill` braucht `display:block` (war inline
   → width/height wirkungslos), unter 1500px wird die Anteil-Spalte
   ausgeblendet (nth-child(5) — bei Spaltenänderungen mitzählen!).
+
+## Finanz-Perioden — verschiebbarer Monatsanfang (2026-09-07)
+
+Nicht bei jedem beginnt der Finanzmonat am 1. `User.budgetStartDay` (1–28,
+Default 1) legt fest, an welchem Tag er anfängt. Bei 15 läuft die Periode
+„2026-09" vom **15.09. bis 14.10.2026**.
+
+**Der entscheidende Punkt: `month` bleibt „YYYY-MM".** Die Periode heißt nach
+dem Kalendermonat, in dem sie BEGINNT. Dadurch bleiben der Index
+`[userId, month]`, die Auto-Kopien wiederkehrender Einträge, `MonthInit`,
+`summary` und `history` unverändert — nur die erlaubte Datumsspanne, die
+Übertragung von `spentOn` und die Beschriftung hängen am Starttag. Es gibt
+KEINE Datenmigration und kein Umbuchen bestehender Einträge.
+
+**Die ganze Mathematik liegt in `src/utils/budgetPeriod.js`** (`periodRange`,
+`periodOf`, `isInPeriod`, `currentPeriod`, `carryDayToPeriod`) und ist im
+Frontend (`public/apps/finanzen/index.html`) 1:1 gespiegelt. Ändert sich die
+Logik, müssen BEIDE Seiten angefasst werden — der Server prüft aber immer
+nach, der Client ist reiner Komfort.
+
+- **Grenze 1–28:** Ab 29 gäbe es Monate ohne diesen Tag, der Periodenanfang
+  wäre mal am 28., mal am 29. — für den Nutzer nicht vorhersagbar.
+- **`req.budgetStartDay`** setzt `requireAuth`; es hängt an der ohnehin
+  nötigen Suspended-Abfrage und kostet daher keine zusätzliche Query.
+- **`carryDayToPeriod`** ersetzt das alte `carryDay`: eine Periode umfasst
+  zwei Kalendermonate, der Tag muss in den richtigen davon. Bei Starttag 15
+  wird aus dem 20. in Periode „2026-10" der 20.10., aus dem 5. der 05.11.
+- **`validateExpense(data, startDay)`** prüft `spentOn` gegen die Periode.
+  Die Routen legen den Monat deshalb VOR der Validierung fest und geben ihn
+  mit — ohne das wurde `spentOn` gar nicht geprüft, wenn der Client kein
+  `month` mitschickte.
+- **Bestandsdaten:** Nach dem Umstellen können Einträge ein `spentOn` haben,
+  das ausserhalb des jetzt angezeigten Zeitraums liegt. Das ist gewollt —
+  Einträge nachträglich in andere Monate zu schieben, würde die
+  Finanzhistorie umschreiben.
+- **Kein `toISOString().slice(0, 7)` mehr** für „aktueller Monat": das
+  rechnete in UTC und lieferte kurz nach Mitternacht den Vormonat.
+  Stattdessen `currentPeriod(startDay)` bzw. im Frontend `currentPeriod()`.
+- **Stub-Server:** `STUB_START_DAY=15 node tests/helpers/layout-stub-server.js`
+  serviert die Frontends mit verschobenem Monatsanfang.
 
 ## Wichtige Designentscheidungen
 

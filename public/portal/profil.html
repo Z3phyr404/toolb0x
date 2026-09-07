@@ -317,8 +317,27 @@
       </form>
     </div>
 
-    <!-- Recovery-Code -->
+    <!-- Monatsbeginn -->
     <div class="ob-card form-card" data-reveal data-reveal-index="4">
+      <h2>Monatsbeginn</h2>
+      <p style="font-size:13px;color:var(--text-2);line-height:1.6;margin-bottom:18px;">
+        Der Finanzmonat muss nicht am 1. anfangen. Wer sein Geld z.&nbsp;B. am 15.
+        bekommt, stellt hier den 15. ein — der Monat &bdquo;September&ldquo; läuft
+        dann vom 15.&nbsp;September bis zum 14.&nbsp;Oktober.
+      </p>
+      <form id="startDayForm">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" for="budgetStartDay">Erster Tag des Monats</label>
+          <select class="ob-input" id="budgetStartDay"></select>
+        </div>
+        <p style="font-size:12px;color:var(--text-3);line-height:1.6;margin-bottom:18px;" id="startDayHint"></p>
+        <div class="profile-error" id="startDayError"></div>
+        <button class="btn-primary" type="submit" id="saveStartDayBtn">Monatsbeginn speichern</button>
+      </form>
+    </div>
+
+    <!-- Recovery-Code -->
+    <div class="ob-card form-card" data-reveal data-reveal-index="5">
       <h2>Recovery-Code</h2>
       <p class="export-desc" style="margin-bottom:14px;">
         Mit dem Recovery-Code kannst du dein Passwort zurücksetzen, ohne deine
@@ -335,7 +354,7 @@
     </div>
 
     <!-- Datenexport -->
-    <div class="ob-card export-card" data-reveal data-reveal-index="5">
+    <div class="ob-card export-card" data-reveal data-reveal-index="6">
       <h2>Datenexport</h2>
       <p class="export-desc">
         Deine Finanzdaten als PDF zum Lesen und Archivieren — oder <strong>alle</strong>
@@ -480,7 +499,73 @@ function populateProfile(user) {
       d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
   }
   updateRecoveryStatus(user.hasRecoveryCode);
+  befuelleStartTage(user.budgetStartDay);
 }
+
+// ---- Monatsbeginn ----
+var MONATE_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+function befuelleStartTage(aktuell) {
+  var sel = document.getElementById('budgetStartDay');
+  var wert = parseInt(aktuell, 10);
+  if (isNaN(wert) || wert < 1 || wert > 28) wert = 1;
+  sel.innerHTML = '';
+  for (var d = 1; d <= 28; d++) {
+    var o = document.createElement('option');
+    o.value = String(d);
+    o.textContent = d + '.' + (d === 1 ? ' (Kalendermonat)' : '');
+    if (d === wert) o.selected = true;
+    sel.appendChild(o);
+  }
+  zeigeStartTagHinweis();
+}
+
+// Zeigt am Beispiel des laufenden Jahres, was die Auswahl bedeutet.
+function zeigeStartTagHinweis() {
+  var d = parseInt(document.getElementById('budgetStartDay').value, 10) || 1;
+  var el = document.getElementById('startDayHint');
+  if (d === 1) {
+    el.textContent = 'Der Finanzmonat entspricht dem Kalendermonat.';
+    return;
+  }
+  var jahr = new Date().getFullYear();
+  var ende = new Date(jahr, 9, d - 1); // 9 = Oktober
+  el.textContent = 'Beispiel: „September ' + jahr + '“ läuft vom ' + d + '. September bis zum '
+    + ende.getDate() + '. ' + MONATE_DE[ende.getMonth()] + ' ' + jahr + '. '
+    + 'Bereits erfasste Einträge bleiben in ihrem Monat stehen; nur neue Datumsangaben richten sich nach dem neuen Zeitraum.';
+}
+
+document.getElementById('budgetStartDay').addEventListener('change', zeigeStartTagHinweis);
+
+document.getElementById('startDayForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var errEl = document.getElementById('startDayError');
+  errEl.classList.remove('show');
+  var btn = document.getElementById('saveStartDayBtn');
+  var alt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Speichert…';
+  try {
+    var res = await fetch(API + '/auth/budget-start-day', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+      body: JSON.stringify({ budgetStartDay: parseInt(document.getElementById('budgetStartDay').value, 10) }),
+    });
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok) {
+      errEl.textContent = (data.errors ? data.errors.join(', ') : null) || data.error || 'Speichern fehlgeschlagen.';
+      errEl.classList.add('show');
+      return;
+    }
+    if (currentUser) currentUser.budgetStartDay = data.budgetStartDay;
+    toast('Monatsbeginn gespeichert');
+  } catch (err) {
+    errEl.textContent = 'Speichern fehlgeschlagen.';
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = alt;
+  }
+});
 
 function updateRecoveryStatus(hasCode) {
   document.getElementById('recoveryStatus').textContent = hasCode
