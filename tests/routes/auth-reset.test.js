@@ -215,3 +215,124 @@ describe('POST /api/auth/reset-with-token (Admin-Fallback, mit Datenverlust)', (
     assert.equal(res.status, 401);
   });
 });
+
+
+describe('Auth credential atomicity regressions', () => {
+  beforeEach(resetStore);
+  after(() => cleanupAuth());
+
+  function arm() {
+    const token = crypto.randomBytes(32).toString('hex');
+    Object.assign(mockPrisma._store.users[0], {
+      resetToken: crypto.createHash('sha256').update(token).digest('hex'),
+      resetTokenExpires: new Date(Date.now() + 60000),
+    });
+    return token;
+  }
+  const reset = token => request(app).post('/api/auth/reset-with-token')
+    .send({ token, newPassword: 'GanzNeu1234' });
+
+  for (const method of ['password', 'recovery']) {
+    it(method + ' invalidates an outstanding reset link without deleting data', async () => {
+      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const token = arm();
+      const categories = structuredClone(mockPrisma._store.categories);
+      const result = method === 'password'
+        ? await request(app).put('/api/auth/password').set('Cookie', reg.headers['set-cookie'])
+          .send({ currentPassword: REGISTER_BODY.password, newPassword: 'Updated1234' })
+        : await request(app).post('/api/auth/reset-password')
+          .send({ email: REGISTER_BODY.email, recoveryCode: reg.body.recoveryCode, newPassword: 'Updated1234' });
+      assert.equal(result.status, 200);
+      assert.equal(mockPrisma._store.users[0].resetToken, null);
+      assert.equal(mockPrisma._store.users[0].resetTokenExpires, null);
+      assert.equal((await reset(token)).status, 401);
+      assert.deepEqual(mockPrisma._store.categories, categories);
+    });
+  }
+
+  it('allows only one concurrent token use after both requests read the valid token', async () => {
+    await registerUser();
+    const token = arm();
+    const original = mockPrisma.user.findUnique;
+    let arrivals = 0, release;
+    const bothRead = new Promise(resolve => { release = resolve; });
+    mockPrisma.user.findUnique = async args => {
+      const snapshot = await original(args);
+      if (args.where.resetToken) {
+        if (++arrivals === 2) release();
+        await bothRead;
+      }
+      return snapshot;
+    };
+    let results;
+    try { results = await Promise.all([reset(token), reset(token)]); }
+    finally { mockPrisma.user.findUnique = original; }
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 401]);
+    assert.equal(mockPrisma._store.categories.length, 9);
+    const before = structuredClone(mockPrisma._store);
+    assert.equal((await reset(token)).status, 401);
+    assert.deepEqual(mockPrisma._store, before);
+  });
+
+  for (const stage of ['delete', 'recreate']) {
+    it('rolls back credentials, token and all data on ' + stage + ' failure; retry succeeds', async () => {
+      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const token = arm();
+      const userId = mockPrisma._store.users[0].id;
+      mockPrisma._store.expenses.push({ id: 'expense', userId });
+      mockPrisma._store.notes.push({ id: 'note', userId });
+      const before = structuredClone(mockPrisma._store);
+      const collection = stage === 'delete' ? mockPrisma.note : mockPrisma.category;
+      const operation = stage === 'delete' ? 'deleteMany' : 'createMany';
+      const original = collection[operation];
+      collection[operation] = async () => { throw new Error('Injected transaction failure'); };
+      try { assert.equal((await reset(token)).status, 500); }
+      finally { collection[operation] = original; }
+      assert.deepEqual(mockPrisma._store, before);
+      assert.equal((await request(app).get('/api/auth/me').set('Cookie', reg.headers['set-cookie'])).status, 200);
+      assert.equal((await reset(token)).status, 200);
+      assert.equal((await request(app).get('/api/auth/me').set('Cookie', reg.headers['set-cookie'])).status, 401);
+    });
+  }
+
+  for (const route of ['password', 'reset-password', 'recovery-code']) {
+    it('rejects a stale ' + route + ' write after a competing credential update', async () => {
+      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const original = mockPrisma.user.updateMany;
+      let winner;
+      mockPrisma.user.updateMany = async args => {
+        Object.assign(mockPrisma._store.users[0], {
+          password: 'competing-password-hash', encryptedKey: 'competing-key', recoveryKey: 'competing-recovery-key',
+        });
+        winner = structuredClone(mockPrisma._store.users[0]);
+        return original(args);
+      };
+      let result;
+      try {
+        result = route === 'password'
+          ? await request(app).put('/api/auth/password').set('Cookie', reg.headers['set-cookie'])
+            .send({ currentPassword: REGISTER_BODY.password, newPassword: 'Updated1234' })
+          : await request(app).post('/api/auth/' + route).set('Cookie', reg.headers['set-cookie'])
+            .send({ email: REGISTER_BODY.email, recoveryCode: reg.body.recoveryCode,
+              currentPassword: REGISTER_BODY.password, newPassword: 'Updated1234' });
+      } finally { mockPrisma.user.updateMany = original; }
+      assert.equal(result.status, 401);
+      assert.deepEqual(mockPrisma._store.users[0], winner);
+    });
+  }
+
+  it('rechecks expiry after crypto preparation before touching data', async () => {
+    await registerUser();
+    const token = arm();
+    const original = mockPrisma.$transaction;
+    mockPrisma.$transaction = callback => {
+      mockPrisma._store.users[0].resetTokenExpires = new Date(0);
+      return original(callback);
+    };
+    const categories = structuredClone(mockPrisma._store.categories);
+    try { assert.equal((await reset(token)).status, 401); }
+    finally { mockPrisma.$transaction = original; }
+    assert.deepEqual(mockPrisma._store.categories, categories);
+    assert.notEqual(mockPrisma._store.users[0].resetToken, null);
+  });
+});

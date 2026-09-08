@@ -40,6 +40,13 @@ const DEFAULT_CATEGORIES = [
   { name: 'Sonstiges', color: '#8E8E93' },
 ];
 
+// Compare the credentials read before expensive crypto work. A competing reset or
+// recovery-code rotation must not be overwritten with stale key material.
+function credentialState(user) {
+  return { id: user.id, password: user.password, encryptedKey: user.encryptedKey,
+    recoveryKey: user.recoveryKey, suspended: false };
+}
+
 // Passwort-Regeln (Registrierung, Passwort ändern, Reset)
 function validatePasswordRules(password) {
   const errors = [];
@@ -277,13 +284,16 @@ router.post('/reset-password', async (req, res) => {
 
     // Neues Passwort setzen, Key neu wrappen — Daten bleiben erhalten
     const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id: user.id },
+    const changed = await prisma.user.updateMany({
+      where: credentialState(user),
       data: {
         password: hashedPassword,
         encryptedKey: wrapEncryptionKey(encKey, newPassword),
+        resetToken: null,
+        resetTokenExpires: null,
       },
     });
+    if (changed.count !== 1) return genericError();
 
     // Alle Sessions beenden — Login mit dem neuen Passwort
     sessionStore.deleteAllForUser(user.id);
@@ -325,55 +335,56 @@ router.post('/reset-with-token', async (req, res) => {
     const tokenHash = crypto.createHash('sha256').update(String(token)).digest('hex');
     const user = await prisma.user.findUnique({ where: { resetToken: tokenHash } });
 
-    if (!user || !user.resetTokenExpires || user.resetTokenExpires < new Date()) {
+    if (!user || !user.resetTokenExpires || user.resetTokenExpires <= new Date()) {
       return res.status(401).json({
         errors: ['Der Reset-Link ist ungültig oder abgelaufen.'],
       });
     }
 
-    // Alle mit dem alten Key verschlüsselten Daten löschen.
-    // Reihenfolge beachtet FK-Beziehungen (Expenses vor Categories).
-    // Eigene Tresore kaskadieren (Mitglieder + Einträge). Tresor-Einträge
-    // ANDERER Tresore bleiben (mit Tresor-Schlüssel verschlüsselt), nur
-    // die eigene Mitgliedschaft fällt weg (gewrappter Schlüssel ist verloren).
-    await prisma.reminder.deleteMany({ where: { userId: user.id } });
-    await prisma.expense.deleteMany({ where: { userId: user.id } });
-    await prisma.income.deleteMany({ where: { userId: user.id } });
-    await prisma.monthInit.deleteMany({ where: { userId: user.id } });
-    await prisma.category.deleteMany({ where: { userId: user.id } });
-    await prisma.note.deleteMany({ where: { userId: user.id } });
-    await prisma.storedPassword.deleteMany({ where: { userId: user.id, vaultId: null } });
-    await prisma.vault.deleteMany({ where: { ownerId: user.id } });
-    await prisma.vaultMember.deleteMany({ where: { userId: user.id } });
-    await prisma.server.deleteMany({ where: { userId: user.id } });
-
-    // Frischer Key, frisches Keypair, frischer Recovery-Code
+    // Prepare all expensive crypto before acquiring the user row lock.
     const encKey = generateEncryptionKey();
     const keypair = generateUserKeypair();
     const recoveryCode = generateRecoveryCode();
     const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const credentials = {
+      password: hashedPassword,
+      encryptedKey: wrapEncryptionKey(encKey, newPassword),
+      publicKey: keypair.publicKey,
+      encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
+      recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
+      resetToken: null,
+      resetTokenExpires: null,
+    };
+    const categories = DEFAULT_CATEGORIES.map(cat => ({
+      name: encrypt(cat.name, encKey), color: encrypt(cat.color, encKey), userId: user.id,
+    }));
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        encryptedKey: wrapEncryptionKey(encKey, newPassword),
-        publicKey: keypair.publicKey,
-        encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
-        recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
-        resetToken: null,
-        resetTokenExpires: null,
-      },
-    });
+    const consumed = await prisma.$transaction(async tx => {
+      // Conditional UPDATE locks the row and rechecks the token after competing
+      // updates commit. A loser must never reach the destructive statements.
+      const result = await tx.user.updateMany({
+        where: { id: user.id, resetToken: tokenHash, resetTokenExpires: { gt: new Date() } },
+        data: credentials,
+      });
+      if (result.count !== 1) return false;
 
-    // Standard-Kategorien mit dem neuen Key anlegen
-    await prisma.category.createMany({
-      data: DEFAULT_CATEGORIES.map(cat => ({
-        name: encrypt(cat.name, encKey),
-        color: encrypt(cat.color, encKey),
-        userId: user.id,
-      })),
+      // FK order matters. Owned vaults cascade; other vaults retain their entries.
+      await tx.reminder.deleteMany({ where: { userId: user.id } });
+      await tx.expense.deleteMany({ where: { userId: user.id } });
+      await tx.income.deleteMany({ where: { userId: user.id } });
+      await tx.monthInit.deleteMany({ where: { userId: user.id } });
+      await tx.category.deleteMany({ where: { userId: user.id } });
+      await tx.note.deleteMany({ where: { userId: user.id } });
+      await tx.storedPassword.deleteMany({ where: { userId: user.id, vaultId: null } });
+      await tx.vault.deleteMany({ where: { ownerId: user.id } });
+      await tx.vaultMember.deleteMany({ where: { userId: user.id } });
+      await tx.server.deleteMany({ where: { userId: user.id } });
+      await tx.category.createMany({ data: categories });
+      return true;
     });
+    if (!consumed) {
+      return res.status(401).json({ errors: ['Der Reset-Link ist ungültig oder abgelaufen.'] });
+    }
 
     sessionStore.deleteAllForUser(user.id);
 
@@ -543,13 +554,18 @@ router.put('/password', requireAuth, async (req, res) => {
     const newWrappedKey = wrapEncryptionKey(encKey, newPassword);
 
     // Beides speichern
-    await prisma.user.update({
-      where: { id: req.userId },
+    const changed = await prisma.user.updateMany({
+      where: credentialState(user),
       data: {
         password: newHashedPassword,
         encryptedKey: newWrappedKey,
+        resetToken: null,
+        resetTokenExpires: null,
       },
     });
+    if (changed.count !== 1) {
+      return res.status(401).json({ errors: ['Die Zugangsdaten wurden geändert. Bitte melde dich erneut an.'] });
+    }
 
     // ALLE Sessions des Users ungültig machen (Sicherheit!)
     // Der User muss sich mit dem neuen Passwort neu einloggen
@@ -610,12 +626,15 @@ router.post('/recovery-code', requireAuth, async (req, res) => {
     }
 
     const recoveryCode = generateRecoveryCode();
-    await prisma.user.update({
-      where: { id: req.userId },
+    const changed = await prisma.user.updateMany({
+      where: credentialState(user),
       data: {
         recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
       },
     });
+    if (changed.count !== 1) {
+      return res.status(401).json({ errors: ['Die Zugangsdaten wurden geändert. Bitte melde dich erneut an.'] });
+    }
 
     res.json({
       message: 'Neuer Recovery-Code erstellt. Der alte Code ist ab sofort ungültig.',

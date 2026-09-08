@@ -129,7 +129,8 @@ function createCollection(store, tableName) {
           return true;
         }) || null;
       }
-      return store[tableName].find(r => matchesWhere(r, where)) || null;
+      const found = store[tableName].find(r => matchesWhere(r, where));
+      return found ? structuredClone(found) : null;
     },
 
     create: async ({ data, include }) => {
@@ -137,6 +138,7 @@ function createCollection(store, tableName) {
         id: crypto.randomUUID(),
         createdAt: new Date(),
         updatedAt: new Date(),
+        ...(tableName === 'users' ? { suspended: false, recoveryKey: null, resetToken: null, resetTokenExpires: null } : {}),
         ...data,
       };
 
@@ -256,7 +258,7 @@ function createMockPrisma() {
     expenseBookings: [],
   };
 
-  return {
+  const client = {
     _store: store, // Für Test-Assertions direkt auf die Daten zugreifen
     expense: createCollection(store, 'expenses'),
     income: createCollection(store, 'incomes'),
@@ -272,6 +274,23 @@ function createMockPrisma() {
     share: createCollection(store, 'shares'),
     expenseBooking: createCollection(store, 'expenseBookings'),
   };
+  // Serialize interactive transactions and restore all tables on failure.
+  // This models atomicity for route tests, not PostgreSQL isolation or FK rules.
+  let tail = Promise.resolve();
+  client.$transaction = callback => {
+    if (typeof callback !== 'function') throw new Error('Mock supports interactive transactions only');
+    const run = tail.then(async () => {
+      const before = structuredClone(store);
+      try { return await callback(client); }
+      catch (error) {
+        for (const table of Object.keys(store)) store[table].splice(0, store[table].length, ...before[table]);
+        throw error;
+      }
+    });
+    tail = run.catch(() => {});
+    return run;
+  };
+  return client;
 }
 
 module.exports = { createMockPrisma };
