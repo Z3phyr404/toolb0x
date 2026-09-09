@@ -36,13 +36,14 @@
   },
   "overrides": {
     "@huggingface/transformers": {
-      "sharp": "0.35.3"
+      "sharp": "0.35.4"
     },
     "onnxruntime-node": {
       "adm-zip": "0.6.0"
     },
     "@prisma/config": {
-      "effect": "3.22.1"
+      "effect": "3.22.1",
+      "deepmerge-ts": "8.0.2"
     },
     "qs": "6.16.0"
   }
