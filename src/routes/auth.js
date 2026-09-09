@@ -630,6 +630,11 @@ router.post('/recovery-code', requireAuth, async (req, res) => {
       where: credentialState(user),
       data: {
         recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
+        // Wie beim Passwortwechsel: ein offener Admin-Reset-Token wird
+        // entwertet. Wer seine Zugangsdaten selbst erneuert, soll nicht
+        // nebenher noch über einen alten Link zurückgesetzt werden können.
+        resetToken: null,
+        resetTokenExpires: null,
       },
     });
     if (changed.count !== 1) {
