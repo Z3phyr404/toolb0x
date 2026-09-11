@@ -837,10 +837,23 @@ der rund 30 Lesestellen musste etwas geändert werden.
   Plan. Ein September mit 137 gebucht bei 400 Plan zeigt im Verlauf 137.
 
 **Frontend:** Häkchen „Sammelposten" im Ausgaben-Dialog (aus dem Betragsfeld
-wird „Budget pro Monat"), Knopf „Buchen" in der Ausgabenleiste (nur sichtbar,
-wenn es Sammelposten gibt), Dialog `mBooking` bleibt nach dem Speichern offen
-für den nächsten Beleg (Enter bucht), `mBookingList` zeigt und löscht einzelne
-Buchungen, Karte „Geplant und gebucht" auf dem Dashboard.
+wird „Budget pro Monat"), `mBookingList` zeigt und löscht einzelne Buchungen,
+Karte „Geplant und gebucht" auf dem Dashboard.
+
+**Eigene Seite „Sammelposten" (2026-09-11, für spontane Ausgaben):** Das
+Buchen lebt in einem eigenen Sidebar-Punkt (`data-page="sammelposten"`,
+mobil als Tab „Buchen"). Knopf „Buchen" in der Ausgabenleiste und der Dialog
+`mBooking` sind dafür ENTFERNT. Die Seite hat ein festes Formular
+(Positions-Chips, Betrag, Notiz, Datum — Enter bucht, Position und Datum
+bleiben stehen), KPIs Gebucht/Budget/Offen, je Posten Fortschrittsbalken mit
+Buchen/Buchungen/Bearbeiten/Löschen und alle Buchungen des Monats nach Tag
+gruppiert. Einstieg von außen immer über `bucheAuf(posId)` (Dashboard-Chips,
+„Buchung hinzufügen" in `mBookingList`). „Neuer Sammelposten" öffnet den
+Ausgaben-Dialog mit Sammelposten UND „Wiederkehrend" vorausgewählt (ein
+Monatsbudget ohne Wiederkehr fehlte im Folgemonat). Kein Extra-Request: die
+Buchungen kommen über `e.bookings` aus `GET /api/expenses`. Der Betrag ist
+ein Textfeld mit `inputmode="decimal"` + `parseBetrag()`, weil `type=number`
+das Komma der iPhone-Tastatur je nach Browser verwirft. Server unverändert.
 
 **Mock-Prisma:** `RUECKWAERTS_RELATION` in `tests/helpers/mockPrisma.js`
 löst 1:n-Includes auf (`include: { bookings: true }`). Der generische Weg

@@ -57,10 +57,16 @@ const API = {
     { id: 'e1', name: 'Miete', amount: '1180', categoryId: 'c1', spentOn: '2026-08-01', tags: ['Fixkosten'], isRecurring: true },
     { id: 'e2', name: 'Strom (Grundversorger)', amount: '84.50', categoryId: 'c1', spentOn: '2026-08-05', tags: ['Fixkosten'], isRecurring: true },
     { id: 'e3', name: 'Internet & Festnetz', amount: '44.99', categoryId: 'c1', spentOn: '2026-08-03', tags: ['Fixkosten'], isRecurring: true },
-    // Sammelposten: amount = Summe der Buchungen, plannedAmount = Budget
-    { id: 'e4', name: 'Lebensmittel', amount: '140.43', plannedAmount: '450', isCollector: true, categoryId: 'c2', spentOn: null, tags: [], isRecurring: true, bookingCount: 2 },
-    { id: 'e5', name: 'Tanken', amount: '72.40', plannedAmount: '160', isCollector: true, categoryId: 'c3', spentOn: null, tags: ['Auto'], isRecurring: true, bookingCount: 1 },
-    { id: 'e6', name: 'Kleidung', amount: '0', plannedAmount: '60', isCollector: true, categoryId: 'c5', spentOn: null, tags: [], isRecurring: true, bookingCount: 0 },
+    // Sammelposten: amount = Summe der Buchungen, plannedAmount = Budget.
+    // `bookings` hängt die echte Route ebenfalls an (Seite "Sammelposten").
+    { id: 'e4', name: 'Lebensmittel', amount: '140.43', plannedAmount: '450', isCollector: true, categoryId: 'c2', spentOn: null, tags: [], isRecurring: true, bookingCount: 2, bookings: [
+      { id: 'b1', expenseId: 'e4', amount: '86.32', note: 'Rewe Wocheneinkauf', bookedOn: '2026-08-08', createdAt: '2026-08-08T17:10:00.000Z' },
+      { id: 'b2', expenseId: 'e4', amount: '54.11', note: 'Aldi', bookedOn: '2026-08-15', createdAt: '2026-08-15T11:02:00.000Z' },
+    ] },
+    { id: 'e5', name: 'Tanken', amount: '72.40', plannedAmount: '160', isCollector: true, categoryId: 'c3', spentOn: null, tags: ['Auto'], isRecurring: true, bookingCount: 1, bookings: [
+      { id: 'b3', expenseId: 'e5', amount: '72.40', note: '', bookedOn: '2026-08-11', createdAt: '2026-08-11T08:40:00.000Z' },
+    ] },
+    { id: 'e6', name: 'Kleidung', amount: '0', plannedAmount: '60', isCollector: true, categoryId: 'c5', spentOn: null, tags: [], isRecurring: true, bookingCount: 0, bookings: [] },
     { id: 'e7', name: 'KFZ-Versicherung', amount: '61.20', categoryId: 'c3', spentOn: '2026-08-02', tags: ['Auto', 'Fixkosten'], isRecurring: true },
     { id: 'e8', name: 'Kino + Essen', amount: '58', categoryId: 'c4', spentOn: '2026-08-16', tags: ['Nicole'], isRecurring: false },
     { id: 'e9', name: 'Fitnessstudio', amount: '29.90', categoryId: 'c4', spentOn: '2026-08-01', tags: ['Abo'], isRecurring: true },

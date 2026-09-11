@@ -333,6 +333,55 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
 .hist-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:22px; }
 @media (max-width:600px) { .hist-kpis { grid-template-columns:1fr; } .hist-bar { width:8px; } }
 
+/* ===== SEITE SAMMELPOSTEN (Buchungsformular, Posten, Buchungen) ===== */
+.sp-entry { margin-bottom:22px; }
+.sp-entry-row { display:grid; grid-template-columns:minmax(150px,210px) minmax(0,1fr) 170px; gap:14px; align-items:end; margin-bottom:16px; }
+.sp-amount { display:flex; align-items:center; gap:8px; padding:4px 14px; border:1px solid rgba(255,255,255,0.1); border-radius:10px; background:rgba(255,255,255,0.04); transition:border-color 0.2s,background 0.2s; }
+.sp-amount:focus-within { border-color:rgba(45,212,191,0.5); background:rgba(255,255,255,0.07); }
+.sp-amount-input { flex:1; min-width:0; border:none; background:transparent; outline:none; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:600; padding:2px 0; }
+.sp-amount-input::placeholder { color:var(--text-3); }
+.sp-euro { font-size:17px; color:var(--text-3); font-weight:600; }
+.sp-optional { text-transform:none; letter-spacing:0; font-weight:400; color:var(--text-3); }
+.sp-sub { margin-bottom:14px; }
+.sp-sub .form-label { margin-bottom:8px; }
+.sp-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.sp-entry-foot { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; padding-top:14px; border-top:1px solid var(--border); }
+.sp-hint { font-size:12px; color:var(--text-3); }
+.sp-hint.warn { color:#fbbf24; }
+.btn:disabled { opacity:0.6; cursor:progress; transform:none; }
+.sp-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; align-items:start; }
+.sp-pos { padding:14px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+.sp-pos:first-child { padding-top:0; }
+.sp-pos:last-child { border-bottom:none; padding-bottom:0; }
+.sp-pos-head { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+.sp-pos-name { flex:1; min-width:0; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sp-pos.active .sp-pos-name { color:#2dd4bf; }
+.sp-pos .plan-bar { margin-bottom:8px; }
+.sp-pos-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.sp-pos-rest { font-size:12px; color:var(--text-3); }
+.sp-pos-rest.over { color:#fb7185; }
+/* Beträge mit Cent: feste 3 Spalten brachen "212,83 €" bei schmalem Fenster
+   um. auto-fit stapelt stattdessen die Kacheln. */
+#spKpis { grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); }
+#spKpis .kpi-value { white-space:nowrap; }
+.sp-empty { text-align:center; padding:48px 24px; }
+.sp-empty p { color:var(--text-2); font-size:14px; line-height:1.6; max-width:480px; margin:10px auto 20px; }
+.sp-day + .sp-day { margin-top:18px; }
+.sp-day-head { display:flex; justify-content:space-between; gap:10px; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-3); padding-bottom:6px; border-bottom:1px solid var(--border); }
+.sp-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.sp-item:last-child { border-bottom:none; }
+.sp-item-main { flex:1; min-width:0; }
+.sp-item-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sp-item-cat { font-size:12px; color:var(--text-3); margin-top:1px; }
+.sp-item-amt { font-family:'JetBrains Mono',monospace; font-weight:600; white-space:nowrap; }
+@media (max-width:1100px) { .sp-grid { grid-template-columns:1fr; } }
+/* Breakpoint bewusst hoch: neben der 250px-Sidebar und 10% Innenabstand
+   bliebe dem Notizfeld sonst unter ~1100px kaum Breite. */
+@media (max-width:1100px) {
+  .sp-entry-row { grid-template-columns:1fr 1fr; }
+  .sp-amount-wrap { grid-column:1 / -1; }
+}
+
 /* ===== RESPONSIVE =====
    Breakpoint 768px wie in obsidian.css (.ob-mobile-header erscheint dort) -
    vorher 900px, dadurch gab es zwischen 769 und 900px weder Sidebar noch
@@ -344,7 +393,9 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
   main { padding:16px; }
   .app { flex-direction:column-reverse; }
   .mobile-tabs { display:flex !important; justify-content:space-around; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:var(--panel); }
-  .mobile-tab { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 12px; border:none; background:none; color:var(--text-3); font-size:10px; font-weight:600; cursor:pointer; transition:color 0.2s; font-family:inherit; }
+  /* Sechs Tabs (seit "Spontan"): gleich breit statt fester Innenabstände,
+     sonst läuft die Leiste auf 375px Breite über. */
+  .mobile-tab { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 2px; border:none; background:none; color:var(--text-3); font-size:10px; font-weight:600; cursor:pointer; transition:color 0.2s; font-family:inherit; }
   .mobile-tab.active { color:#2dd4bf; }
   .mobile-tab svg { width:22px; height:22px; }
 }
@@ -401,6 +452,10 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
     <button class="nav-btn" data-page="expenses">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Ausgaben
+    </button>
+    <button class="nav-btn" data-page="sammelposten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      Sammelposten
     </button>
     <button class="nav-btn" data-page="income">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
@@ -535,10 +590,6 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
             <input type="text" class="search-input" id="searchExpenses" placeholder="Suche nach Name, Kategorie oder Tag..." autocomplete="off">
             <button class="search-clear" id="clearSearchExpenses" style="display:none">&times;</button>
           </div>
-          <button class="btn" id="quickBookBtn" title="Schnell auf einen Sammelposten buchen" style="display:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>
-            Buchen
-          </button>
           <button class="btn btn-primary" id="addExpenseBtn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Hinzufügen
@@ -559,6 +610,65 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
           </tr></thead>
           <tbody id="expTbody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- SAMMELPOSTEN (2026-09-11): spontane und schwankende Ausgaben buchen.
+         Vorher steckte das Buchen hinter einem Knopf in der Ausgabenliste. -->
+    <div class="page" id="page-sammelposten">
+      <div class="page-header">
+        <div>
+          <div class="page-header-label">// SAMMELPOSTEN</div>
+          <h1 class="page-title jitter">Sammelposten</h1>
+          <div class="page-subtitle" id="spSubtitle">&mdash;</div>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn btn-ghost" id="spNewBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Neuer Sammelposten
+          </button>
+        </div>
+      </div>
+
+      <div class="card sp-empty" id="spEmpty" style="display:none">
+        <div class="card-title" style="margin-bottom:0">Noch keine Sammelposten</div>
+        <p>Ein Sammelposten ist ein Monatsbudget für Ausgaben, deren Betrag schwankt &mdash; Lebensmittel, Tanken, Kaffee unterwegs. Du legst ihn einmal an und buchst danach jeden Beleg einzeln darauf.</p>
+        <button class="btn btn-primary" id="spEmptyNewBtn">Ersten Sammelposten anlegen</button>
+      </div>
+
+      <div class="card sp-entry" id="spEntry">
+        <div class="sp-sub">
+          <div class="form-label">Buchen auf</div>
+          <div class="sp-chips" id="spPosChips"></div>
+        </div>
+        <div class="sp-entry-row">
+          <div class="sp-amount-wrap">
+            <label class="form-label" for="spAmount">Betrag</label>
+            <div class="sp-amount">
+              <input class="sp-amount-input" id="spAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="0,00">
+              <span class="sp-euro">&euro;</span>
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="spNote">Notiz <span class="sp-optional">optional</span></label>
+            <input class="form-input" id="spNote" maxlength="100" autocomplete="off" placeholder="z.B. Bäcker, Wocheneinkauf">
+          </div>
+          <div>
+            <label class="form-label" for="spDate">Datum</label>
+            <input class="form-input" id="spDate" type="date">
+          </div>
+        </div>
+        <div class="sp-entry-foot">
+          <span class="sp-hint" id="spHint"></span>
+          <button class="btn btn-primary" id="spSaveBtn">Buchen</button>
+        </div>
+      </div>
+
+      <div class="hist-kpis" id="spKpis"></div>
+
+      <div class="sp-grid" id="spGrid">
+        <div class="card"><div class="card-title">Posten</div><div id="spPosList"></div></div>
+        <div class="card"><div class="card-title">Buchungen im Monat</div><div id="spBookings"></div></div>
       </div>
     </div>
 
@@ -621,6 +731,8 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
     <button class="mobile-tab active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</button>
     <button class="mobile-tab" data-page="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>Verlauf</button>
     <button class="mobile-tab" data-page="expenses"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Ausgaben</button>
+    <!-- Mobil kurz "Buchen": "Sammelposten" passt bei sechs Tabs nicht in die Leiste -->
+    <button class="mobile-tab" data-page="sammelposten"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>Buchen</button>
     <button class="mobile-tab" data-page="income"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Einnahmen</button>
     <button class="mobile-tab" data-page="categories"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>Kategorien</button>
   </div>
@@ -704,42 +816,6 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-cancel" data-close-modal="mExpense">Abbrechen</button><button class="btn btn-primary" id="saveExpenseBtn">Speichern</button></div>
-  </div>
-</div>
-
-<!-- SCHNELLBUCHUNG: Posten wählen, Betrag eingeben, fertig. Der Dialog
-     bleibt nach dem Speichern offen, damit mehrere Belege am Stück
-     eingetippt werden können. -->
-<div class="modal-overlay" id="mBooking">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Buchen</h3><button class="modal-close" data-close-modal="mBooking">&times;</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label" for="fBookPos">Position</label>
-        <select class="form-select" id="fBookPos"></select>
-      </div>
-      <div class="booking-sum" id="bookSum" style="display:none">
-        <span class="form-label" style="margin:0">Bisher gebucht</span>
-        <span><span class="booking-sum-big" id="bookSumValue">&mdash;</span> <span class="coll-plan" id="bookSumPlan"></span></span>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label" for="fBookAmt">Betrag (&euro;)</label><input class="form-input" id="fBookAmt" type="number" step="0.01" min="0" placeholder="0.00"></div>
-        <div class="form-group"><label class="form-label" for="fBookDate">Datum</label><input class="form-input" id="fBookDate" type="date"></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="fBookNote">Notiz (optional)</label>
-        <input class="form-input" id="fBookNote" placeholder="z.B. Wocheneinkauf" maxlength="100">
-      </div>
-      <div class="form-hint" style="font-size:12px;color:var(--text-3);margin-top:-4px">
-        Enter speichert und lässt den Dialog offen &mdash; mehrere Belege am Stück.
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" data-close-modal="mBooking">Fertig</button>
-      <button class="btn btn-primary" id="saveBookingBtn">Buchen</button>
-    </div>
   </div>
 </div>
 
@@ -1005,7 +1081,7 @@ document.getElementById('sidebarUser').addEventListener('click', function(e) {
 // EVENT DELEGATION
 // ============================================================
 document.addEventListener('click', function(e) {
-  var target = e.target.closest('[data-page], [data-close-modal], #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #quickBookBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
+  var target = e.target.closest('[data-page], [data-close-modal], #logoutBtn, #logoutBtnM, #monthPrev, #monthNext, #addExpenseBtn, #addIncomeBtn, #addCatBtn, #saveExpenseBtn, #saveIncomeBtn, #saveCatBtn, #mDelBtn, #exportPdfBtn, .color-swatch, [data-edit-expense], [data-del-expense], [data-edit-income], [data-del-income], [data-edit-cat], [data-del-cat]');
   if (!target) return;
 
   // Navigation
@@ -1032,7 +1108,6 @@ document.addEventListener('click', function(e) {
     return;
   }
   if (target.id === 'addExpenseBtn') { openExpenseModal(); return; }
-  if (target.id === 'quickBookBtn') { openBookingModal(); return; }
   if (target.id === 'addIncomeBtn') { openIncomeModal(); return; }
   if (target.id === 'addCatBtn') { openCatModal(); return; }
   if (target.id === 'saveExpenseBtn') { saveExpense(); return; }
@@ -1186,12 +1261,19 @@ function go(page) {
   // der nächsten Seite nicht mitten im Inhalt landen.
   document.querySelector('main').scrollTop = 0;
   renderCurrentPage();
+  // Auf der Buchungsseite gleich tippen können — aber nur mit Maus: auf
+  // Touch-Geräten würde sonst bei jedem Tab-Wechsel die Tastatur aufklappen.
+  if (page === 'sammelposten' && window.matchMedia('(hover: hover)').matches) {
+    var feld = document.getElementById('spAmount');
+    if (feld.offsetParent) feld.focus({ preventScroll: true });
+  }
 }
 
 function renderCurrentPage() {
   if (currentPage === 'dashboard') renderDash();
   if (currentPage === 'history') renderHistory();
   if (currentPage === 'expenses') renderTable();
+  if (currentPage === 'sammelposten') renderSammelposten();
   if (currentPage === 'income') renderIncome();
   if (currentPage === 'categories') renderCats();
   updateSidebar();
@@ -1615,72 +1697,308 @@ function sammelposten() {
   return expenses.filter(function(e) { return e.isCollector; });
 }
 
-// Sichtbarkeit des "Buchen"-Knopfs: nur wenn es überhaupt Sammelposten gibt.
-function updateQuickBookBtn() {
-  document.getElementById('quickBookBtn').style.display = sammelposten().length ? '' : 'none';
+// ------------------------------------------------------------
+// Seite "Sammelposten" (2026-09-11)
+// ------------------------------------------------------------
+// Spontane und schwankende Ausgaben (Kaffee, Tanken, Lebensmittel) werden
+// hier gebucht. Vorher lag das hinter dem Knopf "Buchen" in der
+// Ausgabenliste und einem Dialog — jetzt ist es ein eigener Sidebar-Punkt
+// mit festem Formular. Kein Extra-Request: GET /expenses hängt die
+// entschlüsselten Buchungen schon an jeden Posten (e.bookings).
+var spPosId = null;       // gewählte Position im Buchungsformular
+var spDatumFuer = null;   // für welchen Monat das Datumsfeld vorbelegt wurde
+var spSpeichert = false;  // verhindert Doppelbuchungen bei schnellem Enter
+
+// Stabil nach Name sortiert: der Server sortiert nach Betrag, dadurch
+// sprängen die Positionen nach jeder Buchung an eine andere Stelle.
+function sammelpostenSortiert() {
+  return sammelposten().slice().sort(function(a, b) { return a.name.localeCompare(b.name, 'de'); });
 }
 
-function openBookingModal(posId) {
-  var liste = sammelposten();
-  if (!liste.length) { toast('Lege zuerst einen Sammelposten an', 'error'); return; }
-  var sel = document.getElementById('fBookPos');
-  sel.innerHTML = liste.map(function(e) {
-    return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(e.name) + '</option>';
+// decrypt() liefert bei defektem Ciphertext einen Text statt zu werfen —
+// ein einziges NaN würde sonst jede Summe auf der Seite mitreißen.
+function zahl(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+// "3,50" / "3.50" / "1.234,50" -> Zahl, alles andere -> NaN.
+// Bewusst Textfeld statt type=number: die iPhone-Dezimaltastatur liefert
+// ein Komma, das type=number je nach Browser still verwirft.
+function parseBetrag(txt) {
+  var s = String(txt || '').replace(/[\s€]/g, '');
+  if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return NaN;
+  return parseFloat(s);
+}
+
+function gesternStr() {
+  var d = new Date(); d.setDate(d.getDate() - 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+var WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+function tagLabel(ymd) {
+  if (!ymd) return 'Ohne Datum';
+  if (ymd === heute()) return 'Heute · ' + fmtDay(ymd);
+  if (ymd === gesternStr()) return 'Gestern · ' + fmtDay(ymd);
+  var p = ymd.split('-').map(Number);
+  return WOCHENTAGE[new Date(p[0], p[1] - 1, p[2]).getDay()] + ' · ' + fmtDay(ymd);
+}
+
+// Von überall (Dashboard-Chip, Buchungsliste, Posten) auf die Seite springen
+// und die Position vorwählen.
+function bucheAuf(posId) {
+  if (posId) spPosId = posId;
+  if (currentPage !== 'sammelposten') {
+    go('sammelposten');
+  } else {
+    renderSammelposten();
+    // Gezielt den Scroll-Container bewegen, kein scrollIntoView (Scroll-Falle, CLAUDE.md).
+    document.querySelector('main').scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  var feld = document.getElementById('spAmount');
+  if (feld.offsetParent) feld.focus({ preventScroll: true });
+}
+
+function neuerSammelposten() {
+  openExpenseModal();
+  document.getElementById('mExpTitle').textContent = 'Sammelposten anlegen';
+  document.getElementById('fExpCollector').checked = true;
+  // Ein Sammelposten ist ein Monatsbudget — ohne "wiederkehrend" fehlte er
+  // im Folgemonat. Anders als bei normalen Ausgaben deshalb vorausgewählt.
+  document.getElementById('fExpRecurring').checked = true;
+  updateCollectorUi();
+}
+
+function renderSammelposten() {
+  var liste = sammelpostenSortiert();
+  var leer = liste.length === 0;
+  document.getElementById('spEmpty').style.display = leer ? '' : 'none';
+  ['spEntry', 'spKpis', 'spGrid'].forEach(function(id) {
+    document.getElementById(id).style.display = leer ? 'none' : '';
+  });
+
+  var geplant = 0, gebucht = 0, offen = 0, anzahl = 0;
+  liste.forEach(function(e) {
+    var p = zahl(e.plannedAmount), g = zahl(e.amount);
+    geplant += p; gebucht += g; offen += Math.max(0, p - g);
+    anzahl += (e.bookings || []).length;
+  });
+  document.getElementById('spSubtitle').textContent = leer
+    ? 'Für spontane und schwankende Ausgaben'
+    : liste.length + ' Posten · ' + anzahl + (anzahl === 1 ? ' Buchung' : ' Buchungen') + ' in ' + monthLabel(currentMonth);
+  if (leer) return;
+
+  // Position vorwählen; nach einem Monatswechsel haben die Kopien neue IDs.
+  if (!liste.some(function(e) { return e.id === spPosId; })) spPosId = liste[0].id;
+
+  document.getElementById('spPosChips').innerHTML = liste.map(function(e) {
+    var c = getCat(e.categoryId || (e.category && e.category.id));
+    return '<button type="button" class="cat-filter-chip' + (e.id === spPosId ? ' active' : '') + '" data-sp-pos="' + escapeHtml(e.id) + '">' +
+      '<span class="cd" style="background:' + escapeHtml(c.color) + '"></span>' + escapeHtml(e.name) +
+      '<span class="chip-sum">' + escapeHtml(fmtS(zahl(e.amount))) + ' / ' + escapeHtml(fmtS(zahl(e.plannedAmount))) + '</span></button>';
   }).join('');
-  sel.value = posId && liste.some(function(e) { return e.id === posId; }) ? posId : liste[0].id;
-  document.getElementById('fBookAmt').value = '';
-  document.getElementById('fBookNote').value = '';
-  // Heute vorbelegen, wenn heute in der gewählten Periode liegt.
+
+  // Datumsfeld auf die Periode begrenzen. Vorbelegt wird nur beim ersten
+  // Anzeigen je Monat — wer für mehrere Belege "gestern" gewählt hat,
+  // behält das nach jeder Buchung.
   var spanne = periodRange(currentMonth);
-  var d = document.getElementById('fBookDate');
-  d.min = spanne.start; d.max = spanne.end;
-  var today = heute();
-  d.value = periodOf(today) === currentMonth ? today : '';
-  updateBookSum();
-  openM('mBooking');
-  setTimeout(function() { document.getElementById('fBookAmt').focus(); }, 120);
+  var datum = document.getElementById('spDate');
+  datum.min = spanne.start; datum.max = spanne.end;
+  var istAktuell = periodOf(heute()) === currentMonth;
+  if (spDatumFuer !== currentMonth) {
+    datum.value = istAktuell ? heute() : '';
+    spDatumFuer = currentMonth;
+  }
+  var hint = document.getElementById('spHint');
+  hint.textContent = istAktuell
+    ? 'Enter bucht und lässt das Formular offen — mehrere Belege am Stück.'
+    : 'Achtung: du buchst in ' + monthLabel(currentMonth) + '.';
+  hint.classList.toggle('warn', !istAktuell);
+
+  var kpi = function(label, wert, farbe) {
+    return '<div class="kpi"><div class="kpi-label">' + label + '</div><div class="kpi-value"' +
+      (farbe ? ' style="color:' + farbe + '"' : '') + '>' + escapeHtml(wert) + '</div></div>';
+  };
+  document.getElementById('spKpis').innerHTML =
+    kpi('Gebucht', fmt(gebucht)) +
+    kpi('Budget', fmt(geplant)) +
+    (gebucht > geplant
+      ? kpi('Über Budget', fmt(gebucht - geplant), '#fb7185')
+      : kpi('Noch offen', fmt(offen), '#2dd4bf'));
+
+  var ICON_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  var ICON_LISTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+  var ICON_STIFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  var ICON_MUELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+
+  document.getElementById('spPosList').innerHTML = liste.map(function(e) {
+    var c = getCat(e.categoryId || (e.category && e.category.id));
+    var p = zahl(e.plannedAmount), g = zahl(e.amount);
+    var anteil = p > 0 ? Math.min(100, g / p * 100) : (g > 0 ? 100 : 0);
+    var ueber = g > p;
+    var n = (e.bookings || []).length;
+    var rest = p <= 0 ? 'Kein Budget' : (ueber ? fmt(g - p) + ' über Budget' : 'Noch ' + fmt(p - g) + ' übrig');
+    var id = escapeHtml(e.id);
+    return '<div class="sp-pos' + (e.id === spPosId ? ' active' : '') + '">' +
+      '<div class="sp-pos-head">' +
+        '<span class="cd" style="background:' + escapeHtml(c.color) + '"></span>' +
+        '<span class="sp-pos-name">' + escapeHtml(e.name) + '</span>' +
+        '<span class="sp-item-amt">' + escapeHtml(fmt(g)) + ' <span class="coll-plan">von ' + escapeHtml(fmt(p)) + '</span></span>' +
+      '</div>' +
+      '<div class="plan-bar"><span class="plan-bar-fill' + (ueber ? ' over' : '') + '" style="width:' + anteil.toFixed(1) + '%"></span></div>' +
+      '<div class="sp-pos-foot">' +
+        '<span class="sp-pos-rest' + (ueber ? ' over' : '') + '">' + escapeHtml(rest) + ' · ' + n + (n === 1 ? ' Buchung' : ' Buchungen') + '</span>' +
+        '<div class="row-actions">' +
+          '<button class="icon-btn" data-sp-book="' + id + '" title="Auf diesen Posten buchen">' + ICON_PLUS + '</button>' +
+          '<button class="icon-btn" data-sp-list="' + id + '" title="Buchungen ansehen">' + ICON_LISTE + '</button>' +
+          '<button class="icon-btn" data-edit-expense="' + id + '" title="Bearbeiten">' + ICON_STIFT + '</button>' +
+          '<button class="icon-btn danger" data-del-expense="' + id + '" title="Löschen">' + ICON_MUELL + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  // Alle Buchungen des Monats, neueste zuerst, nach Tag gruppiert.
+  var alle = [];
+  liste.forEach(function(e) {
+    (e.bookings || []).forEach(function(b) { alle.push({ b: b, posten: e }); });
+  });
+  alle.sort(function(x, y) {
+    var dx = x.b.bookedOn || '', dy = y.b.bookedOn || '';
+    if (dx !== dy) {
+      if (!dx) return 1;
+      if (!dy) return -1;
+      return dx < dy ? 1 : -1;
+    }
+    return String(y.b.createdAt || '').localeCompare(String(x.b.createdAt || ''));
+  });
+  var el = document.getElementById('spBookings');
+  if (!alle.length) {
+    el.innerHTML = '<div class="booking-empty">Noch nichts gebucht in ' + escapeHtml(monthLabel(currentMonth)) + '.</div>';
+    return;
+  }
+  var gruppen = [];
+  alle.forEach(function(x) {
+    var key = x.b.bookedOn || '';
+    var gr = gruppen[gruppen.length - 1];
+    if (!gr || gr.key !== key) { gr = { key: key, items: [], summe: 0 }; gruppen.push(gr); }
+    gr.items.push(x);
+    gr.summe += zahl(x.b.amount);
+  });
+  el.innerHTML = gruppen.map(function(gr) {
+    return '<div class="sp-day">' +
+      '<div class="sp-day-head"><span>' + escapeHtml(tagLabel(gr.key)) + '</span><span>' + escapeHtml(fmt(gr.summe)) + '</span></div>' +
+      gr.items.map(function(x) {
+        var c = getCat(x.posten.categoryId || (x.posten.category && x.posten.category.id));
+        return '<div class="sp-item">' +
+          '<span class="cd" style="background:' + escapeHtml(c.color) + '"></span>' +
+          '<div class="sp-item-main">' +
+            '<div class="sp-item-name">' + escapeHtml(x.posten.name) + '</div>' +
+            (x.b.note ? '<div class="sp-item-cat">' + escapeHtml(x.b.note) + '</div>' : '') +
+          '</div>' +
+          '<span class="sp-item-amt">' + escapeHtml(fmt(zahl(x.b.amount))) + '</span>' +
+          '<button class="icon-btn danger" data-sp-del-booking="' + escapeHtml(x.b.id) + '" data-sp-exp="' + escapeHtml(x.posten.id) + '" title="Buchung löschen">' + ICON_MUELL + '</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }).join('');
 }
 
-function updateBookSum() {
-  var id = document.getElementById('fBookPos').value;
-  var e = expenses.find(function(x) { return x.id === id; });
-  var box = document.getElementById('bookSum');
-  if (!e) { box.style.display = 'none'; return; }
-  box.style.display = '';
-  document.getElementById('bookSumValue').textContent = fmt(parseFloat(e.amount));
-  var plan = parseFloat(e.plannedAmount);
-  document.getElementById('bookSumPlan').textContent = isNaN(plan) ? '' : 'von ' + fmt(plan);
-}
-document.getElementById('fBookPos').addEventListener('change', updateBookSum);
-
-async function saveBooking() {
-  var id = document.getElementById('fBookPos').value;
-  var betrag = parseFloat(document.getElementById('fBookAmt').value);
-  var datum = document.getElementById('fBookDate').value || null;
-  var notiz = document.getElementById('fBookNote').value.trim();
-  if (!id) { toast('Bitte eine Position wählen', 'error'); return; }
-  if (isNaN(betrag) || betrag <= 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
+async function saveSpBooking() {
+  if (spSpeichert) return;
+  var posten = sammelposten().find(function(e) { return e.id === spPosId; });
+  var betragFeld = document.getElementById('spAmount');
+  var notizFeld = document.getElementById('spNote');
+  var betrag = parseBetrag(betragFeld.value);
+  var datum = document.getElementById('spDate').value || null;
+  if (!posten) { toast('Bitte eine Position wählen', 'error'); return; }
+  if (isNaN(betrag) || betrag <= 0) {
+    toast('Bitte gültigen Betrag eingeben', 'error');
+    betragFeld.focus({ preventScroll: true });
+    return;
+  }
   if (datum && periodOf(datum) !== currentMonth) {
-    toast('Das Datum muss im gewählten Monat liegen', 'error'); return;
+    toast(normalizeStartDay(budgetStartDay) === 1
+      ? 'Das Datum muss in ' + monthLabel(currentMonth) + ' liegen'
+      : 'Das Datum muss im Zeitraum ' + periodRangeLabel(currentMonth) + ' liegen', 'error');
+    return;
   }
+
+  spSpeichert = true;
+  var knopf = document.getElementById('spSaveBtn');
+  knopf.disabled = true;
   try {
-    await api('/expenses/' + id + '/bookings', {
+    await api('/expenses/' + posten.id + '/bookings', {
       method: 'POST',
-      body: JSON.stringify({ amount: betrag, bookedOn: datum, note: notiz }),
+      body: JSON.stringify({ amount: betrag, bookedOn: datum, note: notizFeld.value.trim() }),
     });
-    toast('Gebucht: ' + fmt(betrag));
-    // Dialog bleibt offen: Betrag und Notiz leeren, damit der nächste Beleg
-    // sofort eingetippt werden kann.
-    document.getElementById('fBookAmt').value = '';
-    document.getElementById('fBookNote').value = '';
-    document.getElementById('fBookAmt').focus();
-    await loadAllData(['expenses']);
-    updateBookSum();
-    renderCurrentPage();
   } catch(err) {
-    toast((err.errors ? err.errors.join(', ') : null) || 'Buchung fehlgeschlagen', 'error');
+    toast((err.errors ? err.errors.join(', ') : null) || err.error || 'Buchung fehlgeschlagen', 'error');
+    return;
+  } finally {
+    spSpeichert = false;
+    knopf.disabled = false;
   }
+
+  // Gebucht. Betrag und Notiz leeren, Position und Datum bleiben — der
+  // nächste Beleg geht sofort.
+  toast('Gebucht: ' + fmt(betrag) + ' auf ' + posten.name);
+  betragFeld.value = '';
+  notizFeld.value = '';
+  betragFeld.focus({ preventScroll: true });
+  try {
+    await loadAllData(['expenses']);
+  } catch(err) {
+    toast('Die Liste konnte nicht aktualisiert werden', 'error');
+  }
+  renderCurrentPage();
 }
+
+document.getElementById('spSaveBtn').addEventListener('click', saveSpBooking);
+document.getElementById('spNewBtn').addEventListener('click', neuerSammelposten);
+document.getElementById('spEmptyNewBtn').addEventListener('click', neuerSammelposten);
+['spAmount', 'spNote', 'spDate'].forEach(function(id) {
+  document.getElementById(id).addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); saveSpBooking(); }
+  });
+});
+
+document.getElementById('spPosChips').addEventListener('click', function(ev) {
+  var chip = ev.target.closest('[data-sp-pos]');
+  if (!chip) return;
+  spPosId = chip.dataset.spPos;
+  renderSammelposten();
+  var feld = document.getElementById('spAmount');
+  if (!feld.value) feld.focus({ preventScroll: true });
+});
+
+// Bearbeiten/Löschen am Posten laufen über die globale Delegation
+// (data-edit-expense / data-del-expense) wie in der Ausgabenliste.
+document.getElementById('spPosList').addEventListener('click', function(ev) {
+  var buchen = ev.target.closest('[data-sp-book]');
+  if (buchen) { bucheAuf(buchen.dataset.spBook); return; }
+  var liste = ev.target.closest('[data-sp-list]');
+  if (liste) openBookingList(liste.dataset.spList);
+});
+
+document.getElementById('spBookings').addEventListener('click', async function(ev) {
+  var btn = ev.target.closest('[data-sp-del-booking]');
+  if (!btn) return;
+  btn.disabled = true;
+  try {
+    await api('/expenses/' + btn.dataset.spExp + '/bookings/' + btn.dataset.spDelBooking, { method: 'DELETE' });
+  } catch(err) {
+    btn.disabled = false;
+    toast('Fehler beim Löschen', 'error');
+    return;
+  }
+  toast('Buchung gelöscht');
+  try {
+    await loadAllData(['expenses']);
+  } catch(err) {
+    toast('Die Liste konnte nicht aktualisiert werden', 'error');
+  }
+  renderCurrentPage();
+});
 
 async function openBookingList(posId) {
   var e = expenses.find(function(x) { return x.id === posId; });
@@ -1731,17 +2049,10 @@ document.getElementById('blList').addEventListener('click', async function(ev) {
   } catch(err) { toast('Fehler beim Löschen', 'error'); }
 });
 
-document.getElementById('saveBookingBtn').addEventListener('click', saveBooking);
-document.getElementById('fBookAmt').addEventListener('keydown', function(ev) {
-  if (ev.key === 'Enter') { ev.preventDefault(); saveBooking(); }
-});
-document.getElementById('fBookNote').addEventListener('keydown', function(ev) {
-  if (ev.key === 'Enter') { ev.preventDefault(); saveBooking(); }
-});
 document.getElementById('blAddBtn').addEventListener('click', function() {
   var id = bookPosId;
   closeM('mBookingList');
-  openBookingModal(id);
+  bucheAuf(id);
 });
 
 async function delExpense(id) {
@@ -1995,7 +2306,7 @@ function renderPlanCard() {
 
 document.getElementById('planCard').addEventListener('click', function(ev) {
   var chip = ev.target.closest('[data-book-pos]');
-  if (chip) openBookingModal(chip.dataset.bookPos);
+  if (chip) bucheAuf(chip.dataset.bookPos);
 });
 
 function grouped() {
@@ -2253,7 +2564,6 @@ function renderCatFilter() {
 }
 
 function renderTable() {
-  updateQuickBookBtn();
   renderCatFilter();
   renderSortArrows();
   var filtered = getFilteredExpenses();
