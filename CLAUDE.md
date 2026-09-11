@@ -889,6 +889,7 @@ kann nur die Gegenrichtung über `<relation>Id`.
 - Session-Store ist ein Singleton — `require('../utils/sessionStore')` gibt immer dieselbe Instanz zurück
 - PDF-Export nutzt `pdfkit` (server-seitig) — Decrypt-Helfer sind in `export.js` repliziert (gleiche Logik wie `expenses.js`/`income.js`)
 - Gesamt-PDF-Export (`/api/export/pdf-all`) — exportiert alle Monate auf einmal, Button auf der Profilseite (`/portal/profil`)
+- **Fallback „Sonstiges" beim Kategorie-Löschen** (seit 2026-09-11): Ziel ist immer ein ANDERES „Sonstiges" als die gelöschte Kategorie (bei mehreren das älteste, `orderBy createdAt`), Vergleich case-insensitiv und getrimmt. Vorher nahm `find()` das erstbeste in beliebiger DB-Reihenfolge — bei einem doppelten „Sonstiges" (Altlast aus der Zeit vor dem case-insensitiven Vergleich) war das mal die zu löschende selbst, das Löschen wurde mit „kann nicht gelöscht werden" verweigert. Jetzt führt Löschen eines der beiden Duplikate sie zusammen. Tests: `tests/routes/categories.test.js`; der Mock kann dafür `_count: { select: {...} }`.
 - **Erinnerungen** sind an Ausgaben gekoppelt (optional), überleben aber gelöschte Ausgaben (`onDelete: SetNull`)
 - `reminderDate` ist NICHT verschlüsselt (für DB-Queries nötig), `note` ist verschlüsselt
 - Recurring Expenses kopieren KEINE Erinnerungen (Erinnerungen sind einmalige Kalender-Events)

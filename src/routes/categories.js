@@ -122,28 +122,36 @@ router.delete('/:id', async (req, res) => {
     if (!category) return res.status(404).json({ error: 'Kategorie nicht gefunden.' });
 
     if (category._count.expenses > 0) {
-      const allCats = await prisma.category.findMany({ where: { userId: req.userId } });
+      const allCats = await prisma.category.findMany({
+        where: { userId: req.userId },
+        orderBy: { createdAt: 'asc' },
+      });
       // Gross-/Kleinschreibung ignorieren: Anlegen und Umbenennen prüfen
       // ebenfalls case-insensitiv auf Duplikate. Wer seine Kategorie
       // "sonstiges" genannt hat, bekam sonst eine ZWEITE namens "Sonstiges"
       // und konnte danach keine der beiden mehr umbenennen.
-      let fallback = allCats.find(
-        c => entschaerfe(decrypt(c.name, req.encryptionKey))?.toLowerCase() === 'sonstiges',
-      );
+      const istSonstiges = c =>
+        entschaerfe(decrypt(c.name, req.encryptionKey))?.trim().toLowerCase() === 'sonstiges';
+
+      // Ziel ist immer ein ANDERES "Sonstiges" als die zu löschende
+      // Kategorie, bei mehreren das älteste. Vorher nahm find() das erstbeste
+      // in beliebiger DB-Reihenfolge: Gab es (aus Altlasten) zwei "Sonstiges",
+      // war das mal die zu löschende selbst — das Löschen wurde verweigert
+      // und das Duplikat ließ sich nicht zusammenführen.
+      let fallback = allCats.find(c => c.id !== category.id && istSonstiges(c));
 
       if (!fallback) {
+        if (istSonstiges(category)) {
+          return res.status(400).json({
+            error: '"Sonstiges" kann nicht gelöscht werden, solange Ausgaben zugeordnet sind.',
+          });
+        }
         fallback = await prisma.category.create({
           data: {
             name: encrypt('Sonstiges', req.encryptionKey),
             color: encrypt('#8E8E93', req.encryptionKey),
             userId: req.userId,
           },
-        });
-      }
-
-      if (category.id === fallback.id) {
-        return res.status(400).json({
-          error: '"Sonstiges" kann nicht gelöscht werden, solange Ausgaben zugeordnet sind.',
         });
       }
 

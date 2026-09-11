@@ -69,12 +69,23 @@ const RUECKWAERTS_RELATION = {
 
 // Generisches include: { vault: {...} } lädt store.vaults über record.vaultId.
 // Bewusst generisch, damit neue Relationen nicht jedes Mal den Mock brechen.
-function applyInclude(record, include, store) {
+function applyInclude(record, include, store, tableName) {
   if (!include) return record;
   const result = { ...record };
 
   for (const [relation, optionen] of Object.entries(include)) {
     if (!optionen) continue;
+
+    // { _count: { select: { expenses: true } } } auf einer Kategorie zählt
+    // die Ausgaben, deren categoryId auf diesen Datensatz zeigt.
+    if (relation === '_count') {
+      const fk = (tableName.endsWith('ies') ? tableName.slice(0, -3) + 'y' : tableName.slice(0, -1)) + 'Id';
+      result._count = {};
+      for (const kind of Object.keys(optionen.select || {})) {
+        result._count[kind] = (store[kind] || []).filter(k => k[fk] === record.id).length;
+      }
+      continue;
+    }
 
     const rueck = RUECKWAERTS_RELATION[relation];
     if (rueck) {
@@ -105,7 +116,7 @@ function createCollection(store, tableName) {
   return {
     findMany: async ({ where = {}, include } = {}) => {
       const results = store[tableName].filter(r => matchesWhere(r, where)).map(r => ({ ...r }));
-      if (include) return results.map(r => applyInclude(r, include, store));
+      if (include) return results.map(r => applyInclude(r, include, store, tableName));
       return results;
     },
 
@@ -113,7 +124,7 @@ function createCollection(store, tableName) {
       const found = store[tableName].find(r => matchesWhere(r, where));
       if (!found) return null;
       const result = { ...found };
-      if (include) return applyInclude(result, include, store);
+      if (include) return applyInclude(result, include, store, tableName);
       return result;
     },
 
@@ -161,7 +172,7 @@ function createCollection(store, tableName) {
       }
 
       store[tableName].push(record);
-      if (include) return applyInclude(record, include, store);
+      if (include) return applyInclude(record, include, store, tableName);
       return record;
     },
 
@@ -181,7 +192,7 @@ function createCollection(store, tableName) {
       const idx = store[tableName].findIndex(r => r.id === where.id);
       if (idx === -1) throw new Error(`${tableName}: Record not found`);
       Object.assign(store[tableName][idx], data, { updatedAt: new Date() });
-      if (include) return applyInclude(store[tableName][idx], include, store);
+      if (include) return applyInclude(store[tableName][idx], include, store, tableName);
       return store[tableName][idx];
     },
 
