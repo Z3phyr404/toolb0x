@@ -16,6 +16,7 @@ const {
   wrapEncryptionKey,
   unwrapEncryptionKey,
   encrypt,
+  decrypt,
   generateUserKeypair,
   generateRecoveryCode,
   normalizeRecoveryCode,
@@ -27,6 +28,17 @@ const router = express.Router();
 // Synchron beim Modul-Load: ein Login in den ersten Millisekunden nach
 // Serverstart darf nie auf einen noch fehlenden Hash treffen (→ 500).
 const dummyHash = bcrypt.hashSync('dummy-password-for-timing-protection', 12);
+
+// Kontostand aus der DB lesen.
+// decrypt() wirft NICHT: bei defektem Ciphertext kommt der String
+// "[Entschlüsselung fehlgeschlagen]" zurück, parseFloat davon ist NaN — und
+// ein NaN im JSON würde im Frontend als "NaN €" auf dem Dashboard landen.
+// Deshalb hier der Guard: lieber gar kein Stand als ein falscher.
+function leseKontostand(ciphertext, key) {
+  if (!ciphertext) return null;
+  const zahl = parseFloat(decrypt(ciphertext, key));
+  return Number.isFinite(zahl) ? zahl : null;
+}
 
 const DEFAULT_CATEGORIES = [
   { name: 'Wohnen & Grund', color: '#FF9500' },
@@ -354,6 +366,11 @@ router.post('/reset-with-token', async (req, res) => {
       recoveryKey: wrapEncryptionKey(encKey, normalizeRecoveryCode(recoveryCode)),
       resetToken: null,
       resetTokenExpires: null,
+      // Der Kontostand ist mit dem ALTEN Schlüssel verschlüsselt. Bliebe er
+      // stehen, liefe jedes spätere decrypt() darauf ins Leere — deshalb
+      // hier mit löschen, wie jede andere verschlüsselte Zeile auch.
+      accountBalance: null,
+      accountBalanceAt: null,
     };
     const categories = DEFAULT_CATEGORIES.map(cat => ({
       name: encrypt(cat.name, encKey), color: encrypt(cat.color, encKey), userId: user.id,
@@ -441,6 +458,8 @@ router.get('/me', requireAuth, async (req, res) => {
         createdAt: true,
         recoveryKey: true,
         budgetStartDay: true,
+        accountBalance: true,
+        accountBalanceAt: true,
       },
     });
 
@@ -457,6 +476,8 @@ router.get('/me', requireAuth, async (req, res) => {
         createdAt: user.createdAt,
         hasRecoveryCode: !!user.recoveryKey,
         budgetStartDay: normalizeStartDay(user.budgetStartDay),
+        accountBalance: leseKontostand(user.accountBalance, req.encryptionKey),
+        accountBalanceAt: user.accountBalanceAt,
       },
     });
 
@@ -495,6 +516,72 @@ router.put('/budget-start-day', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Monatsbeginn speichern fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Der Monatsbeginn konnte nicht gespeichert werden.' });
+  }
+});
+
+// ============================================================
+// PUT /api/auth/account-balance — Tatsächlicher Kontostand
+// ============================================================
+// Ein Schnappschuss, kein fortgeschriebenes Saldo: der Nutzer schaut in
+// seine Banking-App und trägt ein, was dort steht. Bewusst nichts, was aus
+// den Einträgen berechnet wird — siehe Kommentar im Prisma-Schema.
+//
+// Negative Werte sind erlaubt (Dispo), null/"" löscht den Stand wieder.
+// Ohne Passwortabfrage wie budget-start-day: die Eingabe gibt nichts preis,
+// was ein Angreifer mit gekaperter Sitzung nicht ohnehin sähe.
+// ============================================================
+const MAX_BALANCE = 9999999.99;
+
+router.put('/account-balance', requireAuth, async (req, res) => {
+  try {
+    const wert = req.body.accountBalance;
+
+    // Leeren Stand zulassen — "ich pflege das doch nicht" ist eine gültige
+    // Antwort, und dann soll die Karte auch wieder verschwinden.
+    if (wert === null || wert === undefined || wert === '') {
+      await prisma.user.update({
+        where: { id: req.userId },
+        data: { accountBalance: null, accountBalanceAt: null },
+      });
+      return res.json({
+        accountBalance: null,
+        accountBalanceAt: null,
+        message: 'Kontostand entfernt.',
+      });
+    }
+
+    // Number ODER numerischer String — aber nichts, was parseFloat still
+    // zurechtbiegt ("12abc" wäre 12). Deshalb eine explizite Prüfung.
+    const zahl = typeof wert === 'number' ? wert : Number(String(wert).trim());
+    if (!Number.isFinite(zahl)) {
+      return res.status(400).json({ errors: ['Bitte gib einen gültigen Betrag ein.'] });
+    }
+    if (Math.abs(zahl) > MAX_BALANCE) {
+      return res.status(400).json({
+        errors: ['Der Kontostand darf höchstens 9.999.999,99 € betragen.'],
+      });
+    }
+
+    const gerundet = Math.round(zahl * 100) / 100;
+    const accountBalanceAt = new Date();
+
+    await prisma.user.update({
+      where: { id: req.userId },
+      data: {
+        accountBalance: encrypt(String(gerundet), req.encryptionKey),
+        accountBalanceAt,
+      },
+    });
+
+    res.json({
+      accountBalance: gerundet,
+      accountBalanceAt,
+      message: 'Kontostand gespeichert.',
+    });
+
+  } catch (error) {
+    console.error('Kontostand speichern fehlgeschlagen:', error.message);
+    res.status(500).json({ error: 'Der Kontostand konnte nicht gespeichert werden.' });
   }
 });
 

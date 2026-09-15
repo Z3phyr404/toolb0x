@@ -854,7 +854,8 @@ router.get('/json', async (req, res) => {
       await Promise.all([
         prisma.user.findUnique({
           where: { id: req.userId },
-          select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true },
+          select: { id: true, email: true, name: true, role: true, createdAt: true, updatedAt: true,
+            budgetStartDay: true, accountBalance: true, accountBalanceAt: true },
         }),
         prisma.category.findMany({ where: { userId: req.userId } }),
         prisma.expense.findMany({ where: { userId: req.userId }, include: { category: true, bookings: true } }),
@@ -873,6 +874,12 @@ router.get('/json', async (req, res) => {
         prisma.share.findMany({ where: { userId: req.userId } }),
       ]);
 
+    // decrypt() wirft nicht, sondern liefert bei defektem Ciphertext einen
+    // Hinweistext — parseFloat davon wäre NaN und JSON.stringify macht daraus
+    // null. Der Guard macht das explizit statt zufällig richtig.
+    const kontostandRoh = user.accountBalance ? parseFloat(decrypt(user.accountBalance, key)) : NaN;
+    const kontostand = Number.isFinite(kontostandRoh) ? kontostandRoh : null;
+
     const entschluesselt = {
       hinweis: 'Vollständiger Export deiner Daten aus Toolb0x (DSGVO Art. 20). '
         + 'Alle Inhalte sind hier im Klartext — bewahre die Datei sicher auf.',
@@ -884,6 +891,11 @@ router.get('/json', async (req, res) => {
         rolle: user.role,
         registriertAm: user.createdAt,
         zuletztGeaendert: user.updatedAt,
+        monatsbeginn: user.budgetStartDay,
+        // Selbst gepflegter Kontostand-Schnappschuss. Verschlüsselt in der
+        // DB, hier — wie alles in diesem Export — im Klartext.
+        kontostand: kontostand,
+        kontostandVom: user.accountBalanceAt,
       },
       kategorien: kategorien.map(c => ({
         id: c.id,

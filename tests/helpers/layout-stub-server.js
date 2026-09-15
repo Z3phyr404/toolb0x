@@ -23,7 +23,10 @@ const PORT = 3999;
 //   STUB_START_DAY=15 node tests/helpers/layout-stub-server.js
 const STUB_START_DAY = Number(process.env.STUB_START_DAY) || 1;
 
-const USER = { id: 'stub-user-id', email: 'michael@test.de', name: 'Michael Test', role: 'admin', createdAt: '2026-01-01T00:00:00.000Z', budgetStartDay: STUB_START_DAY };
+const USER = { id: 'stub-user-id', email: 'michael@test.de', name: 'Michael Test', role: 'admin', createdAt: '2026-01-01T00:00:00.000Z', budgetStartDay: STUB_START_DAY,
+  // Kontostand bewusst 9 Tage alt, damit die Veraltet-Markierung sichtbar ist.
+  accountBalance: 1842.37,
+  accountBalanceAt: new Date(Date.now() - 9 * 86400000).toISOString() };
 
 const API = {
   '/api/auth/me': { user: { ...USER, hasRecoveryCode: true } },
@@ -32,6 +35,7 @@ const API = {
   '/api/auth/reset-with-token': { message: 'Passwort zurückgesetzt.', recoveryCode: 'AB2C-DE3F-GH4J-KM5N-PQ6R-ST7U' },
   '/api/auth/recovery-code': { message: 'Neuer Recovery-Code erstellt.', recoveryCode: 'AB2C-DE3F-GH4J-KM5N-PQ6R-ST7U' },
   '/api/auth/budget-start-day': { budgetStartDay: STUB_START_DAY, message: 'Monatsbeginn gespeichert.' },
+  // account-balance wird unten dynamisch beantwortet (PUT ändert den Stand).
   '/api/vaults': { vaults: [] },
   '/api/passwords': { passwords: Array.from({ length: 14 }, (_, i) => ({
     id: 'p' + i,
@@ -234,6 +238,27 @@ http.createServer((req, res) => {
       + '<circle cx="140" cy="120" r="34" fill="hsl(' + hue + ',60%,70%)"/>'
       + '<path d="M0 400 L150 220 L260 320 L330 250 L400 340 L400 400 Z" fill="hsl(' + hue + ',25%,35%)"/>'
       + '</svg>');
+  }
+
+  // Kontostand: einziger Stub-Endpunkt mit Zustand — sonst könnte man das
+  // Eintragen/Entfernen im Browser nicht durchspielen.
+  if (url === '/api/auth/account-balance' && req.method === 'PUT') {
+    let roh = '';
+    req.on('data', c => { roh += c; });
+    return req.on('end', () => {
+      let wert = null;
+      try { wert = JSON.parse(roh || '{}').accountBalance; } catch (e) { wert = null; }
+      const leer = wert === null || wert === undefined || wert === '';
+      const u = API['/api/auth/me'].user;
+      u.accountBalance = leer ? null : Math.round(Number(wert) * 100) / 100;
+      u.accountBalanceAt = leer ? null : new Date().toISOString();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        accountBalance: u.accountBalance,
+        accountBalanceAt: u.accountBalanceAt,
+        message: leer ? 'Kontostand entfernt.' : 'Kontostand gespeichert.',
+      }));
+    });
   }
 
   if (url.startsWith('/api/')) {

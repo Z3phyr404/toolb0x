@@ -29,6 +29,18 @@ model User {
   budgetStartDay Int    @default(1)
   encryptedKey   String // Encryption Key, verschlüsselt mit dem User-Passwort
 
+  // Tatsächlicher Kontostand — ein vom Nutzer gepflegter SCHNAPPSCHUSS,
+  // bewusst KEIN aus den Einträgen fortgeschriebenes Saldo (das wäre doppelte
+  // Buchführung: eine einzige vergessene Ausgabe würde den Stand dauerhaft
+  // verfälschen). Er beantwortet "wie viel Geld liegt gerade da", während die
+  // Kachel "Budget übrig" nur sagt, wie viel von diesem Monat rechnerisch
+  // noch offen ist.
+  // accountBalance ist verschlüsselt und deshalb — wie jeder Betrag — String.
+  // accountBalanceAt bleibt Klartext: es ist nur der Zeitpunkt der Eingabe
+  // und wird gebraucht, um einen veralteten Stand zu markieren.
+  accountBalance   String?   @db.Text
+  accountBalanceAt DateTime?
+
   // Schlüsselpaar für geteilte Tresore (RSA-OAEP).
   // publicKey ist öffentlich (Klartext-PEM) — damit können andere Nutzer
   // Tresor-Schlüssel für diesen User verschlüsseln, ohne dass er online ist.

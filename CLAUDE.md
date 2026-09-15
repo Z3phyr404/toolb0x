@@ -152,6 +152,7 @@ toolb0x/
 ### Verschlüsselte Felder in der DB
 | Modell | Verschlüsselte Felder |
 |--------|----------------------|
+| User | `accountBalance` |
 | Category | `name`, `color` |
 | Expense | `name`, `amount`, `tags` |
 | Income | `name`, `amount` |
@@ -176,6 +177,8 @@ decryptFields(obj, key, fields)  // Objekt mit ausgewählten Feldern entschlüss
 ```
 id (UUID), email (unique), password (bcrypt), name, role (default "user"), suspended (default false), encryptedKey
 budgetStartDay (Int, 1–28, default 1 — erster Tag des Finanzmonats)
+accountBalance (enc, optional — selbst gepflegter Kontostand-Schnappschuss)
+accountBalanceAt (DateTime, optional, nicht enc — Zeitpunkt der Eingabe)
 createdAt, updatedAt
 → hat: categories[], expenses[], incomes[], monthInits[], reminders[]
 ```
@@ -288,6 +291,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | POST | `/reset-with-token` | **Öffentlich.** Reset per Admin-Token (LÖSCHT alle Daten, neuer Key + Code) |
 | POST | `/recovery-code` | Recovery-Code (neu) erzeugen — braucht aktuelles Passwort, Code nur einmal sichtbar |
 | PUT | `/budget-start-day` | Erster Tag des Finanzmonats (1–28) setzen; bewusst OHNE Passwortabfrage |
+| PUT | `/account-balance` | Tatsächlicher Kontostand (Schnappschuss); `null` löscht ihn |
 | POST | `/logout` | Session löschen, Cookie leeren |
 | GET | `/me` | Aktueller User inkl. `hasRecoveryCode` (`requireAuth`) |
 | PUT | `/password` | Passwort ändern (alle Sessions invalidieren) |
@@ -334,7 +338,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 ### Export (`/api/export/`)
 - GET `/pdf?month=YYYY-MM` — PDF-Export der Monatsübersicht (KPIs, Kategorien, Top 10, Einnahmen, Tags)
 - GET `/pdf-all` — Gesamt-PDF-Export aller Einnahmen & Ausgaben (Monatsübersicht + Details pro Monat)
-- GET `/json` — **Vollständiger Datenexport (DSGVO Art. 20)**, maschinenlesbar. Entschlüsselt auch Tresor-Einträge (via `unwrapMembershipKey`). Share-`blob`s sind clientseitig verschlüsselt → nur Metadaten. PDF erfüllt Art. 20 NICHT (nicht maschinenlesbar), daher dieser Endpunkt.
+- GET `/json` — **Vollständiger Datenexport (DSGVO Art. 20)**, maschinenlesbar. Enthält unter `konto` auch `monatsbeginn`, `kontostand` und `kontostandVom`. Entschlüsselt auch Tresor-Einträge (via `unwrapMembershipKey`). Share-`blob`s sind clientseitig verschlüsselt → nur Metadaten. PDF erfüllt Art. 20 NICHT (nicht maschinenlesbar), daher dieser Endpunkt.
 
 ### Passwords (`/api/passwords/`)
 | Methode | Route | Beschreibung |
@@ -858,6 +862,48 @@ das Komma der iPhone-Tastatur je nach Browser verwirft. Server unverändert.
 **Mock-Prisma:** `RUECKWAERTS_RELATION` in `tests/helpers/mockPrisma.js`
 löst 1:n-Includes auf (`include: { bookings: true }`). Der generische Weg
 kann nur die Gegenrichtung über `<relation>Id`.
+
+## Kontostand — was wirklich auf dem Konto liegt (2026-09-15)
+
+Die KPI-Kachel `remaining` (Einnahmen − Ausgaben der Periode) beantwortet
+**nicht** die Frage „kann ich mir das jetzt leisten?". Sie weicht
+systematisch vom Konto ab: wiederkehrende Ausgaben stehen zum Perioden-Anfang
+schon in voller Höhe drin, obwohl Miete und Abos erst im Lauf des Monats
+abgebucht werden, und Überträge aus Vormonaten kommen gar nicht vor (jede
+Periode startet bei null). Deshalb gibt es `User.accountBalance`.
+
+**Das Prinzip: ein SCHNAPPSCHUSS, kein fortgeschriebenes Saldo.** Der Nutzer
+schaut in seine Banking-App und tippt ab, was dort steht. Der Wert wird
+bewusst NICHT aus den Einträgen berechnet und auch nicht mit ihnen
+abgeglichen — das wäre doppelte Buchführung: eine einzige vergessene Ausgabe
+würde den Stand dauerhaft verfälschen, und man bräuchte einen
+Abgleich-Dialog. Ein Schnappschuss darf veralten (und wird ab 7 Tagen in der
+UI markiert), ein falsch fortgeschriebenes Saldo merkt niemand.
+
+- **Keine Prognose.** „Voraussichtlich am Periodenende" bräuchte eine
+  verlässliche Antwort auf „welche Ausgabe ist schon geflossen". Die gibt es
+  heute nicht: `spentOn` ist optional und bei Bestandsdaten `null`, nur
+  Sammelposten wissen es über `ExpenseBooking.bookedOn`. Bevor das kommt,
+  muss die Datumspflege verlässlich sein.
+- **Keine Bankanbindung.** PSD2/FinTS bräuchte eine TPP-Lizenz und würde die
+  Zero-Knowledge-Architektur aufbrechen.
+- **`accountBalance` ist verschlüsselt** (also String wie jeder Betrag),
+  `accountBalanceAt` bleibt Klartext — es ist nur der Eingabezeitpunkt.
+- **Negative Werte sind erlaubt** (Dispo), `0` ist ein gültiger Stand und
+  NICHT dasselbe wie „kein Stand" (Prüfung deshalb `=== ''`, nicht falsy).
+  `null` löscht den Stand.
+- **`reset-with-token` muss beide Felder mitlöschen** — der Ciphertext gehört
+  zum alten Encryption Key und wäre danach nicht mehr lesbar.
+- **`leseKontostand()` in auth.js guardet `decrypt()`**: bei defektem
+  Ciphertext käme sonst `NaN` ins JSON und „NaN €" aufs Dashboard.
+- **Die KPI-Kachel heisst jetzt „Budget übrig"** (vorher „Verbleibend"), in
+  der Sidebar ebenso. Zwei „Geld übrig"-Zahlen nebeneinander wären sonst
+  nicht auseinanderzuhalten. Im PDF-Export steht weiter „Verbleibend".
+- **Migration** `20260915120000_add_account_balance` — bei Deploy
+  `migrate deploy` + `generate` + Restart nicht vergessen.
+- Tests: `tests/routes/auth-account-balance.test.js`; der Layout-Stub
+  beantwortet `PUT /api/auth/account-balance` als einziger Endpunkt
+  ZUSTANDSBEHAFTET (sonst liesse sich Eintragen/Entfernen nicht durchspielen).
 
 ## Wichtige Designentscheidungen
 

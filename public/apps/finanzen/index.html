@@ -61,6 +61,31 @@ main { flex:1; overflow-y:auto; padding:26px 10% 40px; position:relative; }
 .month-btn { width:30px; height:30px; border:none; border-radius:8px; background:rgba(255,255,255,0.06); color:rgba(238,241,246,0.7); cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s; font-family:inherit; }
 .month-btn:hover { background:rgba(255,255,255,0.14); }
 .month-display { font-size:14px; font-weight:600; min-width:120px; text-align:center; }
+/* ===== KONTOSTAND (2026-09-15) =====
+   Bewusst eine eigene Karte ÜBER den KPI-Kacheln und optisch anders: die
+   KPIs sagen, was der Plan für diese Periode hergibt, der Kontostand sagt,
+   was wirklich da ist. Zwei "Geld übrig"-Zahlen nebeneinander wären sonst
+   nicht auseinanderzuhalten — deshalb heisst die KPI-Kachel jetzt auch
+   "Budget übrig" und nicht mehr "Verbleibend". */
+/* [hidden] muss gewinnen: eine eigene display-Regel (Autoren-CSS) schlägt
+   sonst das display:none, das der Browser für [hidden] mitbringt — das
+   Formular stünde trotz .hidden=true als leerer Kasten in der Karte. */
+[hidden] { display:none !important; }
+.balance-card { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:16px 20px; margin-bottom:22px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.balance-icon { width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; background:rgba(148,163,184,0.14); color:#cbd5e1; flex-shrink:0; }
+.balance-main { display:flex; flex-direction:column; gap:2px; margin-right:auto; }
+.balance-label { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-mono); }
+.balance-value { font-size:24px; font-weight:700; letter-spacing:-0.02em; }
+.balance-value.leer { font-size:15px; font-weight:500; color:var(--text-3); }
+.balance-value.minus { color:#fb7185; }
+.balance-stand { font-size:12px; color:var(--text-3); }
+.balance-stand.alt { color:#fbbf24; }
+.balance-form { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; }
+.balance-form .form-input { width:160px; }
+@media (max-width:600px) {
+  .balance-card { gap:12px; }
+  .balance-form .form-input { width:100%; }
+}
 /* ===== GEPLANT / GEBUCHT ===== */
 .plan-card { background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:18px 20px; margin-bottom:22px; }
 .plan-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
@@ -467,7 +492,7 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
     </button>
 
     <div class="sidebar-balance">
-      <div class="sidebar-balance-label">Verbleibend</div>
+      <div class="sidebar-balance-label">Budget übrig</div>
       <div class="sidebar-balance-value" id="sidebarBal">&mdash;</div>
     </div>
 
@@ -516,6 +541,27 @@ td.date-cell { white-space:nowrap; color:var(--text-2); font-size:13px; font-var
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           PDF Export
         </button>
+      </div>
+      <!-- Tatsächlicher Kontostand: Schnappschuss aus der Banking-App.
+           Beantwortet "kann ich mir das jetzt leisten?" — was die KPIs
+           nicht können, weil Fixkosten dort schon zum Monatsanfang in
+           voller Höhe stehen und Überträge aus Vormonaten ganz fehlen. -->
+      <div class="balance-card" id="balanceCard" data-reveal data-reveal-index="1" data-glow-color="rgba(148,163,184,0.2)">
+        <div class="balance-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+        </div>
+        <div class="balance-main">
+          <div class="balance-label">Kontostand</div>
+          <div class="balance-value leer" id="balanceValue">&mdash;</div>
+        </div>
+        <span class="balance-stand" id="balanceStand"></span>
+        <button class="btn btn-ghost" id="balanceEditBtn">Eintragen</button>
+        <form class="balance-form" id="balanceForm" hidden>
+          <input class="form-input" id="balanceInput" inputmode="decimal" autocomplete="off" placeholder="z.&nbsp;B. 1234,56">
+          <button class="btn btn-primary" type="submit">Speichern</button>
+          <button class="btn btn-ghost" type="button" id="balanceCancelBtn">Abbrechen</button>
+          <button class="btn btn-ghost" type="button" id="balanceClearBtn" hidden>Entfernen</button>
+        </form>
       </div>
       <div class="kpi-row" id="kpiRow"></div>
       <!-- Geplant / gebucht der Sammelposten. Nur sichtbar, wenn es welche gibt. -->
@@ -961,6 +1007,10 @@ function monthLabel(ym) {
 // Wird beim Ändern hier IMMER auch serverseitig angepasst — die Route prüft
 // das Datum nochmals gegen die Periode.
 var budgetStartDay = 1;
+// Tatsächlicher Kontostand (Schnappschuss) + Zeitpunkt der letzten Eingabe.
+// Hängt NICHT am gewählten Monat — er gilt immer "jetzt".
+var kontostand = null;
+var kontostandAt = null;
 
 function normalizeStartDay(v) {
   var n = parseInt(v, 10);
@@ -1161,6 +1211,11 @@ async function initApp() {
     // "heute" ist — vorher wäre currentMonth nur der Kalendermonat.
     budgetStartDay = normalizeStartDay(res.user.budgetStartDay);
     currentMonth = currentPeriod();
+    // Der Kontostand kommt aus /auth/me und hängt nicht am Monat — einmal
+    // setzen und zeichnen reicht, auch wenn loadAllData danach scheitert.
+    kontostand = typeof res.user.accountBalance === 'number' ? res.user.accountBalance : null;
+    kontostandAt = res.user.accountBalanceAt || null;
+    renderBalance();
   } catch(err) {
     // NUR eine fehlende/abgelaufene Anmeldung rechtfertigt den Sprung ins
     // Portal. Früher hing das Laden der Daten im selben Zweig: ein 429 oder
@@ -2260,7 +2315,122 @@ function updateSidebar() {
 // ============================================================
 // RENDER: DASHBOARD
 // ============================================================
-function renderDash() { renderKPIs(); renderPlanCard(); renderDashReminders(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
+function renderDash() { renderBalance(); renderKPIs(); renderPlanCard(); renderDashReminders(); renderDonut(); renderBars(); renderBudget(); renderTagAnalysis(); }
+
+// ============================================================
+// KONTOSTAND (2026-09-15)
+// ============================================================
+// Was wirklich auf dem Konto liegt — vom Nutzer aus seiner Banking-App
+// abgetippt. Bewusst NICHT aus den Einträgen fortgeschrieben: dann würde
+// jede vergessene Ausgabe den Stand dauerhaft verfälschen, und man bräuchte
+// einen Abgleich-Dialog. Ein Schnappschuss darf veralten, ein falsch
+// fortgeschriebenes Saldo merkt niemand.
+// ============================================================
+
+// Wie parseBetrag, aber mit Minus: ein Kontostand darf im Dispo stehen.
+function parseKontostand(txt) {
+  var s = String(txt || '').replace(/[\s€]/g, '');
+  var neg = s.charAt(0) === '-';
+  if (neg || s.charAt(0) === '+') s = s.slice(1);
+  if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return NaN;
+  return (neg ? -1 : 1) * parseFloat(s);
+}
+
+// Ganze Tage zwischen dem Stand und heute — in LOKALER Zeit gerechnet,
+// sonst läge das Ergebnis nachts um einen Tag daneben.
+function tageSeit(iso) {
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  var a = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  var n = new Date();
+  var b = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.round((b - a) / 86400000);
+}
+
+var STAND_VERALTET_AB = 7; // Tage
+
+function renderBalance() {
+  var wert = document.getElementById('balanceValue');
+  var stand = document.getElementById('balanceStand');
+  var btn = document.getElementById('balanceEditBtn');
+
+  if (kontostand === null || kontostand === undefined) {
+    wert.className = 'balance-value leer';
+    wert.textContent = 'Noch nicht hinterlegt';
+    stand.textContent = '';
+    stand.className = 'balance-stand';
+    btn.textContent = 'Eintragen';
+    return;
+  }
+
+  wert.className = 'balance-value' + (kontostand < 0 ? ' minus' : '');
+  wert.textContent = fmt(kontostand);
+  btn.textContent = 'Aktualisieren';
+
+  var tage = kontostandAt ? tageSeit(kontostandAt) : null;
+  if (tage === null) { stand.textContent = ''; stand.className = 'balance-stand'; return; }
+  stand.textContent = tage === 0 ? 'Stand: heute'
+    : tage === 1 ? 'Stand: gestern'
+    : 'Stand: vor ' + tage + ' Tagen';
+  // Ein alter Stand ist schlimmer als gar keiner, wenn er unkommentiert
+  // dasteht — ab einer Woche wird er deshalb sichtbar markiert.
+  stand.className = 'balance-stand' + (tage >= STAND_VERALTET_AB ? ' alt' : '');
+}
+
+function oeffneBalanceForm() {
+  var form = document.getElementById('balanceForm');
+  var input = document.getElementById('balanceInput');
+  input.value = kontostand === null || kontostand === undefined
+    ? ''
+    : String(kontostand).replace('.', ',');
+  document.getElementById('balanceClearBtn').hidden = (kontostand === null || kontostand === undefined);
+  form.hidden = false;
+  document.getElementById('balanceEditBtn').hidden = true;
+  input.focus();
+  input.select();
+}
+
+function schliesseBalanceForm() {
+  document.getElementById('balanceForm').hidden = true;
+  document.getElementById('balanceEditBtn').hidden = false;
+}
+
+async function speichereKontostand(wert) {
+  try {
+    var res = await api('/auth/account-balance', {
+      method: 'PUT',
+      body: JSON.stringify({ accountBalance: wert }),
+    });
+    kontostand = res.accountBalance;
+    kontostandAt = res.accountBalanceAt;
+    schliesseBalanceForm();
+    renderBalance();
+    toast(res.message || 'Kontostand gespeichert');
+  } catch (err) {
+    toast((err && err.errors && err.errors[0]) || 'Der Kontostand konnte nicht gespeichert werden.', 'error');
+  }
+}
+
+document.getElementById('balanceEditBtn').addEventListener('click', oeffneBalanceForm);
+document.getElementById('balanceCancelBtn').addEventListener('click', schliesseBalanceForm);
+document.getElementById('balanceClearBtn').addEventListener('click', function() {
+  speichereKontostand(null);
+});
+// Enter im Betragsfeld speichert. Die implizite Formular-Absendung des
+// Browsers würde das auch tun — aber die Seite fängt Enter global ab (Modals),
+// und ein eigener Handler ist hier dasselbe Muster wie beim Buchungsfeld.
+document.getElementById('balanceInput').addEventListener('keydown', function(ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  document.getElementById('balanceForm').dispatchEvent(new Event('submit', { cancelable: true }));
+});
+document.getElementById('balanceForm').addEventListener('submit', function(ev) {
+  ev.preventDefault();
+  var zahl = parseKontostand(document.getElementById('balanceInput').value);
+  if (isNaN(zahl)) { toast('Bitte gib einen gültigen Betrag ein (z.\u00a0B. 1234,56).', 'error'); return; }
+  speichereKontostand(zahl);
+});
 
 // "Geplant / gebucht": was von den Budgets der Sammelposten schon verbraucht
 // ist und was noch offen aussteht. Der offene Rest ist der Grund, warum
@@ -2344,7 +2514,7 @@ function renderKPIs() {
     '</div>' +
     '<div class="kpi"' + genau(b) + ' data-reveal data-reveal-index="3" data-glow-color="rgba(45,212,191,0.24)">' +
       '<div class="kpi-icon" style="background:rgba(45,212,191,0.14);color:#2dd4bf"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.5" cy="13.5" r="1.3"/></svg></div>' +
-      '<div class="kpi-label">Verbleibend</div>' +
+      '<div class="kpi-label">Budget übrig</div>' +
       '<div class="kpi-value" style="color:' + (b >= 0 ? '#2dd4bf' : '#ff6b60') + '">' + fmtS(b) + '</div>' +
     '</div>' +
     '<div class="kpi" data-reveal data-reveal-index="4" data-glow-color="rgba(251,191,36,0.24)">' +
