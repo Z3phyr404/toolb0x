@@ -73,6 +73,7 @@ model User {
   shares           Share[]
   ownedVaults      Vault[]          @relation("VaultOwner")
   vaultMemberships VaultMember[]
+  invites          Invite[]
 
   @@map("users")
 }
@@ -386,4 +387,32 @@ model Share {
 
   @@index([userId])
   @@map("shares")
+}
+
+// ============================================================
+// INVITE — Einladungslinks (Registrierung nur auf Einladung)
+// ============================================================
+// Seit 2026-10-10 ist die offene Registrierung abgeschaltet: Konten
+// entstehen nur noch über einen Link, den ein Admin erzeugt und selbst
+// weitergibt (/portal?invite=<token>). Wie beim Reset-Link liegt nur
+// der SHA-256-Hash des Tokens in der DB. Jeder Link gilt für EIN Konto.
+// note:   Klartext-Merker für den Admin ("für Anna") — optional
+// usedAt: gesetzt, sobald damit ein Konto angelegt wurde
+// ============================================================
+model Invite {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  note      String    @default("")
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  // Wer den Link erzeugt hat. Wird der Admin gelöscht, bleibt die
+  // Einladung gültig (SetNull) — sie gehört dem Eingeladenen.
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdById])
+  @@map("invites")
 }

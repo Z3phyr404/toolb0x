@@ -376,6 +376,28 @@
       cursor: not-allowed;
     }
 
+    /* ===== EINLADUNGEN ===== */
+    .invite-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 32px;
+    }
+    .invite-hint { font-size: 13px; color: var(--text-3); margin-bottom: 14px; line-height: 1.5; }
+    .invite-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .invite-form .ob-input { flex: 1 1 220px; width: auto; padding: 9px 12px; font-size: 14px; }
+    .invite-form select.ob-input { flex: 0 0 auto; }
+    .invite-result { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .invite-result[hidden] { display: none; }
+    .invite-result .ob-input { flex: 1 1 320px; width: auto; padding: 9px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+    .invite-list { list-style: none; margin: 16px 0 0; padding: 0; }
+    .invite-list li {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px;
+    }
+    .invite-list .invite-meta { color: var(--text-3); font-size: 12px; }
+
     .suspend-btn.is-admin {
       background: rgba(255,255,255,0.04);
       color: var(--text-3);
@@ -507,11 +529,31 @@
       <div class="page-header" data-reveal data-reveal-index="0">
         <div class="page-label">// ADMINISTRATION</div>
         <h1 class="page-title jitter">System-Übersicht</h1>
-        <p class="page-subtitle">Nutzerverwaltung und System-Statistiken.</p>
+        <p class="page-subtitle">Nutzerverwaltung, Einladungen und System-Statistiken.</p>
       </div>
 
       <div id="content">
         <div class="loading">Lade Daten...</div>
+      </div>
+
+      <!-- Einladungen: Registrierung geht nur noch per Link (seit 2026-10-10) -->
+      <div class="section-title">Einladungen</div>
+      <div class="invite-panel" id="inviteSection">
+        <p class="invite-hint">Neue Konten können nur über einen Einladungslink angelegt werden. Jeder Link gilt für <strong>ein</strong> Konto. Du gibst ihn selbst weiter (z.&nbsp;B. per Messenger).</p>
+        <form class="invite-form" id="inviteForm">
+          <input class="ob-input" id="inviteNote" type="text" maxlength="80" placeholder="Für wen? (nur als Merker für dich, optional)" autocomplete="off">
+          <select class="ob-input" id="inviteDays" title="Gültigkeit">
+            <option value="1">1 Tag gültig</option>
+            <option value="7" selected>7 Tage gültig</option>
+            <option value="30">30 Tage gültig</option>
+          </select>
+          <button class="suspend-btn unsuspend" type="submit" id="inviteCreateBtn">Einladungslink erstellen</button>
+        </form>
+        <div class="invite-result" id="inviteResult" hidden>
+          <input class="ob-input" id="inviteUrl" type="text" readonly>
+          <button class="suspend-btn reset" type="button" id="inviteCopyBtn">Kopieren</button>
+        </div>
+        <ul class="invite-list" id="inviteList"></ul>
       </div>
     </main>
   </div>
@@ -748,6 +790,99 @@
           btn.disabled = false;
         }
       });
+
+      // ===== EINLADUNGEN =====
+      function fmtDate(d) {
+        return new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      }
+
+      async function loadInvites() {
+        var listEl = document.getElementById('inviteList');
+        try {
+          var res = await fetch('/api/admin/invites');
+          if (!res.ok) throw new Error('Fehler');
+          var invites = (await res.json()).invites;
+          if (!invites.length) {
+            listEl.innerHTML = '<li><span class="invite-meta">Keine offenen Einladungen.</span></li>';
+            return;
+          }
+          listEl.innerHTML = invites.map(function (inv) {
+            return '<li><div>' +
+                '<div>' + (inv.note ? escapeHtml(inv.note) : '<span class="invite-meta">ohne Merker</span>') + '</div>' +
+                '<div class="invite-meta">erstellt ' + fmtDate(inv.createdAt) + ' · gültig bis ' + fmtDate(inv.expiresAt) + '</div>' +
+              '</div>' +
+              '<button class="suspend-btn suspend" type="button" data-invite-revoke="' + escapeHtml(inv.id) + '">Zurückziehen</button></li>';
+          }).join('');
+        } catch (e) {
+          listEl.innerHTML = '<li><span class="invite-meta">Einladungen konnten nicht geladen werden.</span></li>';
+        }
+      }
+
+      document.getElementById('inviteForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var btn = document.getElementById('inviteCreateBtn');
+        btn.disabled = true;
+        try {
+          var res = await fetch('/api/admin/invites', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({
+              note: document.getElementById('inviteNote').value.trim(),
+              days: Number(document.getElementById('inviteDays').value),
+            }),
+          });
+          var data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Fehler', true); return; }
+
+          // Der Link ist nur JETZT sichtbar — in der DB liegt nur sein Hash
+          var url = window.location.origin + '/portal?invite=' + data.token;
+          document.getElementById('inviteUrl').value = url;
+          document.getElementById('inviteResult').hidden = false;
+          document.getElementById('inviteNote').value = '';
+          try {
+            await navigator.clipboard.writeText(url);
+            showToast('Einladungslink kopiert — gültig bis ' + fmtDate(data.expiresAt) + '.');
+          } catch (clipErr) {
+            showToast('Link erstellt — bitte manuell kopieren. Er wird nur jetzt angezeigt.');
+          }
+          loadInvites();
+        } catch (err) {
+          showToast('Netzwerkfehler', true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      document.getElementById('inviteCopyBtn').addEventListener('click', function () {
+        var input = document.getElementById('inviteUrl');
+        navigator.clipboard.writeText(input.value)
+          .then(function () { showToast('Einladungslink kopiert.'); })
+          .catch(function () { input.select(); showToast('Kopieren fehlgeschlagen — Link ist markiert.', true); });
+      });
+
+      document.getElementById('inviteList').addEventListener('click', async function (e) {
+        var btn = e.target.closest('[data-invite-revoke]');
+        if (!btn) return;
+        if (!confirm('Einladung zurückziehen? Der Link funktioniert danach nicht mehr.')) return;
+        btn.disabled = true;
+        try {
+          var res = await fetch('/api/admin/invites/' + encodeURIComponent(btn.getAttribute('data-invite-revoke')), {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'X-CSRF-Token': getCsrfToken() },
+          });
+          var data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Fehler', true); btn.disabled = false; return; }
+          showToast(data.message);
+          loadInvites();
+        } catch (err) {
+          showToast('Netzwerkfehler', true);
+          btn.disabled = false;
+        }
+      });
+
+      loadInvites();
 
       function escapeHtml(str) {
         var div = document.createElement('div');

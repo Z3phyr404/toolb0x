@@ -122,6 +122,9 @@ const API = {
     { ...USER, suspended: false, _count: { categories: 0, expenses: 0, incomes: 0, reminders: 0 } },
     { id: 'user-2', email: 'lena@test.de', name: 'Lena Beispiel', role: 'user', suspended: false, createdAt: '2026-05-10T00:00:00.000Z', _count: { categories: 9, expenses: 4, incomes: 2, reminders: 1 } },
   ] },
+  '/api/admin/invites': { invites: [
+    { id: 'inv-1', note: 'für Lena', createdAt: '2026-10-08T10:00:00.000Z', expiresAt: '2026-10-15T10:00:00.000Z' },
+  ] },
   '/api/admin/users/user-2/reset-link': { message: 'Reset-Link erstellt.', token: 'deadbeef'.repeat(8), expiresAt: '2026-07-16T12:00:00.000Z' },
   '/api/fotos/library': { generatedAt: '2026-08-06T12:00:00.000Z', photoCount: 74, persons: ['Lena', 'Michael'],
     // Zwei Beispiel-Events (fotob0x Etappe 6) für die Event-Gruppierung in
@@ -212,7 +215,7 @@ const API = {
 };
 
 const PAGES = {
-  '/': '/landing/index.html',
+  '/': '/portal/index.html',
   '/portal': '/portal/index.html',
   '/portal/profil': '/portal/profil.html',
   '/app/passwords': '/apps/passwords/index.html',
@@ -259,6 +262,11 @@ http.createServer((req, res) => {
         message: leer ? 'Kontostand entfernt.' : 'Kontostand gespeichert.',
       }));
     });
+  }
+
+  if (url === '/api/admin/invites' && req.method === 'POST') {
+    res.writeHead(201, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ id: 'inv-neu', token: 'c0ffee'.repeat(10) + 'c0ff', note: '', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() }));
   }
 
   if (url.startsWith('/api/')) {

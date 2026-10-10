@@ -138,7 +138,7 @@
 <div class="auth-screen" id="authScreen">
   <div class="auth-card">
     <!-- Nicht eingeloggt → Startseite (erklärt das Portal), nicht /portal -->
-    <a href="/" class="auth-logo ob-logo-link" title="Was ist Toolb0x?">
+    <a href="/portal" class="auth-logo ob-logo-link" title="Toolb0x">
       <div class="auth-logo-mark brand-tile">
         <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
           <defs><linearGradient id="brandGradAuth" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#ffb347"/><stop offset="1" stop-color="#ff5c7a"/></linearGradient></defs>
@@ -161,9 +161,9 @@
       <input class="auth-input" id="authPassword" type="password" placeholder="Passwort" autocomplete="current-password">
       <button class="auth-btn" type="submit" id="authBtn">Anmelden</button>
     </form>
-    <div class="auth-switch">
-      <span id="authSwitchText">Noch kein Konto?</span>
-      <a id="authSwitchLink">Registrieren</a>
+    <div class="auth-switch" id="authSwitchRow" style="display:none">
+      <span id="authSwitchText"></span>
+      <a id="authSwitchLink"></a>
     </div>
     <div class="auth-switch" id="forgotRow">
       <a id="forgotLink">Passwort vergessen?</a>
@@ -353,13 +353,14 @@
 const API = '/api';
 // Admin-Reset-Link: /portal?reset=<token> → Modus "token" (neues Passwort setzen)
 const resetToken = new URLSearchParams(window.location.search).get('reset');
-// Landing-Page-CTA: /portal?register=1 → direkt im Registrieren-Modus starten
-const wantsRegister = new URLSearchParams(window.location.search).get('register');
+// Einladungslink: /portal?invite=<token> → Registrieren-Modus. Ohne
+// Einladung gibt es keine Registrierung (seit 2026-10-10).
+const inviteToken = new URLSearchParams(window.location.search).get('invite');
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('authForm').addEventListener('submit', handleAuth);
   document.getElementById('authSwitchLink').addEventListener('click', function () {
-    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    setAuthMode(authMode === 'login' && inviteToken ? 'register' : 'login');
   });
   document.getElementById('forgotLink').addEventListener('click', function () {
     setAuthMode('forgot');
@@ -382,8 +383,8 @@ let afterRecoveryModal = null;
 
 const AUTH_MODES = {
   login:    { name: false, email: true,  recovery: false, pw: 'Passwort',       pwAc: 'current-password', btn: 'Anmelden',               subtitle: 'Melde dich an, um fortzufahren',
-              switchText: 'Noch kein Konto?', switchLink: 'Registrieren', forgot: true },
-  register: { name: true,  email: true,  recovery: false, pw: 'Passwort',       pwAc: 'new-password',     btn: 'Registrieren',           subtitle: 'Erstelle ein neues Konto',
+              switchText: '', switchLink: '', forgot: true },
+  register: { name: true,  email: true,  recovery: false, pw: 'Passwort',       pwAc: 'new-password',     btn: 'Registrieren',           subtitle: 'Du wurdest eingeladen — lege dein Konto an',
               switchText: 'Bereits registriert?', switchLink: 'Anmelden', forgot: false },
   forgot:   { name: false, email: true,  recovery: true,  pw: 'Neues Passwort', pwAc: 'new-password',     btn: 'Passwort zurücksetzen',  subtitle: 'Reset mit deinem Recovery-Code — ohne Datenverlust',
               switchText: 'Doch wieder eingefallen?', switchLink: 'Anmelden', forgot: false },
@@ -404,6 +405,13 @@ function setAuthMode(mode) {
   document.getElementById('authBtn').textContent = m.btn;
   document.getElementById('authSwitchText').textContent = m.switchText;
   document.getElementById('authSwitchLink').textContent = m.switchLink;
+  // Im Login-Modus gibt es nur mit Einladungslink einen Weg zur Registrierung
+  const showSwitch = mode === 'login' ? !!inviteToken : !!m.switchLink;
+  if (mode === 'login' && inviteToken) {
+    document.getElementById('authSwitchText').textContent = 'Eingeladen?';
+    document.getElementById('authSwitchLink').textContent = 'Konto anlegen';
+  }
+  document.getElementById('authSwitchRow').style.display = showSwitch ? '' : 'none';
   document.getElementById('forgotRow').style.display = m.forgot ? '' : 'none';
   document.getElementById('authError').classList.remove('show', 'info');
   if (mode === 'token') {
@@ -475,12 +483,15 @@ async function handleAuth(e) {
   try {
     if (mode === 'login' || mode === 'register') {
       if (mode === 'register' && !name) throw { errors: ['Bitte gib deinen Namen ein.'] };
-      const body = mode === 'login' ? { email, password } : { email, password, name };
+      const body = mode === 'login' ? { email, password } : { email, password, name, invite: inviteToken };
       const data = await postJson(mode === 'login' ? '/auth/login' : '/auth/register', body);
 
       SessionTimeout.markActive();
       // Merker: Auf diesem Gerät existiert ein Konto (für den Neustart-Hinweis)
       try { localStorage.setItem('toolbox_known', '1'); } catch {}
+
+      // Eingelöster Einladungslink gehört nicht in Verlauf/Lesezeichen
+      if (inviteToken) window.history.replaceState(null, '', '/portal');
 
       if (mode === 'register' && data.recoveryCode) {
         // Recovery-Code EINMALIG zeigen, erst danach ins Portal
@@ -515,6 +526,8 @@ async function handleAuth(e) {
       setAuthMode('login');
       showAuthMessage('Diese E-Mail-Adresse ist bereits registriert — melde dich hier mit deinem Passwort an.', true);
       document.getElementById('authPassword').focus();
+    } else if (err.code === 'INVITE_REQUIRED') {
+      showAuthMessage(err.errors?.[0] + ' Bitte frag nach einem neuen Link.');
     } else {
       showAuthMessage(err.errors?.join(', ') || err.error || 'Ein Fehler ist aufgetreten.');
     }
@@ -828,8 +841,8 @@ if (resetToken) {
   document.addEventListener('DOMContentLoaded', function () { setAuthMode('token'); });
   hideLoading();
 } else {
-  if (wantsRegister) {
-    // Von der Landing Page: Registrieren-Modus vorwählen
+  if (inviteToken) {
+    // Einladungslink: Registrieren-Modus vorwählen
     // (checkAuth läuft trotzdem — bestehende Sessions landen im Portal)
     document.addEventListener('DOMContentLoaded', function () { setAuthMode('register'); });
   }

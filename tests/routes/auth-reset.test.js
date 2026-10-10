@@ -20,7 +20,7 @@ const prismaPath = require.resolve('../../src/utils/prisma');
 require.cache[prismaPath] = { id: prismaPath, filename: prismaPath, loaded: true, exports: mockPrisma };
 
 // --- 2. Auth-Helper laden (setzt JWT_SECRET) ---
-const { cleanupAuth } = require('../helpers/authHelper');
+const { cleanupAuth, createInvite } = require('../helpers/authHelper');
 
 // --- 3. Route + Test-App laden ---
 const authRouter = require('../../src/routes/auth');
@@ -36,7 +36,7 @@ function resetStore() {
 }
 
 async function registerUser() {
-  const res = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+  const res = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
   assert.equal(res.status, 201);
   return res.body.recoveryCode;
 }
@@ -118,7 +118,7 @@ describe('POST /api/auth/recovery-code (Code rotieren)', () => {
 
   it('erzeugt einen neuen Code — der alte wird ungültig', async () => {
     // Registrierung setzt das Auth-Cookie und liefert den ersten Code
-    const registerRes = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+    const registerRes = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
     const cookie = registerRes.headers['set-cookie'];
     const oldCode = registerRes.body.recoveryCode;
 
@@ -143,7 +143,7 @@ describe('POST /api/auth/recovery-code (Code rotieren)', () => {
   });
 
   it('verlangt das korrekte aktuelle Passwort', async () => {
-    const registerRes = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+    const registerRes = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
     const cookie = registerRes.headers['set-cookie'];
 
     const rotate = await request(app).post('/api/auth/recovery-code')
@@ -234,7 +234,7 @@ describe('Auth credential atomicity regressions', () => {
 
   for (const method of ['password', 'recovery']) {
     it(method + ' invalidates an outstanding reset link without deleting data', async () => {
-      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const reg = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
       const token = arm();
       const categories = structuredClone(mockPrisma._store.categories);
       const result = method === 'password'
@@ -276,7 +276,7 @@ describe('Auth credential atomicity regressions', () => {
 
   for (const stage of ['delete', 'recreate']) {
     it('rolls back credentials, token and all data on ' + stage + ' failure; retry succeeds', async () => {
-      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const reg = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
       const token = arm();
       const userId = mockPrisma._store.users[0].id;
       mockPrisma._store.expenses.push({ id: 'expense', userId });
@@ -297,7 +297,7 @@ describe('Auth credential atomicity regressions', () => {
 
   for (const route of ['password', 'reset-password', 'recovery-code']) {
     it('rejects a stale ' + route + ' write after a competing credential update', async () => {
-      const reg = await request(app).post('/api/auth/register').send(REGISTER_BODY);
+      const reg = await request(app).post('/api/auth/register').send({ ...REGISTER_BODY, invite: await createInvite(mockPrisma) });
       const original = mockPrisma.user.updateMany;
       let winner;
       mockPrisma.user.updateMany = async args => {

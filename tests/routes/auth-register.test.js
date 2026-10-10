@@ -6,6 +6,8 @@
 // - Doppelte E-Mail → 400 mit code EMAIL_EXISTS (Frontend
 //   wechselt damit automatisch in den Anmelde-Modus)
 // - Passwort-Validierung
+// - Nur mit Einladungslink (seit 2026-10-10): fehlend, falsch,
+//   abgelaufen, schon benutzt → 403 INVITE_REQUIRED
 // ============================================================
 
 const { describe, it, beforeEach, after } = require('node:test');
@@ -19,19 +21,22 @@ const prismaPath = require.resolve('../../src/utils/prisma');
 require.cache[prismaPath] = { id: prismaPath, filename: prismaPath, loaded: true, exports: mockPrisma };
 
 // --- 2. Auth-Helper laden (setzt JWT_SECRET) ---
-const { cleanupAuth } = require('../helpers/authHelper');
+const { cleanupAuth, createInvite } = require('../helpers/authHelper');
 
 // --- 3. Route + Test-App laden ---
 const authRouter = require('../../src/routes/auth');
 const { createTestApp } = require('../helpers/testApp');
 const app = createTestApp({ path: '/api/auth', router: authRouter });
 
-const VALID_BODY = { email: 'neu@test.de', password: 'Test1234!', name: 'Neuer Nutzer' };
+const BASE_BODY = { email: 'neu@test.de', password: 'Test1234!', name: 'Neuer Nutzer' };
+let VALID_BODY;
 
 describe('POST /api/auth/register', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockPrisma._store.users.length = 0;
     mockPrisma._store.categories.length = 0;
+    mockPrisma._store.invites.length = 0;
+    VALID_BODY = { ...BASE_BODY, invite: await createInvite(mockPrisma) };
   });
 
   after(() => cleanupAuth());
@@ -60,7 +65,7 @@ describe('POST /api/auth/register', () => {
 
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ ...VALID_BODY, name: 'Zweiter Versuch' });
+      .send({ ...VALID_BODY, name: 'Zweiter Versuch', invite: await createInvite(mockPrisma) });
 
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'EMAIL_EXISTS');
@@ -73,7 +78,7 @@ describe('POST /api/auth/register', () => {
 
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ ...VALID_BODY, email: 'NEU@test.de' });
+      .send({ ...VALID_BODY, email: 'NEU@test.de', invite: await createInvite(mockPrisma) });
 
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'EMAIL_EXISTS');
@@ -87,5 +92,55 @@ describe('POST /api/auth/register', () => {
     assert.equal(res.status, 400);
     assert.ok(res.body.errors.length >= 1);
     assert.equal(res.body.code, undefined, 'Validierungsfehler haben keinen EMAIL_EXISTS-Code');
+  });
+
+  it('verweigert die Registrierung ohne Einladung', async () => {
+    const { invite, ...ohne } = VALID_BODY;
+    const res = await request(app).post('/api/auth/register').send(ohne);
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, 'INVITE_REQUIRED');
+    assert.equal(mockPrisma._store.users.length, 0);
+  });
+
+  it('verweigert einen unbekannten Einladungs-Token', async () => {
+    const res = await request(app).post('/api/auth/register')
+      .send({ ...VALID_BODY, invite: 'a'.repeat(64) });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.code, 'INVITE_REQUIRED');
+  });
+
+  it('verweigert eine abgelaufene Einladung', async () => {
+    mockPrisma._store.invites[0].expiresAt = new Date(Date.now() - 1000);
+    const res = await request(app).post('/api/auth/register').send(VALID_BODY);
+
+    assert.equal(res.status, 403);
+    assert.equal(mockPrisma._store.users.length, 0);
+  });
+
+  it('löst eine Einladung ein — ein zweites Konto damit geht nicht', async () => {
+    const erst = await request(app).post('/api/auth/register').send(VALID_BODY);
+    assert.equal(erst.status, 201);
+    assert.ok(mockPrisma._store.invites[0].usedAt, 'usedAt muss gesetzt sein');
+
+    const zweit = await request(app).post('/api/auth/register')
+      .send({ ...VALID_BODY, email: 'anderer@test.de' });
+    assert.equal(zweit.status, 403);
+    assert.equal(mockPrisma._store.users.length, 1);
+  });
+
+  it('verrät ohne gültige Einladung nicht, ob die E-Mail existiert', async () => {
+    await request(app).post('/api/auth/register').send(VALID_BODY);
+    const { invite, ...ohne } = VALID_BODY;
+    const res = await request(app).post('/api/auth/register').send(ohne);
+
+    assert.equal(res.status, 403);
+    assert.notEqual(res.body.code, 'EMAIL_EXISTS');
+  });
+
+  it('lässt die Einladung gültig, wenn die Registrierung scheitert', async () => {
+    await request(app).post('/api/auth/register').send({ ...VALID_BODY, password: 'schwach' });
+    assert.equal(mockPrisma._store.invites[0].usedAt, null);
   });
 });

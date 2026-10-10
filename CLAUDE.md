@@ -49,8 +49,6 @@ toolb0x/
 │       ├── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
 │       └── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
 └── public/
-    ├── landing/
-    │   └── index.html                   # ÖFFENTLICHE Landing Page (/, kein Login)
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
     │   └── profil.html                  # Profil-/Einstellungsseite
@@ -76,8 +74,8 @@ toolb0x/
 
 | URL | Beschreibung |
 |-----|-------------|
-| `/` | **Landing Page** (`public/landing/index.html`, seit 2026-08-22 bewusst als **privates, nicht-kommerzielles Projekt** formuliert: noindex, Hinweisblock „Privat, nicht öffentlich", kein Marketing-Ton) — Primär-CTA „Anmelden" → `/portal`, Sekundär „Konto anlegen" → `/portal?register=1` (öffnet direkt den Registrieren-Modus). Eingeloggte Besucher sehen „Zum Portal", die Registrieren-Buttons werden ausgeblendet |
-| `/portal` | Tool-Übersicht (HTML mit Nonce) |
+| `/` | 302 → `/portal`. Die Landing Page ist seit 2026-10-10 **entfernt** (privates Projekt, Login-Seite reicht) |
+| `/portal` | Tool-Übersicht bzw. Login (HTML mit Nonce). `?invite=<token>` öffnet den Registrieren-Modus, `?reset=<token>` den Admin-Reset |
 | `/portal/profil` | Profilseite (HTML mit Nonce) |
 | `/app/finanzen` | Finanz-App (HTML mit Nonce) |
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
@@ -286,7 +284,7 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | Methode | Route | Beschreibung |
 |---------|-------|-------------|
 | POST | `/login` | Login, gibt Cookie zurück |
-| POST | `/register` | Registrierung + Default-Kategorien; liefert einmalig `recoveryCode` |
+| POST | `/register` | **Nur mit Einladung** (`invite` im Body, sonst 403 `INVITE_REQUIRED`). Registrierung + Default-Kategorien; liefert einmalig `recoveryCode` |
 | POST | `/reset-password` | **Öffentlich.** Passwort-Reset per Recovery-Code (OHNE Datenverlust) |
 | POST | `/reset-with-token` | **Öffentlich.** Reset per Admin-Token (LÖSCHT alle Daten, neuer Key + Code) |
 | POST | `/recovery-code` | Recovery-Code (neu) erzeugen — braucht aktuelles Passwort, Code nur einmal sichtbar |
@@ -374,6 +372,9 @@ ver- und beim Empfänger entschlüsselt. Server sieht weder Klartext noch Key no
 | GET | `/stats` | Nutzeranzahl + neuester Nutzer (`requireAuth` + `requireAdmin`) |
 | GET | `/users` | Nutzerliste mit E-Mail, Rolle, Datenstatistiken |
 | PATCH | `/users/:id/suspend` | Nutzer sperren/entsperren (body: `{ suspended: bool }`) |
+| POST | `/invites` | Einladungslink erzeugen (`{ note?, days? }`, 1–30 Tage, Default 7) → Klartext-`token` NUR in dieser Antwort |
+| GET | `/invites` | Offene Einladungen (unbenutzt + gültig), ohne Hash |
+| DELETE | `/invites/:id` | Offene Einladung zurückziehen |
 | POST | `/users/:id/reset-link` | Passwort-Reset-Token erzeugen (60 Min, nur Hash in DB; nicht für Admins/sich selbst) |
 | DELETE | `/users/:id` | Nutzer endgültig löschen (Kaskade löscht alle Daten; nicht für Admins/sich selbst) |
 
@@ -473,8 +474,8 @@ auf Verlaufs-Buttons), `--brand-link`. Neue Brand-Flächen IMMER über diese Tok
    - Ganz oben: `<a href="/portal" class="ob-sidebar-back">← Zur Übersicht</a>`
    - Darunter: `.ob-sidebar-logo` (App-Icon-Tile + Name) — muss ein
      `<a href="/portal" class="ob-sidebar-logo ob-logo-link">` sein: **Das Logo führt
-     IMMER zur Übersicht.** Auf öffentlichen Seiten (Landing, `/s`, Auth-Karte) zeigt es
-     stattdessen auf `/`, weil `/portal` dort nur ein Login-Formular wäre.
+     IMMER zur Übersicht.** Auf öffentlichen Seiten (`/s`, Auth-Karte) zeigt es auf
+     `/portal` (= Login), eine Landing Page gibt es seit 2026-10-10 nicht mehr.
      `.ob-logo-link` (obsidian.css) liefert Cursor + Hover und überschreibt das
      `cursor:default` von `.jitter`
    - Navigation: `.ob-nav-btn` (Akzentfarbe pro App via `--sb-accent`, `--sb-accent-border`, `--sb-accent-bg` auf dem Layout-Container)
@@ -952,6 +953,7 @@ UI markiert), ein falsch fortgeschriebenes Saldo merkt niemand.
   (inkl. eigener Tresore + Tresor-Mitgliedschaften; Shares bleiben) und provisioniert
   frischen Key/Keypair/Recovery-Code + Standard-Kategorien. Beide öffentlichen Routen
   haben einen eigenen Rate-Limiter (10/15min). Es gibt bewusst KEINEN E-Mail-Reset (kein SMTP).
+- **Registrierung nur auf Einladung** (seit 2026-10-10, Migration `20261010120000_add_invites`, Modell `Invite`): Admin-Bereich → „Einladungen" erzeugt `/portal?invite=<64 hex>`. In der DB liegt nur der SHA-256-Hash (`tokenHash`), jeder Link gilt für EIN Konto (`usedAt`), Gültigkeit 1/7/30 Tage. `/register` prüft die Einladung ALS ERSTES (ohne gültigen Link verrät die Route nicht, ob eine E-Mail existiert) und löst sie in derselben `$transaction` wie `user.create` per bedingtem `updateMany` ein — parallele Registrierungen mit demselben Link scheitern, eine fehlgeschlagene Registrierung lässt den Link gültig. Ohne `?invite` zeigt das Portal keinerlei Registrieren-Link. Tests: `tests/routes/auth-register.test.js`, `tests/routes/admin-invites.test.js`; Helfer `createInvite(prisma)` in `tests/helpers/authHelper.js` für jeden Test, der über die Route registriert.
 - **Registrierungs-UX**: Doppelte E-Mail liefert `400 + code: 'EMAIL_EXISTS'` — das Portal wechselt dann automatisch in den Anmelde-Modus (E-Mail bleibt stehen). Nach Browser-Neustart-Logout zeigt das Portal einen Info-Hinweis „Zur Sicherheit abgemeldet" — aber nur, wenn `localStorage.toolbox_known` gesetzt ist (wird bei erfolgreichem Login/Register gesetzt; verhindert die Meldung bei Erstbesuchern). Grund: Nutzer hielten die Registrierung für fehlgeschlagen, weil sie nach Browser-Neustart wieder das Login-Formular sahen, und versuchten sich erneut zu registrieren.
 - **Nutzer löschen (Admin)**: `DELETE /api/admin/users/:id` — Kaskade löscht alle Daten inkl. eigener Tresore (auch für Tresor-Mitglieder weg!). Sessions werden sofort beendet. Admins und sich selbst kann man nicht löschen.
 - **Nutzersperre** (`suspended`-Feld): Gesperrte Nutzer können sich nicht einloggen (403 beim Login). Beim Sperren werden alle aktiven Sessions sofort beendet (`sessionStore.deleteAllForUser`). Admins können nicht gesperrt werden. Admin kann sich nicht selbst sperren.

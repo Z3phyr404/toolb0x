@@ -139,10 +139,9 @@ app.use('/api/vaults', vaultRoutes);
 // FRONTEND-ROUTING
 // ============================================================
 
-// Root → Öffentliche Landing Page (erklärt das Portal, CTA → /portal)
-app.get('/', serveHtmlWithNonce(
-  path.join(__dirname, 'public', 'landing', 'index.html')
-));
+// Root → direkt zur Anmeldung. Eine Landing Page gibt es seit 2026-10-10
+// nicht mehr: privates Projekt, Konten nur per Einladungslink.
+app.get('/', (req, res) => res.redirect(302, '/portal'));
 
 // Portal
 app.get('/portal', serveHtmlWithNonce(

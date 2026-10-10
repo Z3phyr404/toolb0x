@@ -115,7 +115,7 @@ npm start      # Production
 
 | Methode | Route | Beschreibung |
 |---|---|---|
-| POST | `/api/auth/register` | Registrierung |
+| POST | `/api/auth/register` | Registrierung (nur mit Einladungslink) |
 | POST | `/api/auth/login` | Login |
 | POST | `/api/auth/logout` | Logout |
 | GET | `/api/auth/me` | Aktueller Nutzer |

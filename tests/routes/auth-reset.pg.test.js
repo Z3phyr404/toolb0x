@@ -27,10 +27,11 @@ const request = require('supertest');
 const DB_URL = process.env.TEST_DATABASE_URL;
 const DEFAULT_CATEGORY_COUNT = 9;
 
-let prisma, app, realTransaction, cleanupAuth;
+let prisma, app, realTransaction, cleanupAuth, createInvite;
 
 describe('Admin-Reset gegen echtes PostgreSQL', { skip: DB_URL ? false : 'TEST_DATABASE_URL nicht gesetzt' }, () => {
   async function wipe() {
+    await prisma.invite.deleteMany({});
     await prisma.expenseBooking.deleteMany({});
     await prisma.expense.deleteMany({});
     await prisma.income.deleteMany({});
@@ -54,7 +55,7 @@ describe('Admin-Reset gegen echtes PostgreSQL', { skip: DB_URL ? false : 'TEST_D
     const prismaPath = require.resolve('../../src/utils/prisma');
     require.cache[prismaPath] = { id: prismaPath, filename: prismaPath, loaded: true, exports: prisma };
 
-    ({ cleanupAuth } = require('../helpers/authHelper')); // setzt JWT_SECRET
+    ({ cleanupAuth, createInvite } = require('../helpers/authHelper')); // setzt JWT_SECRET
     const authRouter = require('../../src/routes/auth');
     const { createTestApp } = require('../helpers/testApp');
     app = createTestApp({ path: '/api/auth', router: authRouter });
@@ -78,7 +79,7 @@ describe('Admin-Reset gegen echtes PostgreSQL', { skip: DB_URL ? false : 'TEST_D
 
   async function registerUser(email = 'pg-reset@test.de', password = 'AltesPw1234') {
     const res = await request(app).post('/api/auth/register')
-      .send({ email, password, name: 'PG Reset' });
+      .send({ email, password, name: 'PG Reset', invite: await createInvite(prisma) });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const user = await prisma.user.findUnique({ where: { email } });
     return { user, password, recoveryCode: res.body.recoveryCode };

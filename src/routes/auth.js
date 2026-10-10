@@ -94,10 +94,31 @@ function createToken(userId, sessionId) {
 }
 
 // ============================================================
-// POST /api/auth/register
+// POST /api/auth/register — nur mit Einladung
 // ============================================================
+// Registrierung NUR mit Einladungslink (seit 2026-10-10). Der Token aus
+// /portal?invite=<token> kommt als `invite` im Body. Er wird als ERSTES
+// geprüft — ohne gültige Einladung verrät die Route nicht einmal, ob eine
+// E-Mail schon existiert. Eingelöst wird er in derselben Transaktion wie
+// das Anlegen des Kontos: schlägt das fehl, bleibt der Link gültig.
+const INVITE_INVALID = 'Dieser Einladungslink ist ungültig, abgelaufen oder wurde schon benutzt.';
+
+function hashInviteToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 router.post('/register', async (req, res) => {
   try {
+    const inviteToken = typeof req.body.invite === 'string' ? req.body.invite.trim() : '';
+    if (!/^[a-f0-9]{64}$/.test(inviteToken)) {
+      return res.status(403).json({ code: 'INVITE_REQUIRED', errors: [INVITE_INVALID] });
+    }
+    const tokenHash = hashInviteToken(inviteToken);
+    const invite = await prisma.invite.findUnique({ where: { tokenHash } });
+    if (!invite || invite.usedAt || invite.expiresAt <= new Date()) {
+      return res.status(403).json({ code: 'INVITE_REQUIRED', errors: [INVITE_INVALID] });
+    }
+
     const errors = validateRegistration(req.body);
     if (errors.length > 0) {
       return res.status(400).json({ errors });
@@ -137,25 +158,38 @@ router.post('/register', async (req, res) => {
       color: encrypt(cat.color, encKey),
     }));
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        encryptedKey: wrappedKey,
-        publicKey: keypair.publicKey,
-        encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
-        recoveryKey,
-        categories: {
-          create: encryptedCategories,
+    const user = await prisma.$transaction(async (tx) => {
+      // Atomar einlösen: zwei parallele Registrierungen mit demselben
+      // Link können nicht beide durchkommen.
+      const claimed = await tx.invite.updateMany({
+        where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) {
+        const err = new Error('invite-claimed');
+        err.inviteClaimed = true;
+        throw err;
+      }
+      return tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          encryptedKey: wrappedKey,
+          publicKey: keypair.publicKey,
+          encryptedPrivateKey: encrypt(keypair.privateKey, encKey),
+          recoveryKey,
+          categories: {
+            create: encryptedCategories,
+          },
         },
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        createdAt: true,
-      },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          createdAt: true,
+        },
+      });
     });
 
     // Fix #1: Key im Session-Store speichern statt im JWT
@@ -170,6 +204,9 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (error) {
+    if (error.inviteClaimed) {
+      return res.status(403).json({ code: 'INVITE_REQUIRED', errors: [INVITE_INVALID] });
+    }
     console.error('Registrierung fehlgeschlagen:', error.message);
     res.status(500).json({
       errors: ['Ein unerwarteter Fehler ist aufgetreten.'],

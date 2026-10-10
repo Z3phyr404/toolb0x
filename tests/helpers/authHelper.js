@@ -64,4 +64,18 @@ function cleanupAuth() {
   sessionStore.destroy();
 }
 
-module.exports = { createTestAuth, cleanupAuth, TEST_JWT_SECRET };
+/**
+ * Legt eine gültige Einladung an, wie es POST /api/admin/invites tut,
+ * und gibt den Klartext-Token zurück (Registrierung braucht ihn seit
+ * 2026-10-10). Funktioniert mit Mock-Prisma und echtem PrismaClient.
+ */
+async function createInvite(prismaClient, { days = 7 } = {}) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  await prismaClient.invite.create({
+    data: { tokenHash, note: '', usedAt: null, expiresAt: new Date(Date.now() + days * 86400000) },
+  });
+  return token;
+}
+
+module.exports = { createTestAuth, cleanupAuth, createInvite, TEST_JWT_SECRET };

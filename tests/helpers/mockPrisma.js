@@ -267,6 +267,7 @@ function createMockPrisma() {
     servers: [],
     shares: [],
     expenseBookings: [],
+    invites: [],
   };
 
   const client = {
@@ -284,6 +285,7 @@ function createMockPrisma() {
     server: createCollection(store, 'servers'),
     share: createCollection(store, 'shares'),
     expenseBooking: createCollection(store, 'expenseBookings'),
+    invite: createCollection(store, 'invites'),
   };
   // Serialize interactive transactions and restore all tables on failure.
   // This models atomicity for route tests, not PostgreSQL isolation or FK rules.
