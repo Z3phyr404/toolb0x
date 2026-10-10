@@ -517,6 +517,7 @@ JWT_SECRET=<min. 32 Zeichen, random bytes empfohlen>
 NODE_ENV=development|production
 CORS_ORIGIN=http://localhost:3000
 RATE_LIMIT_LOGIN=10
+HOST=127.0.0.1   # Default; Node lauscht nur lokal, nach außen spricht nur nginx
 ```
 
 ---

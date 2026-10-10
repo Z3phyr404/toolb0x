@@ -28,6 +28,10 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
+// Nur localhost: nach außen spricht ausschließlich nginx (proxy_pass auf
+// 127.0.0.1:3000). Die Firewall blockt 3000 zwar auch, das hier ist die
+// zweite Sicherung. HOST=0.0.0.0 nur, wenn wirklich nötig (z. B. Docker).
+const HOST = process.env.HOST || '127.0.0.1';
 
 // ============================================================
 // NONCE-INJECTION — Für CSP-sichere Inline-Scripts
@@ -202,9 +206,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: message });
 });
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`\n🚀 Tool-Portal läuft auf http://localhost:${PORT}`);
-  console.log(`🏠 Landing:     http://localhost:${PORT}/`);
   console.log(`📊 Portal:      http://localhost:${PORT}/portal`);
   console.log(`💰 Finanz-App:  http://localhost:${PORT}/app/finanzen`);
   console.log(`📡 API:         http://localhost:${PORT}/api`);
