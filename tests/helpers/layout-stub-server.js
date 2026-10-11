@@ -48,6 +48,11 @@ const API = {
     createdAt: '2026-06-01T00:00:00.000Z',
   })) },
   '/api/servers': { servers: [] },
+  '/api/hermes/status': { configured: true, online: true, version: '0.21.6' },
+  '/api/hermes/sessions': { sessions: [
+    { id: 'api_1791706319_aaaa1111', title: 'Speicher auf dem Server prüfen', preview: 'Wie viel Speicher ist frei?', lastActive: Date.now() / 1000 - 600, messageCount: 4 },
+    { id: 'api_1791600000_bbbb2222', title: 'nginx-Logs durchsehen', preview: 'Schau in die nginx-Logs', lastActive: Date.now() / 1000 - 90000, messageCount: 6 },
+  ] },
   // Finanz-App (2026-08-22): realistischer Monat, damit Dashboard/Listen
   // beim UI-Check gefüllt sind (vorher leere Arrays -> leere App).
   '/api/reminders/upcoming': { reminders: [
@@ -224,6 +229,7 @@ const PAGES = {
   '/app/finanzen': '/apps/finanzen/index.html',
   '/app/fotos': '/apps/fotos/index.html',
   '/app/notizen': '/apps/notizen/index.html',
+  '/app/hermes': '/apps/hermes/index.html',
   '/s': '/share/index.html',
 };
 
@@ -262,6 +268,39 @@ http.createServer((req, res) => {
         message: leer ? 'Kontostand entfernt.' : 'Kontostand gespeichert.',
       }));
     });
+  }
+
+  // Hermes-Chat: Verlauf, neuer Chat und ein gefakter SSE-Stream mit
+  // Werkzeug-Chip, Freigabe-Abfrage und Markdown-Antwort.
+  if (/^\/api\/hermes\/sessions\/[^/]+\/messages$/.test(url)) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ messages: [
+      { role: 'user', text: 'Wie viel Speicher ist auf dem Server frei?' },
+      { role: 'tool', name: 'terminal', detail: 'df -h /' },
+      { role: 'assistant', text: 'Auf `/` sind **52 GB frei** (29 % belegt).\n\n| Mount | Größe | Frei |\n|---|---|---|\n| / | 75G | 52G |' },
+    ] }));
+  }
+  if (url === '/api/hermes/sessions' && req.method === 'POST') {
+    res.writeHead(201, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ session: { id: 'api_1791709999_cccc3333', title: 'Neuer Chat', preview: '', lastActive: Date.now() / 1000, messageCount: 0 } }));
+  }
+  if (/^\/api\/hermes\/sessions\/[^/]+\/chat$/.test(url) && req.method === 'POST') {
+    res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' });
+    const schritte = [
+      ['start', { runId: 'run_stub0000000000' }],
+      ['tool', { name: 'terminal', detail: 'uptime && free -h' }],
+      ['approval', { runId: 'run_stub0000000000', command: 'sudo systemctl restart nginx', description: 'Dienst neu starten', choices: ['once', 'session', 'deny'] }],
+    ];
+    const antwort = 'Der Server läuft seit **16 Stunden**.\n\n- RAM frei: 2,3 GB\n- Last: 0,17\n\n```bash\nuptime\n```';
+    for (let i = 0; i < antwort.length; i += 12) schritte.push(['delta', { text: antwort.slice(i, i + 12) }]);
+    schritte.push(['done', { status: 'completed' }]);
+    let n = 0;
+    const tick = setInterval(() => {
+      const [ev, data] = schritte[n++];
+      res.write('event: ' + ev + '\ndata: ' + JSON.stringify(data) + '\n\n');
+      if (n >= schritte.length) { clearInterval(tick); res.end(); }
+    }, 120);
+    return;
   }
 
   if (url === '/api/admin/invites' && req.method === 'POST') {

@@ -109,6 +109,19 @@ function setupSecurity(app) {
   });
   app.use('/api/fotos/search', fotoSearchLimiter);
 
+  // Hermes-Chat (2026-10-11): jede Nachricht startet einen Agent-Lauf auf
+  // dem Server und verbraucht ChatGPT-Kontingent. Eigenes Budget nur für
+  // das Absenden — Verlauf laden, Freigeben und Stoppen zählen nicht mit.
+  const hermesChatLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_HERMES_CHAT) || 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Zu viele Nachrichten an Hermes. Bitte warte einen Moment.' },
+    skip: (req) => !(req.method === 'POST' && /^\/sessions\/[^/]+\/chat$/.test(req.path)),
+  });
+  app.use('/api/hermes', hermesChatLimiter);
+
   const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: parseInt(process.env.RATE_LIMIT_LOGIN) || 10,
@@ -160,7 +173,9 @@ function setupSecurity(app) {
   const express = require('express');
   const jsonParser = express.json({ limit: '10kb' });
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/notes')) return next();
+    // Eigene, größere Parser: Notizen (500 KB) und Hermes-Chat (64 KB,
+    // eingefügte Logs) — beide setzt der jeweilige Router selbst.
+    if (req.path.startsWith('/api/notes') || req.path.startsWith('/api/hermes')) return next();
     jsonParser(req, res, next);
   });
   app.use(express.urlencoded({ extended: false, limit: '10kb' }));

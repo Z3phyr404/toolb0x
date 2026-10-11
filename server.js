@@ -93,6 +93,12 @@ app.use('/app/fotos', express.static(path.join(__dirname, 'public', 'apps', 'fot
   index: false,
 }));
 
+// Statische Dateien: Hermes-Chat (nur CSS/JS/Bilder, kein HTML)
+app.use('/app/hermes', express.static(path.join(__dirname, 'public', 'apps', 'hermes'), {
+  etag: true,
+  index: false,
+}));
+
 // Statische Dateien: Öffentliche Share-Seite (nur Assets, HTML via Nonce)
 app.use('/s', express.static(path.join(__dirname, 'public', 'share'), {
   etag: true,
@@ -124,6 +130,7 @@ const serverRoutes = require('./src/routes/servers');
 const fotoRoutes = require('./src/routes/fotos');
 const shareRoutes = require('./src/routes/share');
 const vaultRoutes = require('./src/routes/vaults');
+const hermesRoutes = require('./src/routes/hermes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -138,6 +145,7 @@ app.use('/api/servers', serverRoutes);
 app.use('/api/fotos', fotoRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/vaults', vaultRoutes);
+app.use('/api/hermes', hermesRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -187,6 +195,11 @@ app.get('/app/fotos', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'apps', 'fotos', 'index.html')
 ));
 
+// Hermes-Chat (nur für Admins, HTML mit Nonce)
+app.get('/app/hermes', serveHtmlWithNonce(
+  path.join(__dirname, 'public', 'apps', 'hermes', 'index.html')
+));
+
 // Öffentliche Share-Seite (KEIN Login, KEIN Portal-Redirect)
 app.get('/s', serveHtmlWithNonce(
   path.join(__dirname, 'public', 'share', 'index.html')
@@ -217,6 +230,7 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`🔐 Passwörter:   http://localhost:${PORT}/app/passwords`);
   console.log(`🖥️  Server:       http://localhost:${PORT}/app/servers`);
   console.log(`📷 Fotos:        http://localhost:${PORT}/app/fotos`);
+  console.log(`☤  Hermes:       http://localhost:${PORT}/app/hermes`);
   console.log(`🔗 Share:        http://localhost:${PORT}/s`);
   console.log(`🔒 Umgebung:    ${process.env.NODE_ENV || 'development'}\n`);
 });

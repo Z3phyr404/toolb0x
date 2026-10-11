@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Toolb0x — Hermes</title>
+  <link rel="stylesheet" href="/shared/obsidian.css" nonce="__CSP_NONCE__">
+  <style nonce="__CSP_NONCE__">
+    /* ============================================================
+       OBSIDIAN — HERMES-CHAT
+       ============================================================ */
+
+    html, body { height:100%; overflow:hidden; }
+    [hidden] { display: none !important; }
+
+    .ob-page {
+      position: relative;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      /* Sidebar-Akzent (lime) für .ob-nav-btn.active */
+      --sb-accent: #a3e635;
+      --sb-accent-border: rgba(163,230,53,0.25);
+      --sb-accent-bg: rgba(163,230,53,0.12);
+    }
+
+    /* ===== GLOW BLOBS ===== */
+    .glow-blob {
+      position: absolute;
+      pointer-events: none;
+      transition: transform 0.35s cubic-bezier(0.2,0.8,0.2,1), background 0.5s ease;
+    }
+    .glow-primary {
+      top: -160px; right: -120px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(163,230,53,0.16), transparent 70%);
+    }
+    .glow-secondary {
+      bottom: -200px; left: -140px;
+      width: 520px; height: 520px;
+      background: radial-gradient(circle, rgba(45,212,191,0.07), transparent 72%);
+      transition-duration: 0.55s;
+    }
+
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg,#d9f99d,#84cc16);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 5px 16px rgba(132,204,22,0.3);
+      flex-shrink: 0;
+    }
+    .brand-icon svg { color: #1a2e05; }
+
+    /* ===== SIDEBAR: CHATLISTE ===== */
+    .sb-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(238,241,246,0.4);
+      padding: 18px 13px 6px;
+    }
+    .chat-list {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .chat-item {
+      display: block; width: 100%; text-align: left;
+      padding: 9px 12px; border-radius: 10px;
+      border: 1px solid transparent; background: transparent;
+      color: rgba(238,241,246,0.65); font-family: inherit; font-size: 13.5px;
+      cursor: pointer; transition: background .15s, color .15s;
+    }
+    .chat-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .chat-item.active { color: var(--text); background: var(--sb-accent-bg); border-color: var(--sb-accent-border); }
+    .chat-item-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .chat-item-time { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    .chat-empty { padding: 8px 13px; font-size: 13px; color: var(--text-3); }
+
+    /* ===== MAIN ===== */
+    .ob-main {
+      display: flex; flex-direction: column;
+      height: 100vh; height: 100dvh;
+      padding: 24px 5% 18px;
+      overflow: hidden;
+    }
+
+    .chat-head {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; letter-spacing: 0.14em;
+      color: rgba(163,230,53,0.9);
+      margin-bottom: 6px;
+    }
+    .chat-title {
+      font-size: 26px; font-weight: 700; letter-spacing: -0.03em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chat-head-text { flex: 1; min-width: 0; }
+    .chat-head-actions { display: flex; gap: 8px; }
+    .title-input { max-width: 420px; font-size: 18px; font-weight: 600; padding: 8px 12px; }
+    .btn-danger-soft:hover, .btn-danger-soft.confirm {
+      background: rgba(255,99,71,0.12); color: #ff8a70; border-color: rgba(255,99,71,0.3);
+    }
+
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12.5px; color: var(--text-3); margin-bottom: 12px;
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
+    .status-dot.online { background: var(--success); box-shadow: 0 0 8px rgba(52,211,153,0.6); }
+    .status-dot.offline { background: var(--error-btn); }
+
+    .banner {
+      padding: 14px 16px; border-radius: 14px; margin-bottom: 12px;
+      background: rgba(255,59,48,0.08); border: 1px solid rgba(255,59,48,0.25);
+      color: #ffb3ad; font-size: 14px; line-height: 1.5;
+    }
+
+    /* ===== NACHRICHTEN ===== */
+    .messages {
+      flex: 1 1 auto; min-height: 0; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 14px;
+      padding: 6px 4px 18px;
+    }
+    .msg { max-width: 860px; width: 100%; }
+    .msg-user { align-self: flex-end; display: flex; justify-content: flex-end; }
+    .msg-user .bubble {
+      background: rgba(163,230,53,0.12); border: 1px solid rgba(163,230,53,0.22);
+      border-radius: 18px 18px 6px 18px; padding: 11px 15px;
+      max-width: 85%; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+      font-size: 15px; line-height: 1.55;
+    }
+    .msg-assistant { align-self: flex-start; }
+    .msg-assistant .who {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 600; color: rgba(163,230,53,0.85); margin-bottom: 6px;
+    }
+    .msg-assistant .content {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px 18px 18px 18px; padding: 13px 17px;
+      font-size: 15px; line-height: 1.6; overflow-wrap: anywhere;
+    }
+    .msg-assistant .content:empty { display: none; }
+    .content p { margin: 0 0 10px; }
+    .content p:last-child { margin-bottom: 0; }
+    .content h4 { font-size: 15.5px; font-weight: 700; margin: 14px 0 6px; }
+    .content h4:first-child { margin-top: 0; }
+    .content ul, .content ol { margin: 4px 0 10px 22px; }
+    .content li { margin: 2px 0; }
+    .content a { color: #bef264; }
+    .content code {
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      background: rgba(255,255,255,0.07); padding: 1px 5px; border-radius: 5px;
+    }
+    .content pre {
+      background: var(--panel-inset); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; margin: 8px 0 12px;
+      overflow-x: auto;
+    }
+    .content pre code { background: none; padding: 0; font-size: 12.5px; line-height: 1.5; white-space: pre; }
+    .content table { border-collapse: collapse; margin: 8px 0 12px; font-size: 13.5px; display: block; overflow-x: auto; }
+    .content th, .content td { border: 1px solid var(--border-strong); padding: 6px 10px; text-align: left; }
+    .content th { background: rgba(255,255,255,0.05); }
+
+    .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .tools:empty { display: none; }
+    .tool-chip {
+      display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+      font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+      padding: 4px 10px; border-radius: 99px;
+      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: var(--text-2);
+    }
+    .tool-chip .t-name { color: rgba(163,230,53,0.85); flex-shrink: 0; }
+    .tool-chip .t-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tool-chip.failed .t-name { color: var(--error-text); }
+    .commentary { font-size: 13px; color: var(--text-2); font-style: italic; margin-bottom: 8px; }
+
+    .thinking { display: inline-flex; gap: 4px; padding: 4px 0; }
+    .thinking span {
+      width: 6px; height: 6px; border-radius: 50%; background: rgba(163,230,53,0.7);
+      animation: blink 1.2s infinite ease-in-out;
+    }
+    .thinking span:nth-child(2) { animation-delay: .2s; }
+    .thinking span:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+    .run-note { font-size: 13px; color: var(--text-3); margin-top: 8px; }
+    .run-note.error { color: var(--error-text); }
+
+    .approval {
+      margin-top: 10px; padding: 14px 16px; border-radius: 14px;
+      background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.3);
+    }
+    .approval-title { font-weight: 700; font-size: 14px; color: #fcd34d; margin-bottom: 6px; }
+    .approval-desc { font-size: 13.5px; color: var(--text-2); margin-bottom: 8px; }
+    .approval pre {
+      font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
+      background: var(--panel-inset); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+    }
+    .approval-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .approval-done { font-size: 13px; color: var(--text-2); }
+
+    .empty-state {
+      margin: auto; text-align: center; max-width: 440px; color: var(--text-2);
+      font-size: 14.5px; line-height: 1.6;
+    }
+    .empty-state .big { font-size: 40px; margin-bottom: 8px; color: rgba(163,230,53,0.8); }
+    .empty-state h2 { font-size: 20px; color: var(--text); margin-bottom: 8px; }
+    .suggestions { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+    .suggestions button { text-align: left; font-size: 13.5px; padding: 10px 14px; }
+
+    /* ===== EINGABE ===== */
+    .composer {
+      display: flex; align-items: flex-end; gap: 10px;
+      background: var(--panel); border: 1px solid var(--border-strong);
+      border-radius: 18px; padding: 8px 8px 8px 16px;
+      max-width: 860px; width: 100%;
+    }
+    .composer textarea {
+      flex: 1; resize: none; border: none; outline: none; background: transparent;
+      color: var(--text); font-family: inherit; font-size: 15px; line-height: 1.5;
+      max-height: 220px; padding: 7px 0;
+    }
+    .composer textarea::placeholder { color: var(--text-3); }
+    .send-btn {
+      flex-shrink: 0; width: 40px; height: 40px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg,#d9f99d,#84cc16); color: #1a2e05;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: opacity .2s, transform .2s;
+    }
+    .send-btn:hover { transform: translateY(-1px); }
+    .send-btn:disabled { opacity: .35; cursor: default; transform: none; }
+    .send-btn.stop { background: rgba(255,99,71,0.18); color: #ff8a70; }
+    .composer-hint { font-size: 11.5px; color: var(--text-3); margin-top: 8px; max-width: 860px; }
+
+    /* ===== MOBIL ===== */
+    .mobile-chatbar { display: none; }
+    @media (max-width: 768px) {
+      .ob-main { padding: 16px 14px 12px; }
+      .mobile-chatbar { display: flex; gap: 8px; margin-bottom: 12px; }
+      .mobile-chatbar select { flex: 1; min-width: 0; padding: 9px 12px; font-size: 14px; }
+      .chat-title { font-size: 20px; }
+      .section-label { display: none; }
+      .msg-user .bubble { max-width: 92%; }
+      .composer-hint { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="ob-loading" id="loadingOverlay"><div class="ob-spinner"></div></div>
+
+<div class="ob-page ob-layout" id="pageRoot">
+  <!-- Glow Blobs -->
+  <div class="glow-blob glow-primary" data-glow data-glow-primary data-depth="55"></div>
+  <div class="glow-blob glow-secondary" data-glow data-depth="30"></div>
+
+  <!-- SIDEBAR -->
+  <aside class="ob-sidebar">
+    <a href="/portal" class="ob-sidebar-back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Zur Übersicht
+    </a>
+    <a href="/portal" class="ob-sidebar-logo ob-logo-link" title="Zur Übersicht">
+      <div class="brand-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <span class="ob-sidebar-logo-text jitter">Hermes</span>
+    </a>
+    <button class="ob-nav-btn active" type="button" id="newChatBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Neuer Chat
+    </button>
+    <div class="sb-label">Chats</div>
+    <div class="chat-list" id="chatList"></div>
+    <div class="ob-sidebar-user">
+      <div class="ob-sidebar-avatar" id="userAvatar">?</div>
+      <div class="ob-sidebar-user-info">
+        <div class="ob-sidebar-user-name" id="userName"></div>
+      </div>
+      <button class="ob-sidebar-logout" id="logoutBtn" title="Abmelden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <main class="ob-main ob-main-col">
+    <!-- Mobile-Header (nur sichtbar, wenn Sidebar versteckt) -->
+    <div class="ob-mobile-header">
+      <a href="/portal" class="ob-mobile-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </a>
+      <h1>Hermes</h1>
+      <button class="ob-btn-logout" id="logoutBtnM">Abmelden</button>
+    </div>
+    <div class="mobile-chatbar">
+      <select class="ob-input" id="chatSelect" aria-label="Chat auswählen"></select>
+      <button class="ob-btn-ghost" type="button" id="newChatBtnM">+ Neu</button>
+    </div>
+
+    <div class="chat-head">
+      <div class="chat-head-text">
+        <div class="section-label">// HERMES AGENT</div>
+        <div class="chat-title" id="chatTitle">Neuer Chat</div>
+        <input class="ob-input title-input" id="titleInput" maxlength="120" hidden aria-label="Chat-Name">
+      </div>
+      <div class="chat-head-actions" id="chatActions" hidden>
+        <button class="ob-btn-ghost" type="button" id="renameBtn" title="Chat umbenennen">Umbenennen</button>
+        <button class="ob-btn-ghost btn-danger-soft" type="button" id="deleteBtn" title="Chat löschen">Löschen</button>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Verbinde mit Hermes …</span>
+    </div>
+    <div class="banner" id="banner" hidden></div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Nachricht an Hermes …" aria-label="Nachricht an Hermes"></textarea>
+      <button class="send-btn" type="button" id="sendBtn" title="Senden (Enter)" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="composer-hint">Enter sendet, Umschalt+Enter macht eine neue Zeile. Hermes arbeitet auf dem Server mit den Rechten von „michael". Die Chats speichert Hermes selbst, nicht verschlüsselt.</div>
+  </main>
+</div>
+
+<div class="ob-toast-box" id="toasts"></div>
+
+<script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
+<script nonce="__CSP_NONCE__" src="/shared/obsidian.js"></script>
+<script nonce="__CSP_NONCE__">
+(function() {
+  'use strict';
+
+  var API = '/api';
+  var sessions = [];
+  var currentId = null;
+  var online = false;
+  var run = null;          // { runId, stopRequested } während eine Antwort läuft
+  var deleteArmed = null;  // Timer der zweistufigen Lösch-Bestätigung
+
+  var ICON_SEND = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+  var ICON_STOP = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+  var SUGGESTIONS = [
+    'Wie viel Speicher und RAM sind auf dem Server gerade frei?',
+    'Läuft toolb0x (pm2) fehlerfrei? Schau in die letzten Logs.',
+    'Fasse zusammen, welche Sicherheitsupdates anstehen.'
+  ];
+
+  function $(id) { return document.getElementById(id); }
+
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    // Serialisierung escaped in Textknoten nur &, < und >. Das Ergebnis
+    // landet aber auch in ATTRIBUTEN (href, title) — ohne
+    // Anführungszeichen-Escaping kann ein Wert dort ein eigenes
+    // Attribut aufmachen.
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function getCsrfToken() {
+    var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+    return m ? m[1] : '';
+  }
+
+  function toast(msg, type) {
+    var el = document.createElement('div');
+    el.className = 'ob-toast ' + (type || 'success');
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(function() { el.remove(); }, 3100);
+  }
+
+  function showLoading() { $('loadingOverlay').classList.remove('hidden'); }
+  function hideLoading() { $('loadingOverlay').classList.add('hidden'); }
+
+  function api(endpoint, options) {
+    var opts = options || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (opts.method && opts.method !== 'GET') headers['X-CSRF-Token'] = getCsrfToken();
+    return fetch(API + endpoint, {
+      method: opts.method || 'GET',
+      credentials: 'include',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    }).then(function(res) {
+      return res.json().catch(function() { return {}; }).then(function(data) {
+        if (res.status === 401) { window.location.href = '/portal'; throw data; }
+        if (!res.ok) throw data;
+        return data;
+      });
+    });
+  }
+
+  function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function storeSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+
+  // ============================================================
+  // MARKDOWN (klein und sicher: erst escapen, dann formatieren)
+  // ============================================================
+
+  function inline(s) {
+    return s.split(/`([^`\n]+)`/).map(function(part, i) {
+      if (i % 2) return '<code>' + escapeHtml(part) + '</code>';
+      return escapeHtml(part)
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    }).join('');
+  }
+
+  function cells(line) {
+    return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function(c) { return c.trim(); });
+  }
+
+  function blocks(text) {
+    var lines = text.split('\n');
+    var html = '';
+    var para = [];
+    function flush() {
+      if (para.length) html += '<p>' + para.map(inline).join('<br>') + '</p>';
+      para = [];
+    }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line.trim()) { flush(); continue; }
+      var h = line.match(/^#{1,6}\s+(.*)$/);
+      if (h) { flush(); html += '<h4>' + inline(h[1]) + '</h4>'; continue; }
+      if (/^\s*\|/.test(line) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+        flush();
+        var head = cells(line);
+        html += '<table><thead><tr>' + head.map(function(c) { return '<th>' + inline(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+        i += 2;
+        while (i < lines.length && /^\s*\|/.test(lines[i])) {
+          html += '<tr>' + cells(lines[i]).map(function(c) { return '<td>' + inline(c) + '</td>'; }).join('') + '</tr>';
+          i++;
+        }
+        i--;
+        html += '</tbody></table>';
+        continue;
+      }
+      var ul = /^\s*[-*•]\s+/, ol = /^\s*\d+[.)]\s+/;
+      if (ul.test(line) || ol.test(line)) {
+        flush();
+        var tag = ul.test(line) ? 'ul' : 'ol';
+        var re = tag === 'ul' ? ul : ol;
+        html += '<' + tag + '>';
+        while (i < lines.length && re.test(lines[i])) {
+          html += '<li>' + inline(lines[i].replace(re, '')) + '</li>';
+          i++;
+        }
+        i--;
+        html += '</' + tag + '>';
+        continue;
+      }
+      para.push(line);
+    }
+    flush();
+    return html;
+  }
+
+  function markdown(src) {
+    // Ungerade Abschnitte zwischen ``` sind Code. Ein noch offener Block
+    // (während des Streamens) wird dabei schon als Code gezeigt.
+    return String(src || '').split('```').map(function(part, i) {
+      if (i % 2 === 0) return blocks(part);
+      var code = part.replace(/^[\w+.-]*\n/, '');
+      return '<pre><code>' + escapeHtml(code.replace(/\n$/, '')) + '</code></pre>';
+    }).join('');
+  }
+
+  // ============================================================
+  // AUTH
+  // ============================================================
+
+  function logout() {
+    SessionTimeout.stop();
+    fetch(API + '/auth/logout', {
+      method: 'POST', credentials: 'include',
+      headers: { 'X-CSRF-Token': getCsrfToken() }
+    }).catch(function() {});
+    window.location.href = '/portal';
+  }
+
+  function checkAuth() {
+    showLoading();
+    if (SessionTimeout.wasRestarted()) {
+      fetch(API + '/auth/logout', {
+        method: 'POST', credentials: 'include',
+        headers: { 'X-CSRF-Token': getCsrfToken() }
+      }).catch(function() {});
+      window.location.href = '/portal';
+      return;
+    }
+    api('/auth/me').then(function(data) {
+      if (data.user.role !== 'admin') {
+        window.location.href = '/portal';
+        return;
+      }
+      $('userName').textContent = data.user.name;
+      $('userAvatar').textContent = (data.user.name || 'U').charAt(0).toUpperCase();
+      hideLoading();
+      SessionTimeout.start(function() { window.location.href = '/portal'; });
+      start();
+    }).catch(function() {
+      window.location.href = '/portal';
+    });
+  }
+
+  // ============================================================
+  // STATUS + CHATLISTE
+  // ============================================================
+
+  function setStatus(state, text) {
+    $('statusDot').className = 'status-dot ' + state;
+    $('statusText').textContent = text;
+  }
+
+  function showBanner(text) {
+    $('banner').textContent = text;
+    $('banner').hidden = !text;
+  }
+
+  function loadStatus() {
+    return api('/hermes/status').then(function(s) {
+      online = !!s.online;
+      if (!s.configured) {
+        setStatus('offline', 'Nicht eingerichtet');
+        showBanner('Hermes ist auf dem Server noch nicht mit toolb0x verbunden: HERMES_API_KEY fehlt in der .env von toolb0x.');
+      } else if (!s.online) {
+        setStatus('offline', 'Nicht erreichbar');
+        showBanner('Hermes antwortet nicht. Auf dem Server prüfen: systemctl --user status hermes-gateway');
+      } else {
+        setStatus('online', 'Verbunden' + (s.version ? ' · Hermes ' + s.version : ''));
+        showBanner('');
+      }
+      updateSendState();
+    }).catch(function() {
+      online = false;
+      setStatus('offline', 'Status unbekannt');
+      updateSendState();
+    });
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    var d = new Date(ts * 1000);
+    var now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    return sameDay
+      ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+
+  function loadSessions() {
+    return api('/hermes/sessions').then(function(d) {
+      sessions = d.sessions || [];
+      renderChatList();
+    }).catch(function(e) {
+      sessions = [];
+      renderChatList();
+      if (online) toast((e && e.error) || 'Chats konnten nicht geladen werden.', 'error');
+    });
+  }
+
+  function renderChatList() {
+    var list = $('chatList');
+    if (!sessions.length) {
+      list.innerHTML = '<div class="chat-empty">Noch keine Chats.</div>';
+    } else {
+      list.innerHTML = sessions.map(function(s) {
+        return '<button type="button" class="chat-item' + (s.id === currentId ? ' active' : '') + '" data-id="' + escapeHtml(s.id) + '">' +
+          '<span class="chat-item-title">' + escapeHtml(s.title || s.preview || 'Chat') + '</span>' +
+          '<span class="chat-item-time">' + escapeHtml(formatTime(s.lastActive)) + '</span></button>';
+      }).join('');
+    }
+    var sel = $('chatSelect');
+    sel.innerHTML = '<option value="">Neuer Chat</option>' + sessions.map(function(s) {
+      return '<option value="' + escapeHtml(s.id) + '"' + (s.id === currentId ? ' selected' : '') + '>' +
+        escapeHtml(s.title || s.preview || 'Chat') + '</option>';
+    }).join('');
+  }
+
+  function currentSession() {
+    for (var i = 0; i < sessions.length; i++) if (sessions[i].id === currentId) return sessions[i];
+    return null;
+  }
+
+  function renderHead() {
+    var s = currentSession();
+    $('chatTitle').textContent = s ? (s.title || 'Chat') : 'Neuer Chat';
+    $('chatTitle').hidden = false;
+    $('titleInput').hidden = true;
+    $('chatActions').hidden = !s;
+    disarmDelete();
+  }
+
+  // ============================================================
+  // NACHRICHTEN
+  // ============================================================
+
+  function nearBottom() {
+    var m = $('messages');
+    return m.scrollHeight - m.scrollTop - m.clientHeight < 120;
+  }
+  function scrollDown(force) {
+    var m = $('messages');
+    if (force || nearBottom()) m.scrollTop = m.scrollHeight;
+  }
+
+  function renderEmpty() {
+    $('messages').innerHTML =
+      '<div class="empty-state"><div class="big">☤</div><h2>Was soll Hermes tun?</h2>' +
+      '<div>Hermes läuft auf deinem Server und kann dort Befehle ausführen, Dateien lesen und im Web suchen.</div>' +
+      '<div class="suggestions">' + SUGGESTIONS.map(function(t) {
+        return '<button type="button" class="ob-btn-ghost" data-suggest="' + escapeHtml(t) + '">' + escapeHtml(t) + '</button>';
+      }).join('') + '</div></div>';
+  }
+
+  function addUser(text) {
+    var empty = $('messages').querySelector('.empty-state');
+    if (empty) empty.remove();
+    var el = document.createElement('div');
+    el.className = 'msg msg-user';
+    el.innerHTML = '<div class="bubble"></div>';
+    el.firstChild.textContent = text;
+    $('messages').appendChild(el);
+    return el;
+  }
+
+  // Ein Hermes-Block: Werkzeug-Chips, Zwischenbemerkungen, Antworttext
+  function addAssistant() {
+    var empty = $('messages').querySelector('.empty-state');
+    if (empty) empty.remove();
+    var el = document.createElement('div');
+    el.className = 'msg msg-assistant';
+    el.innerHTML = '<div class="who">☤ Hermes</div><div class="tools"></div><div class="notes"></div><div class="content"></div>';
+    $('messages').appendChild(el);
+    return {
+      el: el,
+      tools: el.querySelector('.tools'),
+      notes: el.querySelector('.notes'),
+      content: el.querySelector('.content'),
+      text: ''
+    };
+  }
+
+  function addToolChip(block, name, detail, failed) {
+    var chip = document.createElement('span');
+    chip.className = 'tool-chip' + (failed ? ' failed' : '');
+    chip.innerHTML = '<span class="t-name"></span><span class="t-detail"></span>';
+    chip.firstChild.textContent = name;
+    chip.lastChild.textContent = detail || '';
+    if (detail) chip.title = detail;
+    block.tools.appendChild(chip);
+  }
+
+  function renderHistory(messages) {
+    var box = $('messages');
+    box.innerHTML = '';
+    if (!messages.length) { renderEmpty(); return; }
+    var block = null;
+    messages.forEach(function(m) {
+      if (m.role === 'user') {
+        block = null;
+        addUser(m.text);
+      } else {
+        if (!block) block = addAssistant();
+        if (m.role === 'tool') addToolChip(block, m.name, m.detail);
+        else {
+          block.text += (block.text ? '\n\n' : '') + m.text;
+          block.content.innerHTML = markdown(block.text);
+        }
+      }
+    });
+    scrollDown(true);
+  }
+
+  function openChat(id) {
+    if (run) { toast('Bitte warten, bis Hermes fertig ist.', 'error'); return; }
+    currentId = id || null;
+    storeSet('hermes_letzter_chat', currentId);
+    renderChatList();
+    renderHead();
+    if (!currentId) { renderEmpty(); $('input').focus(); return; }
+    $('messages').innerHTML = '<div class="empty-state"><div class="thinking"><span></span><span></span><span></span></div></div>';
+    api('/hermes/sessions/' + encodeURIComponent(currentId) + '/messages').then(function(d) {
+      if (id !== currentId) return;
+      renderHistory(d.messages || []);
+    }).catch(function(e) {
+      $('messages').innerHTML = '';
+      toast((e && e.error) || 'Verlauf konnte nicht geladen werden.', 'error');
+    });
+  }
+
+  // ============================================================
+  // SENDEN + STREAM
+  // ============================================================
+
+  function updateSendState() {
+    var btn = $('sendBtn');
+    if (run) {
+      btn.disabled = false;
+      btn.classList.add('stop');
+      btn.innerHTML = ICON_STOP;
+      btn.title = 'Antwort abbrechen';
+    } else {
+      btn.classList.remove('stop');
+      btn.innerHTML = ICON_SEND;
+      btn.title = 'Senden (Enter)';
+      btn.disabled = !online || !$('input').value.trim();
+    }
+  }
+
+  function autoGrow() {
+    var t = $('input');
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 220) + 'px';
+  }
+
+  function ensureSession(firstMessage) {
+    if (currentId) return Promise.resolve(currentId);
+    var title = firstMessage.replace(/\s+/g, ' ').slice(0, 60);
+    return api('/hermes/sessions', { method: 'POST', body: { title: title } }).then(function(d) {
+      sessions.unshift(d.session);
+      currentId = d.session.id;
+      storeSet('hermes_letzter_chat', currentId);
+      renderChatList();
+      renderHead();
+      return currentId;
+    });
+  }
+
+  function send(textOverride) {
+    if (run) return;
+    var text = (textOverride != null ? textOverride : $('input').value).trim();
+    if (!text || !online) return;
+    $('input').value = '';
+    autoGrow();
+    run = { runId: null, stopRequested: false };
+    updateSendState();
+
+    addUser(text);
+    var block = addAssistant();
+    var thinking = document.createElement('div');
+    thinking.className = 'thinking';
+    thinking.innerHTML = '<span></span><span></span><span></span>';
+    block.el.appendChild(thinking);
+    scrollDown(true);
+
+    ensureSession(text).then(function(id) {
+      return fetch(API + '/hermes/sessions/' + encodeURIComponent(id) + '/chat', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ input: text })
+      });
+    }).then(function(res) {
+      var type = res.headers.get('Content-Type') || '';
+      if (!res.ok || type.indexOf('text/event-stream') === -1) {
+        return res.json().catch(function() { return {}; }).then(function(d) {
+          if (res.status === 401) window.location.href = '/portal';
+          throw d;
+        });
+      }
+      return readStream(res, block, thinking);
+    }).catch(function(e) {
+      thinking.remove();
+      note(block, (e && e.error) || 'Hermes konnte nicht erreicht werden.', true);
+    }).then(function() {
+      thinking.remove();
+      run = null;
+      updateSendState();
+      loadSessions();
+      $('input').focus();
+    });
+  }
+
+  function note(block, text, isError) {
+    var n = document.createElement('div');
+    n.className = 'run-note' + (isError ? ' error' : '');
+    n.textContent = text;
+    block.el.appendChild(n);
+    scrollDown();
+  }
+
+  var renderPending = false;
+  function renderText(block) {
+    if (renderPending) return;
+    renderPending = true;
+    requestAnimationFrame(function() {
+      renderPending = false;
+      var stick = nearBottom();
+      block.content.innerHTML = markdown(block.text);
+      if (stick) scrollDown(true);
+    });
+  }
+
+  function readStream(res, block, thinking) {
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+    var finished = false;
+
+    function handle(event, data) {
+      switch (event) {
+        case 'start':
+          run.runId = data.runId;
+          break;
+        case 'tool':
+          addToolChip(block, data.name, data.detail);
+          scrollDown();
+          break;
+        case 'tool-failed':
+          addToolChip(block, data.name, 'fehlgeschlagen', true);
+          break;
+        case 'commentary':
+          var c = document.createElement('div');
+          c.className = 'commentary';
+          c.textContent = data.text;
+          block.notes.appendChild(c);
+          scrollDown();
+          break;
+        case 'delta':
+          thinking.remove();
+          block.text += data.text;
+          renderText(block);
+          break;
+        case 'message':
+          thinking.remove();
+          if (data.text) { block.text = data.text; renderText(block); }
+          break;
+        case 'approval':
+          showApproval(block, data);
+          break;
+        case 'done':
+          finished = true;
+          thinking.remove();
+          if (data.status === 'cancelled') note(block, 'Abgebrochen.');
+          else if (data.status === 'failed') note(block, data.error || 'Hermes konnte die Anfrage nicht abschließen.', true);
+          break;
+      }
+    }
+
+    function pump() {
+      return reader.read().then(function(r) {
+        if (r.done) {
+          if (!finished) note(block, 'Die Verbindung wurde unterbrochen. Hermes arbeitet eventuell weiter, die Antwort steht dann im Verlauf.', true);
+          return;
+        }
+        buffer += decoder.decode(r.value, { stream: true });
+        var idx;
+        while ((idx = buffer.indexOf('\n\n')) !== -1) {
+          var raw = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          var event = 'message', data = '';
+          raw.split('\n').forEach(function(line) {
+            if (line.indexOf('event:') === 0) event = line.slice(6).trim();
+            else if (line.indexOf('data:') === 0) data += line.slice(5).trim();
+          });
+          if (!data) continue;
+          try { handle(event, JSON.parse(data)); } catch (e) {}
+        }
+        return pump();
+      });
+    }
+    return pump();
+  }
+
+  var CHOICE_LABEL = { once: 'Einmal erlauben', session: 'Für diesen Chat erlauben', deny: 'Ablehnen' };
+
+  function showApproval(block, data) {
+    var box = document.createElement('div');
+    box.className = 'approval';
+    box.innerHTML = '<div class="approval-title">Hermes möchte einen Befehl ausführen, der eine Freigabe braucht</div>' +
+      '<div class="approval-desc"></div><pre></pre><div class="approval-actions"></div>';
+    box.querySelector('.approval-desc').textContent = data.description || '';
+    box.querySelector('pre').textContent = data.command || '';
+    var actions = box.querySelector('.approval-actions');
+    var choices = data.choices && data.choices.length ? data.choices : ['once', 'deny'];
+    choices.forEach(function(c) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = c === 'deny' ? 'ob-btn-ghost btn-danger-soft' : 'ob-btn-ghost';
+      b.textContent = CHOICE_LABEL[c] || c;
+      b.addEventListener('click', function() {
+        actions.querySelectorAll('button').forEach(function(x) { x.disabled = true; });
+        api('/hermes/runs/' + encodeURIComponent(data.runId || (run && run.runId) || '') + '/approval', { method: 'POST', body: { choice: c } })
+          .then(function() {
+            actions.innerHTML = '<span class="approval-done"></span>';
+            actions.firstChild.textContent = c === 'deny' ? 'Abgelehnt.' : 'Freigegeben.';
+          }).catch(function(e) {
+            actions.querySelectorAll('button').forEach(function(x) { x.disabled = false; });
+            toast((e && e.error) || 'Entscheidung konnte nicht übermittelt werden.', 'error');
+          });
+      });
+      actions.appendChild(b);
+    });
+    block.el.appendChild(box);
+    scrollDown(true);
+  }
+
+  function stopRun() {
+    if (!run || !run.runId || run.stopRequested) return;
+    run.stopRequested = true;
+    api('/hermes/runs/' + encodeURIComponent(run.runId) + '/stop', { method: 'POST', body: {} })
+      .catch(function(e) { run && (run.stopRequested = false); toast((e && e.error) || 'Abbrechen hat nicht geklappt.', 'error'); });
+  }
+
+  // ============================================================
+  // UMBENENNEN / LÖSCHEN
+  // ============================================================
+
+  function startRename() {
+    var s = currentSession();
+    if (!s) return;
+    $('titleInput').value = s.title || '';
+    $('chatTitle').hidden = true;
+    $('titleInput').hidden = false;
+    $('titleInput').focus();
+    $('titleInput').select();
+  }
+
+  function finishRename(save) {
+    var s = currentSession();
+    var title = $('titleInput').value.trim();
+    $('titleInput').hidden = true;
+    $('chatTitle').hidden = false;
+    if (!save || !s || !title || title === s.title) return;
+    api('/hermes/sessions/' + encodeURIComponent(s.id), { method: 'PATCH', body: { title: title } }).then(function(d) {
+      s.title = d.title;
+      renderHead();
+      renderChatList();
+    }).catch(function(e) { toast((e && e.error) || 'Umbenennen hat nicht geklappt.', 'error'); });
+  }
+
+  function disarmDelete() {
+    clearTimeout(deleteArmed);
+    deleteArmed = null;
+    $('deleteBtn').classList.remove('confirm');
+    $('deleteBtn').textContent = 'Löschen';
+  }
+
+  function deleteChat() {
+    if (!currentId || run) return;
+    if (!deleteArmed) {
+      $('deleteBtn').classList.add('confirm');
+      $('deleteBtn').textContent = 'Wirklich löschen?';
+      deleteArmed = setTimeout(disarmDelete, 4000);
+      return;
+    }
+    disarmDelete();
+    var id = currentId;
+    api('/hermes/sessions/' + encodeURIComponent(id), { method: 'DELETE' }).then(function() {
+      sessions = sessions.filter(function(s) { return s.id !== id; });
+      toast('Chat gelöscht.');
+      openChat(null);
+    }).catch(function(e) { toast((e && e.error) || 'Löschen hat nicht geklappt.', 'error'); });
+  }
+
+  // ============================================================
+  // START
+  // ============================================================
+
+  function start() {
+    Promise.all([loadStatus(), loadSessions()]).then(function() {
+      var last = storeGet('hermes_letzter_chat');
+      var exists = sessions.some(function(s) { return s.id === last; });
+      openChat(exists ? last : null);
+    });
+  }
+
+  $('logoutBtn').addEventListener('click', logout);
+  $('logoutBtnM').addEventListener('click', logout);
+  $('newChatBtn').addEventListener('click', function() { openChat(null); });
+  $('newChatBtnM').addEventListener('click', function() { openChat(null); });
+  $('chatSelect').addEventListener('change', function() { openChat(this.value || null); });
+  $('chatList').addEventListener('click', function(e) {
+    var item = e.target.closest('.chat-item');
+    if (item) openChat(item.getAttribute('data-id'));
+  });
+  $('messages').addEventListener('click', function(e) {
+    var b = e.target.closest('[data-suggest]');
+    if (b) send(b.getAttribute('data-suggest'));
+  });
+  $('sendBtn').addEventListener('click', function() { if (run) stopRun(); else send(); });
+  $('input').addEventListener('input', function() { autoGrow(); updateSendState(); });
+  $('input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      send();
+    }
+  });
+  $('renameBtn').addEventListener('click', startRename);
+  $('titleInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); finishRename(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finishRename(false); }
+  });
+  $('titleInput').addEventListener('blur', function() { if (!this.hidden) finishRename(true); });
+  $('deleteBtn').addEventListener('click', deleteChat);
+
+  initGlow($('pageRoot'));
+  checkAuth();
+})();
+</script>
+</body>
+</html>

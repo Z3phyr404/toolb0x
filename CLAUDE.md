@@ -47,7 +47,8 @@ toolb0x/
 │       ├── passwords.js                 # /api/passwords CRUD (privat + Tresor-Einträge)
 │       ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
 │       ├── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
-│       └── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
+│       ├── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
+│       └── hermes.js                    # /api/hermes/* — Chat mit dem Hermes Agent (Proxy auf 127.0.0.1:8642, requireAdmin)
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -81,6 +82,7 @@ toolb0x/
 | `/app/admin` | Admin-Bereich (nur für Admins, HTML mit Nonce) |
 | `/app/passwords` | Passwort-Manager (HTML mit Nonce) |
 | `/app/fotos` | Fotos-Übersicht (nur für Admins, HTML mit Nonce) |
+| `/app/hermes` | Chat mit dem Hermes Agent (nur für Admins, HTML mit Nonce) |
 | `/app/<neues-tool>` | Zukünftige Tools (gleicher Mechanismus) |
 | `/s` | **Öffentliche** View-Seite für geteilte Links (KEIN Login, KEIN Portal-Redirect) — Schlüssel steht im URL-Fragment `#<token>~<key>` |
 | `/api/auth/*` | Auth-API |
@@ -100,6 +102,7 @@ toolb0x/
 | `/api/fotos/search/status` | KI-Suche: liegen Suchvektoren vor? (requireAdmin) |
 | `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
 | `/api/fotos/edit-request` | POST `{ id \| ids: [...], rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange (ids[] max. 500, je Foto ein Marker), GET = offene Anzahl (requireAdmin) |
+| `/api/hermes/*` | Hermes-Chat: status, sessions (CRUD + messages), `POST sessions/:id/chat` (SSE), runs/:runId/approval\|stop (requireAdmin) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -906,6 +909,49 @@ UI markiert), ein falsch fortgeschriebenes Saldo merkt niemand.
 - Tests: `tests/routes/auth-account-balance.test.js`; der Layout-Stub
   beantwortet `PUT /api/auth/account-balance` als einziger Endpunkt
   ZUSTANDSBEHAFTET (sonst liesse sich Eintragen/Entfernen nicht durchspielen).
+
+## Hermes-Chat (2026-10-11)
+
+Auf dem Server läuft seit 2026-10-11 der **Hermes Agent** (Nous Research) als
+systemd-Benutzerdienst `hermes-gateway` des Users michael (Telegram-Bot +
+API-Server). `/app/hermes` ist ein Chat dazu im toolb0x-Design.
+
+**Architektur:** Browser → `/api/hermes/*` (requireAuth + requireAdmin) →
+Hermes-API-Server auf `127.0.0.1:8642` (Bearer-Key). Der Key steht NUR in der
+toolb0x-`.env` (`HERMES_API_KEY`, identisch mit `API_SERVER_KEY` in
+`~/.hermes/.env`), der Browser sieht ihn nie. Optional `HERMES_API_URL`
+(Default `http://127.0.0.1:8642`). Ohne Key zeigt die Seite „nicht
+eingerichtet", die Route macht dann keine Upstream-Anfrage.
+
+- **Chats leben in Hermes** (`~/.hermes/state.db`, Quelle `api_server`), NICHT
+  in Postgres → nicht Zero-Knowledge. Die Seite sagt das unter dem
+  Eingabefeld. Kein Prisma-Modell, keine Migration.
+- **Stream wird gefiltert, nicht durchgereicht:** `POST sessions/:id/chat`
+  liest Hermes' SSE (`/api/sessions/{id}/chat/stream`) serverseitig und
+  sendet nur `start`, `tool` (Name + Kurzbefehl), `tool-failed`, `delta`,
+  `commentary`, `message`, `approval`, `done`. Werkzeug-AUSGABEN (Dateiinhalte,
+  Befehlsausgaben, `run.completed.messages`) verlassen den Server nie — auch
+  der Verlauf (`GET sessions/:id/messages`) liefert nur Text + Werkzeugname.
+- **Freigaben:** Gefährliche Befehle pausieren den Lauf (`approval.request`).
+  Erlaubt sind `once`, `session`, `deny` — `always` bewusst NICHT (dauerhafte
+  Freigabe ändert die Hermes-Konfiguration, gehört ins Terminal).
+- **Verbindungsabbruch ≠ Abbruch:** Schließt der Browser, liest die Route den
+  Upstream weiter zu Ende (Hermes arbeitet weiter, Ergebnis steht im
+  Verlauf). Abbrechen nur über den Stopp-Knopf (`runs/:runId/stop`).
+- **SSE durch nginx:** Header `X-Accel-Buffering: no` (sonst puffert nginx
+  bis zum Ende); Hermes schickt alle 10 s `: keepalive`, die Route reicht es
+  weiter → kein 60-s-Timeout. Keine nginx-Änderung nötig.
+- **Body-Limit:** `/api/hermes` ist (wie `/api/notes`) vom globalen
+  10-KB-Parser ausgenommen, der Router hat 64 KB (Nachrichten bis 20.000
+  Zeichen, eingefügte Logs). Eigener Rate-Limiter nur fürs Absenden:
+  `RATE_LIMIT_HERMES_CHAT` (Default 60/15 min).
+- **Einrichtung auf dem Server (einmalig, erledigt 2026-10-11):**
+  `hermes config set API_SERVER_ENABLED true`, `API_SERVER_KEY` (zufällig),
+  `API_SERVER_HOST 127.0.0.1`, `systemctl --user restart hermes-gateway`;
+  denselben Key als `HERMES_API_KEY` in die toolb0x-`.env`, `pm2 restart all`.
+- Tests: `tests/routes/hermes.test.js` (globalThis.fetch gestubbt, nie echte
+  Upstream-Anfragen). Der Layout-Stub fakt Chatliste, Verlauf und einen
+  Stream mit Werkzeug-Chip + Freigabe-Karte.
 
 ## Wichtige Designentscheidungen
 
