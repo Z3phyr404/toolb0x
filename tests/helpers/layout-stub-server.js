@@ -276,6 +276,30 @@ http.createServer((req, res) => {
     const stubCreds = API.__integrations || (API.__integrations = [
       { id: '11111111-2222-4333-8444-555555555555', name: 'Hermes', scope: 'finance', createdAt: '2026-10-11T08:00:00.000Z', lastUsedAt: new Date(Date.now() - 3600000).toISOString(), revokedAt: null, active: true },
     ]);
+    const { describeScopes } = require('../../src/integration/scopes');
+    for (const c of stubCreds) {
+      if (!c.scopes) c.scopes = ['finance.read', 'finance.write', 'reminders.read'];
+      c.scopeDetails = describeScopes(c.scopes, 'admin');
+    }
+    const stubApprovals = API.__approvals || (API.__approvals = [
+      { id: 'bbbbbbbb-1111-4222-8333-444444444444', action: 'note.delete', scope: 'notes.write', scopeLabel: 'Notizen anlegen, ändern, verschieben, löschen', credentialName: 'Hermes', contentHash: 'a'.repeat(64), createdAt: new Date(Date.now() - 600000).toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), summary: { before: { title: 'Alte Einkaufsliste' }, deletesSubpages: 0 } },
+      { id: 'cccccccc-1111-4222-8333-444444444444', action: 'server.restart', scope: 'servers.actions', scopeLabel: 'Server', credentialName: 'Hermes', contentHash: 'b'.repeat(64), createdAt: new Date(Date.now() - 300000).toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString(), summary: { server: 'Synth-VPS', action: 'restart' } },
+    ]);
+    if (url === '/api/integrations/approvals') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ approvals: stubApprovals }));
+    }
+    const appr = url.match(/^\/api\/integrations\/approvals\/([^/]+)\/(approve|reject)$/);
+    if (appr) {
+      const i = stubApprovals.findIndex(a => a.id === appr[1]);
+      if (i >= 0) stubApprovals.splice(i, 1);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ ok: true }));
+    }
+    if (/\/scopes$/.test(url) || /\/rotate$/.test(url)) {
+      res.writeHead(/\/rotate$/.test(url) ? 201 : 200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(/\/rotate$/.test(url) ? { credential: stubCreds[0], token: 'tbxi_' + stubCreds[0].id + '.STUB-erneuert-nur-zur-Anzeige-kein-Schluessel' } : { scopes: stubCreds[0].scopes }));
+    }
     res.writeHead(req.method === 'POST' ? 201 : 200, { 'Content-Type': 'application/json' });
     if (req.method === 'POST') {
       const c = { id: 'aaaaaaaa-bbbb-4ccc-8ddd-' + String(Date.now()).slice(-12).padStart(12, '0'), name: 'Hermes', scope: 'finance', createdAt: new Date().toISOString(), lastUsedAt: null, revokedAt: null, active: true };

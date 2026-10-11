@@ -294,7 +294,7 @@ describe('Integration — Ausgabe anlegen (Entwurf → Bestätigung)', () => {
   });
 
   it('unbekannte Aktion: 400', async () => {
-    const res = await draft('category.delete', { id: catFood.id });
+    const res = await draft('password.read', { id: catFood.id });
     assert.equal(res.status, 400);
     assert.equal(res.body.error, 'UNKNOWN_ACTION');
   });

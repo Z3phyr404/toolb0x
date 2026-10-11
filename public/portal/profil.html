@@ -357,16 +357,20 @@
     <div class="ob-card form-card" data-reveal data-reveal-index="5">
       <h2>Hermes-Zugang</h2>
       <p class="export-desc" style="margin-bottom:10px;">
-        Damit kann dein Hermes-Agent auf diesem Server deine Finanzen lesen und
-        &mdash; nach deiner Best&auml;tigung im Chat &mdash; Ausgaben, Buchungen und
-        Einnahmen anlegen, &auml;ndern oder l&ouml;schen. Der Zugang funktioniert
-        auch, wenn du abgemeldet bist, und ist nur lokal auf dem Server erreichbar.
+        Damit kann dein Hermes-Agent (Zephyr) auf diesem Server toolb0x nutzen &mdash;
+        nur in den Bereichen, die du unten einzeln freischaltest. Der Zugang
+        funktioniert auch, wenn du abgemeldet bist, und ist nur lokal auf dem
+        Server erreichbar. L&ouml;schungen au&szlig;erhalb der Finanzen und alle
+        Servereingriffe f&uuml;hrt er erst aus, wenn du sie hier freigibst.
       </p>
       <p class="export-desc" style="margin-bottom:14px;font-size:12px;color:var(--text-3);">
-        Wichtig: Wer den Zugang hat, kann deine Finanzdaten entschl&uuml;sseln.
-        Passw&ouml;rter, Notizen und Tresore sind davon nicht betroffen.
-        Widerrufen wirkt sofort.
+        Wichtig: Der Zugang enth&auml;lt eine Kopie deines Datenschl&uuml;ssels. Die
+        Berechtigungen begrenzen, was Hermes &uuml;ber die Schnittstelle tun darf.
+        Wer zus&auml;tzlich Zugriff auf die Server-Datenbank hat (Hermes l&auml;uft
+        derzeit als derselbe Linux-Benutzer), k&ouml;nnte technisch alle deine
+        verschl&uuml;sselten Daten lesen. Widerrufen wirkt sofort.
       </p>
+      <div id="approvalList" style="margin-bottom:14px;"></div>
       <div id="integrationList" style="margin-bottom:14px;"></div>
       <form id="integrationForm">
         <div class="form-group" style="margin-bottom:16px;">
@@ -705,10 +709,182 @@ async function loadIntegrations() {
       row.appendChild(info);
       row.appendChild(btn);
       list.appendChild(row);
+      list.appendChild(buildScopeEditor(c));
     });
   } catch (e) {
     list.textContent = 'Zugänge konnten nicht geladen werden.';
   }
+  loadApprovals();
+}
+
+// Berechtigungen je Zugang: Häkchen-Liste. Neue Rechte einschalten braucht
+// das Passwort, Abschalten nicht. Dazu "Schlüssel erneuern" (Rotation).
+function buildScopeEditor(c) {
+  var box = document.createElement('div');
+  box.style.cssText = 'padding:10px 0 14px;border-bottom:1px solid rgba(255,255,255,0.08);';
+  var head = document.createElement('div');
+  head.className = 'form-label';
+  head.textContent = 'Berechtigungen';
+  box.appendChild(head);
+  var granted = {};
+  (c.scopeDetails || []).forEach(function(s) {
+    if (!s.available) return;
+    var lab = document.createElement('label');
+    lab.style.cssText = 'display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0;cursor:pointer;';
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = s.granted;
+    cb.value = s.name;
+    granted[s.name] = s.granted;
+    var txt = document.createElement('span');
+    txt.textContent = s.label;
+    lab.appendChild(cb);
+    lab.appendChild(txt);
+    box.appendChild(lab);
+  });
+  var pw = document.createElement('input');
+  pw.className = 'ob-input';
+  pw.type = 'password';
+  pw.placeholder = 'Passwort (nur zum Einschalten neuer Rechte und zum Erneuern)';
+  pw.autocomplete = 'current-password';
+  pw.style.margin = '10px 0';
+  box.appendChild(pw);
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;';
+  var save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'btn-primary';
+  save.textContent = 'Berechtigungen speichern';
+  save.addEventListener('click', async function() {
+    var scopes = Array.prototype.slice.call(box.querySelectorAll('input[type=checkbox]'))
+      .filter(function(x) { return x.checked; }).map(function(x) { return x.value; });
+    save.disabled = true;
+    try {
+      var res = await fetch(API + '/integrations/' + encodeURIComponent(c.id) + '/scopes', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ scopes: scopes, password: pw.value || undefined }),
+      });
+      var data = await res.json();
+      if (!res.ok) throw data;
+      toast('Berechtigungen gespeichert');
+      loadIntegrations();
+    } catch (err) {
+      toast((err && ((err.errors && err.errors.join(', ')) || err.error)) || 'Speichern fehlgeschlagen', 'error');
+    } finally {
+      save.disabled = false;
+    }
+  });
+  var rotate = document.createElement('button');
+  rotate.type = 'button';
+  rotate.className = 'btn-primary';
+  rotate.style.cssText = 'background:rgba(255,255,255,0.08);color:var(--text);';
+  rotate.textContent = 'Schlüssel erneuern';
+  rotate.addEventListener('click', async function() {
+    if (!pw.value) { toast('Bitte zuerst dein Passwort eingeben.', 'error'); return; }
+    rotate.disabled = true;
+    try {
+      var res = await fetch(API + '/integrations/' + encodeURIComponent(c.id) + '/rotate', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+        body: JSON.stringify({ password: pw.value }),
+      });
+      var data = await res.json();
+      if (!res.ok) throw data;
+      document.getElementById('integrationTokenText').textContent = data.token;
+      document.getElementById('mIntegrationToken').classList.add('active');
+      toast('Neuer Schlüssel erzeugt — der alte gilt ab sofort nicht mehr');
+      loadIntegrations();
+    } catch (err) {
+      toast((err && ((err.errors && err.errors.join(', ')) || err.error)) || 'Erneuern fehlgeschlagen', 'error');
+    } finally {
+      rotate.disabled = false;
+    }
+  });
+  row.appendChild(save);
+  row.appendChild(rotate);
+  box.appendChild(row);
+  return box;
+}
+
+// Offene Freigaben: Entwürfe, die Hermes nur mit deiner Zustimmung ausführen
+// darf (Löschungen außerhalb der Finanzen, Kategorien löschen, Foto-
+// Löschwünsche, Servereingriffe). Die Zusammenfassung kommt vom Server.
+var AKTION_LABEL = {
+  'category.delete': 'Kategorie löschen',
+  'reminder.delete': 'Erinnerung löschen',
+  'note.delete': 'Notiz löschen',
+  'photo.delete': 'Fotos löschen (Papierkorb in fotob0x)',
+  'server.update': 'Server: System-Update',
+  'server.restart': 'Server: Neustart',
+  'server.service-restart': 'Server: Dienst neu starten',
+};
+
+async function loadApprovals() {
+  var box = document.getElementById('approvalList');
+  try {
+    var res = await fetch(API + '/integrations/approvals', { credentials: 'include' });
+    if (!res.ok) throw new Error();
+    var data = await res.json();
+    box.textContent = '';
+    if (!data.approvals.length) return;
+    var head = document.createElement('div');
+    head.className = 'form-label';
+    head.textContent = 'Offene Freigaben (' + data.approvals.length + ')';
+    box.appendChild(head);
+    data.approvals.forEach(function(a) {
+      var card = document.createElement('div');
+      card.style.cssText = 'border:1px solid rgba(255,159,10,0.45);border-radius:12px;padding:12px;margin:8px 0;';
+      var title = document.createElement('div');
+      title.style.fontWeight = '600';
+      title.textContent = AKTION_LABEL[a.action] || a.action;
+      var meta = document.createElement('div');
+      meta.style.cssText = 'font-size:12px;color:var(--text-3);margin:2px 0 8px;';
+      meta.textContent = 'Von ' + a.credentialName + ' · ' + fmtZeitpunkt(a.createdAt) + ' · gültig bis ' + fmtZeitpunkt(a.expiresAt);
+      var pre = document.createElement('pre');
+      pre.style.cssText = 'white-space:pre-wrap;font-size:12px;margin:0 0 10px;max-height:180px;overflow:auto;';
+      pre.textContent = JSON.stringify(a.summary, null, 2);
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;';
+      var ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'btn-primary';
+      ok.textContent = 'Freigeben';
+      var no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'ob-btn-danger';
+      no.textContent = 'Ablehnen';
+      ok.addEventListener('click', function() { decideApproval(a, 'approve', ok, no); });
+      no.addEventListener('click', function() { decideApproval(a, 'reject', ok, no); });
+      row.appendChild(ok);
+      row.appendChild(no);
+      card.appendChild(title);
+      card.appendChild(meta);
+      card.appendChild(pre);
+      card.appendChild(row);
+      box.appendChild(card);
+    });
+  } catch (e) {
+    box.textContent = 'Freigaben konnten nicht geladen werden.';
+  }
+}
+
+async function decideApproval(a, what, ok, no) {
+  ok.disabled = true;
+  no.disabled = true;
+  try {
+    var res = await fetch(API + '/integrations/approvals/' + encodeURIComponent(a.id) + '/' + what, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+      body: JSON.stringify({ contentHash: a.contentHash }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw data;
+    toast(what === 'approve' ? (res.status === 202 ? 'Freigegeben — läuft' : 'Freigegeben und ausgeführt') : 'Abgelehnt');
+  } catch (err) {
+    toast((err && err.error) || 'Fehlgeschlagen', 'error');
+  }
+  loadApprovals();
 }
 
 // Zweistufig: erster Klick fragt nach, zweiter widerruft.

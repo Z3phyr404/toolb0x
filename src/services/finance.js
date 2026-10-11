@@ -586,6 +586,37 @@ async function deleteIncome(db, ctx, existing) {
 }
 
 // ------------------------------------------------------------
+// Kategorien
+// ------------------------------------------------------------
+
+/**
+ * Löscht eine Kategorie. Zugeordnete Ausgaben wandern nach "Sonstiges":
+ * immer ein ANDERES "Sonstiges" als die gelöschte Kategorie (bei mehreren
+ * das älteste, Vergleich case-insensitiv); gibt es keins, wird es angelegt.
+ * @returns {{ movedExpenses: number } | { error: string }}
+ */
+async function deleteCategory(db, ctx, category) {
+  const { userId, key } = ctx;
+  const expenses = await db.expense.findMany({ where: { categoryId: category.id } });
+  if (expenses.length > 0) {
+    const allCats = await db.category.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
+    const istSonstiges = c => entschaerfe(decrypt(c.name, key))?.trim().toLowerCase() === 'sonstiges';
+    let fallback = allCats.find(c => c.id !== category.id && istSonstiges(c));
+    if (!fallback) {
+      if (istSonstiges(category)) {
+        return { error: '"Sonstiges" kann nicht gelöscht werden, solange Ausgaben zugeordnet sind.' };
+      }
+      fallback = await db.category.create({
+        data: { name: encrypt('Sonstiges', key), color: encrypt('#8E8E93', key), userId },
+      });
+    }
+    await db.expense.updateMany({ where: { categoryId: category.id }, data: { categoryId: fallback.id } });
+  }
+  await db.category.delete({ where: { id: category.id } });
+  return { movedExpenses: expenses.length };
+}
+
+// ------------------------------------------------------------
 // Auswertungen (rein lesend)
 // ------------------------------------------------------------
 
@@ -756,6 +787,7 @@ module.exports = {
   createIncome,
   updateIncome,
   deleteIncome,
+  deleteCategory,
   computeSummary,
   computeHistory,
 };

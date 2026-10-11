@@ -531,6 +531,18 @@ const ACTIONS = {
   },
 };
 
+// Finanzbuchhaltung: Michaels Vorgabe (2026-10-12) — klare Buchungsaufträge
+// führt Zephyr ohne erneute Rückfrage aus. Der technische Entwurf/Commit-
+// Ablauf bleibt trotzdem (Einmaligkeit, Idempotenz, Versionsbindung).
+for (const name of Object.keys(ACTIONS)) {
+  ACTIONS[name].scope = 'finance.write';
+  ACTIONS[name].level = 'auto';
+}
+
+require('./actions-extra')(ACTIONS, {
+  checkFields, invalid, fail, notFound, changed, verify, readBool, sha256, stableStringify,
+});
+
 module.exports = {
   ACTIONS,
   IntegrationError,

@@ -433,7 +433,10 @@ model IntegrationCredential {
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String    @default("Hermes")
-  scope      String    @default("finance")
+  scope      String    @default("finance") // Altfeld, ersetzt durch `scopes`
+  // Einzeln schaltbare Berechtigungen (src/integration/scopes.js). Neue
+  // Berechtigungen sind standardmäßig AUS; einschalten nur in der App.
+  scopes     String[]  @default(["finance.read", "finance.write"])
   secretHash String    @unique
   wrappedKey String?   @db.Text // null = widerrufen
   lastUsedAt DateTime?
@@ -456,7 +459,14 @@ model IntegrationDraft {
   credential   IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
   userId       String
   action       String
+  scope        String                @default("finance.write")
+  // Freigabestufe: "auto" | "chat" (Zephyr bestätigt selbst) oder
+  // "app" (nur Michael in der App kann freigeben, technisch erzwungen)
+  level        String                @default("auto")
   payload      String                @db.Text // VERSCHLÜSSELT (JSON)
+  summary      String                @default("") @db.Text // VERSCHLÜSSELT (JSON) — Anzeige in der App
+  decision     String? // "approved" | "rejected" (nur level "app")
+  decidedAt    DateTime?
   contentHash  String
   expiresAt    DateTime
   usedAt       DateTime?

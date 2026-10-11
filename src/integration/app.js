@@ -1,16 +1,20 @@
 // ============================================================
-// INTEGRATIONS-LISTENER — lokaler Zugang für Hermes (2026-10-11)
+// INTEGRATIONS-LISTENER — lokaler Zugang für Zephyr/Hermes
 // ============================================================
+// 2026-10-11: Finanzzugang. 2026-10-12: einzeln schaltbare Berechtigungen
+// (src/integration/scopes.js) und Freigabestufen (auto | chat | app).
+//
 // Eigene Express-App auf einem EIGENEN Port, gebunden an 127.0.0.1.
 // nginx leitet nur an Port 3000 weiter — dieser Listener ist von außen
 // also technisch nicht erreichbar, selbst wenn nginx /api komplett
 // durchreicht. Zusätzlich lehnt er alles ab, was nicht von Loopback kommt
 // oder Proxy-Header trägt.
 //
-// Kein Cookie, kein Login, kein Admin: Authentifizierung NUR per
-// Dauer-Token (Authorization: Bearer tbxi_…), Rechte = Finanz-App.
-// Lesen ist direkt möglich, jede Änderung läuft über
-// Entwurf → Bestätigung (contentHash + Idempotency-Key).
+// Kein Cookie, kein Login, kein Admin-Token: Authentifizierung NUR per
+// Dauer-Token (Authorization: Bearer tbxi_…). Jede Route verlangt ihre
+// Berechtigung; jede Änderung läuft über Entwurf → Bestätigung
+// (contentHash + Idempotency-Key), Stufe "app" nur über die App.
+// Es gibt bewusst KEINE Shell-, SQL- oder freien Proxy-Endpunkte.
 // Doku: docs/hermes-integration.md
 // ============================================================
 
@@ -19,13 +23,18 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const finance = require('../services/finance');
-const { encrypt, decrypt, decryptStrict } = require('../utils/encryption');
+const { encrypt, decrypt } = require('../utils/encryption');
 const { entschaerfe } = require('../utils/legacyText');
 const { currentPeriod, periodRange } = require('../utils/budgetPeriod');
 const { authenticate, revokeCredential } = require('./credentials');
 const { ACTIONS, IntegrationError, stableStringify, sha256, publicExpense, publicIncome } = require('./actions');
+const { describeScopes, normalizeScopes, isKnownScope } = require('./scopes');
+const { executeDraft, draftStatus, replayOf } = require('./execute');
+const { registerReads } = require('./reads');
 
 const DRAFT_TTL_MS = 10 * 60 * 1000;
+// Entwürfe, die Michael in der App freigeben muss, brauchen mehr Zeit.
+const APP_DRAFT_TTL_MS = 72 * 60 * 60 * 1000;
 const MAX_OPEN_DRAFTS = 50;
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -33,7 +42,7 @@ const IDEMPOTENCY_RE = /^[A-Za-z0-9_-]{16,128}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
-// Audit: nur Metadaten. Niemals Token, Schlüssel, Beträge oder Namen.
+// Audit: nur Metadaten. Niemals Token, Schlüssel, Beträge, Namen, Inhalte.
 function audit(event, req, extra = {}) {
   const parts = [`[integration] ${event}`];
   if (req.integration) parts.push(`cred=${req.integration.credentialId.slice(0, 8)}`);
@@ -72,6 +81,12 @@ const envInt = (name, fallback) => parseInt(process.env[name], 10) || fallback;
 
 function makeLimiters() {
   const common = { windowMs: 15 * 60 * 1000, standardHeaders: true, legacyHeaders: false };
+  const perCred = (name, fallback, message) => rateLimit({
+    ...common,
+    max: envInt(name, fallback),
+    keyGenerator: req => req.integration.credentialId,
+    message: { error: 'RATE_LIMITED', message },
+  });
   return {
     // Fehlgeschlagene Anmeldungen (alles kommt von 127.0.0.1 → global).
     authFail: rateLimit({
@@ -80,18 +95,12 @@ function makeLimiters() {
       skipSuccessfulRequests: true,
       message: { error: 'RATE_LIMITED', message: 'Zu viele fehlgeschlagene Anmeldungen.' },
     }),
-    read: rateLimit({
-      ...common,
-      max: envInt('INTEGRATION_RATE_READ', 300),
-      keyGenerator: req => req.integration.credentialId,
-      message: { error: 'RATE_LIMITED', message: 'Zu viele Leseanfragen.' },
-    }),
-    write: rateLimit({
-      ...common,
-      max: envInt('INTEGRATION_RATE_WRITE', 60),
-      keyGenerator: req => req.integration.credentialId,
-      message: { error: 'RATE_LIMITED', message: 'Zu viele Schreibanfragen. Bitte warte einen Moment.' },
-    }),
+    read: perCred('INTEGRATION_RATE_READ', 300, 'Zu viele Leseanfragen.'),
+    write: perCred('INTEGRATION_RATE_WRITE', 60, 'Zu viele Schreibanfragen. Bitte warte einen Moment.'),
+    // SSH auf fremde Server: eng.
+    ssh: perCred('INTEGRATION_RATE_SSH', 30, 'Zu viele Server-Abfragen.'),
+    // KI-Fotosuche kostet echte CPU-Inferenz.
+    photoSearch: perCred('INTEGRATION_RATE_PHOTO_SEARCH', 60, 'Zu viele Fotosuchen.'),
   };
 }
 
@@ -117,11 +126,21 @@ async function requireIntegration(req, res, next) {
   }
 }
 
+// Berechtigung prüfen (wird bei JEDER Anfrage frisch aus der DB gelesen).
+function need(scope) {
+  return (req, res, next) => {
+    if (req.integration.scopes.includes(scope)) return next();
+    audit('scope-denied', req, { scope });
+    res.status(403).json({ error: 'SCOPE_MISSING', message: `Berechtigung ${scope} ist nicht erteilt. Freischalten kann nur Michael in toolb0x.` });
+  };
+}
+
 const ctxOf = req => ({
   userId: req.integration.userId,
   key: req.integration.key,
   startDay: req.integration.startDay,
   credentialId: req.integration.credentialId,
+  role: req.integration.role,
 });
 
 function monthParam(req) {
@@ -142,21 +161,28 @@ function createRouter(limiters) {
   const router = express.Router();
   router.use(limiters.authFail, requireIntegration);
 
-  // ---------- Lesen (ohne Nebenwirkungen, keine Monatsinitialisierung) ----------
-
+  // ---------- Status: Berechtigungen und Freigabestufen ----------
   router.get('/status', limiters.read, (req, res) => {
-    const cur = currentPeriod(req.integration.startDay);
+    const { startDay, scopes, role } = req.integration;
+    const cur = currentPeriod(startDay);
     res.json({
-      scope: 'finance',
-      budgetStartDay: req.integration.startDay,
+      budgetStartDay: startDay,
       currentPeriod: cur,
-      period: periodRange(cur, req.integration.startDay),
+      period: periodRange(cur, startDay),
       draftTtlSeconds: DRAFT_TTL_MS / 1000,
-      actions: Object.keys(ACTIONS),
+      appApprovalTtlSeconds: APP_DRAFT_TTL_MS / 1000,
+      scopes: describeScopes(scopes, role),
+      // Freigabestufe je Aktion — Zephyr richtet sein Verhalten danach:
+      // auto = ohne Rückfrage, chat = vorher im Chat fragen,
+      // app = Michael gibt in toolb0x frei (technisch erzwungen).
+      actions: Object.entries(ACTIONS).map(([name, a]) => ({
+        name, scope: a.scope, level: a.level, granted: scopes.includes(a.scope),
+      })),
     });
   });
 
-  router.get('/categories', limiters.read, async (req, res) => {
+  // ---------- Finanzen lesen (ohne Nebenwirkungen) ----------
+  router.get('/categories', limiters.read, need('finance.read'), async (req, res) => {
     try {
       const { userId, key } = ctxOf(req);
       const rows = await prisma.category.findMany({ where: { userId } });
@@ -167,7 +193,7 @@ function createRouter(limiters) {
     } catch (err) { sendError(res, err); }
   });
 
-  router.get('/expenses', limiters.read, async (req, res) => {
+  router.get('/expenses', limiters.read, need('finance.read'), async (req, res) => {
     try {
       const ctx = ctxOf(req);
       const month = monthParam(req);
@@ -187,7 +213,7 @@ function createRouter(limiters) {
     } catch (err) { sendError(res, err); }
   });
 
-  router.get('/income', limiters.read, async (req, res) => {
+  router.get('/income', limiters.read, need('finance.read'), async (req, res) => {
     try {
       const ctx = ctxOf(req);
       const month = monthParam(req);
@@ -202,18 +228,21 @@ function createRouter(limiters) {
     } catch (err) { sendError(res, err); }
   });
 
-  router.get('/summary', limiters.read, async (req, res) => {
+  router.get('/summary', limiters.read, need('finance.read'), async (req, res) => {
     try {
       res.json(await finance.computeSummary(prisma, ctxOf(req), monthParam(req)));
     } catch (err) { sendError(res, err); }
   });
 
-  router.get('/history', limiters.read, async (req, res) => {
+  router.get('/history', limiters.read, need('finance.read'), async (req, res) => {
     try {
       const n = Math.min(24, Math.max(3, parseInt(req.query.months, 10) || 12));
       res.json(await finance.computeHistory(prisma, ctxOf(req), monthParam(req), n));
     } catch (err) { sendError(res, err); }
   });
+
+  // ---------- Weitere Bereiche lesen (reads.js) ----------
+  registerReads(router, { need, limiters, ctxOf, sendError });
 
   // Was dieser Zugang geschrieben hat (nur Metadaten).
   router.get('/writes', limiters.read, async (req, res) => {
@@ -228,7 +257,6 @@ function createRouter(limiters) {
   });
 
   // ---------- Schreiben: Entwurf ----------
-
   router.post('/drafts', limiters.write, async (req, res) => {
     try {
       const body = req.body || {};
@@ -236,6 +264,10 @@ function createRouter(limiters) {
       if (extra.length) throw new IntegrationError(400, 'VALIDATION', 'Unbekannte Felder.', extra.map(k => `Unbekanntes Feld: ${k}`));
       const spec = Object.prototype.hasOwnProperty.call(ACTIONS, body.action) ? ACTIONS[body.action] : null;
       if (!spec) throw new IntegrationError(400, 'UNKNOWN_ACTION', `Unbekannte Aktion. Erlaubt: ${Object.keys(ACTIONS).join(', ')}`);
+      if (!req.integration.scopes.includes(spec.scope)) {
+        audit('scope-denied', req, { scope: spec.scope, action: body.action });
+        throw new IntegrationError(403, 'SCOPE_MISSING', `Berechtigung ${spec.scope} ist nicht erteilt. Freischalten kann nur Michael in toolb0x.`);
+      }
 
       const ctx = ctxOf(req);
       const prepared = await spec.prepare(prisma, ctx, body.params);
@@ -249,26 +281,41 @@ function createRouter(limiters) {
         throw new IntegrationError(429, 'TOO_MANY_DRAFTS', 'Zu viele offene Entwürfe. Bitte bestätigen oder ablaufen lassen.');
       }
 
-      const expiresAt = new Date(now.getTime() + DRAFT_TTL_MS);
+      const expiresAt = new Date(now.getTime() + (spec.level === 'app' ? APP_DRAFT_TTL_MS : DRAFT_TTL_MS));
       const draft = await prisma.integrationDraft.create({
         data: {
           id: crypto.randomUUID(),
           credentialId: ctx.credentialId,
           userId: ctx.userId,
           action: body.action,
+          scope: spec.scope,
+          level: spec.level,
           payload: encrypt(JSON.stringify(payload), ctx.key),
+          summary: encrypt(JSON.stringify(prepared.summary), ctx.key),
           contentHash,
           expiresAt,
           usedAt: null,
+          decision: null,
         },
       });
-      audit('draft', req, { action: body.action, draft: draft.id.slice(0, 8) });
-      res.status(201).json({ draftId: draft.id, action: body.action, contentHash, expiresAt, summary: prepared.summary });
+      audit('draft', req, { action: body.action, level: spec.level, draft: draft.id.slice(0, 8) });
+      res.status(201).json({
+        draftId: draft.id, action: body.action, scope: spec.scope, level: spec.level,
+        contentHash, expiresAt, summary: prepared.summary,
+        ...(spec.level === 'app' ? { next: 'Michael muss diesen Entwurf in toolb0x freigeben (Profil → Hermes-Zugang → Offene Freigaben). Status: GET /v1/drafts/<draftId>.' } : {}),
+      });
     } catch (err) { sendError(res, err); }
   });
 
-  // ---------- Schreiben: Bestätigung ----------
+  // ---------- Status eines Entwurfs (v. a. für App-Freigaben) ----------
+  router.get('/drafts/:id', limiters.read, async (req, res) => {
+    try {
+      if (!UUID.test(req.params.id)) throw new IntegrationError(404, 'DRAFT_NOT_FOUND', 'Entwurf nicht gefunden.');
+      res.json(await draftStatus(prisma, ctxOf(req), req.params.id));
+    } catch (err) { sendError(res, err); }
+  });
 
+  // ---------- Schreiben: Bestätigung durch Zephyr ----------
   router.post('/drafts/:id/confirm', limiters.write, async (req, res) => {
     const ctx = ctxOf(req);
     const draftId = req.params.id;
@@ -282,54 +329,7 @@ function createRouter(limiters) {
       if (extra.length || typeof body.contentHash !== 'string' || !HASH_RE.test(body.contentHash)) {
         throw new IntegrationError(400, 'VALIDATION', 'Erwartet genau { contentHash } aus dem Entwurf.');
       }
-      const requestHash = sha256(`${draftId}:${body.contentHash}`);
-
-      const out = await prisma.$transaction(async (tx) => {
-        const prior = await tx.integrationWrite.findUnique({
-          where: { credentialId_idempotencyKey: { credentialId: ctx.credentialId, idempotencyKey } },
-        });
-        if (prior) return replayOf(prior, requestHash, ctx);
-
-        const draft = await tx.integrationDraft.findFirst({ where: { id: draftId, credentialId: ctx.credentialId } });
-        if (!draft) throw new IntegrationError(404, 'DRAFT_NOT_FOUND', 'Entwurf nicht gefunden.');
-        if (draft.contentHash !== body.contentHash) throw new IntegrationError(409, 'HASH_MISMATCH', 'Die Bestätigung passt nicht zu diesem Entwurf.');
-        if (draft.usedAt) throw new IntegrationError(409, 'DRAFT_USED', 'Dieser Entwurf wurde bereits verwendet.');
-        if (new Date(draft.expiresAt) < new Date()) throw new IntegrationError(410, 'DRAFT_EXPIRED', 'Der Entwurf ist abgelaufen. Bitte neu erstellen.');
-
-        // Einmalig: bedingt beanspruchen. Parallele Bestätigungen mit anderem
-        // Key bekommen count 0 (in PostgreSQL wartet die zweite auf die
-        // Zeilensperre der ersten und sieht danach usedAt gesetzt).
-        const claim = await tx.integrationDraft.updateMany({ where: { id: draft.id, usedAt: null }, data: { usedAt: new Date() } });
-        if (claim.count !== 1) throw new IntegrationError(409, 'DRAFT_USED', 'Dieser Entwurf wurde bereits verwendet.');
-
-        // Inhalt integritätsgeprüft entschlüsseln und gegen den Hash prüfen.
-        let payload;
-        try { payload = JSON.parse(decryptStrict(draft.payload, ctx.key)); } catch { payload = null; }
-        if (!payload || sha256(stableStringify(payload)) !== draft.contentHash || payload.action !== draft.action) {
-          throw new IntegrationError(409, 'HASH_MISMATCH', 'Der Entwurf wurde verändert und wird nicht ausgeführt.');
-        }
-
-        const result = await ACTIONS[payload.action].execute(tx, ctx, payload.params, payload.version);
-        const { status, ...rest } = result;
-        const responseBody = { ok: true, draftId: draft.id, action: payload.action, ...rest };
-
-        await tx.integrationWrite.create({
-          data: {
-            credentialId: ctx.credentialId,
-            userId: ctx.userId,
-            idempotencyKey,
-            requestHash,
-            draftId: draft.id,
-            action: payload.action,
-            targetType: result.targetType,
-            targetId: result.targetId || null,
-            month: result.month || null,
-            result: encrypt(JSON.stringify({ status, body: responseBody }), ctx.key),
-          },
-        });
-        return { status, body: responseBody, action: payload.action };
-      }, { maxWait: 10000, timeout: 15000 });
-
+      const out = await executeDraft(prisma, ctx, { draftId, idempotencyKey, contentHash: body.contentHash });
       audit(out.replayed ? 'confirm-replay' : 'confirm', req, { action: out.action || '-', status: out.status });
       res.status(out.status).json(out.body);
     } catch (err) {
@@ -352,7 +352,21 @@ function createRouter(limiters) {
     }
   });
 
-  // ---------- Selbst-Widerruf („Hermes, Zugang sperren") ----------
+  // ---------- Selbstbeschränkung: Berechtigung abgeben ----------
+  // Zephyr kann Rechte nur VERRINGERN, nie erweitern.
+  router.post('/scopes/drop', async (req, res) => {
+    try {
+      const scope = (req.body || {}).scope;
+      if (typeof scope !== 'string' || !isKnownScope(scope)) throw new IntegrationError(400, 'VALIDATION', 'scope: unbekannte Berechtigung.');
+      const cred = await prisma.integrationCredential.findUnique({ where: { id: req.integration.credentialId } });
+      const remaining = normalizeScopes(cred.scopes).filter(s => s !== scope);
+      await prisma.integrationCredential.updateMany({ where: { id: cred.id, revokedAt: null }, data: { scopes: remaining } });
+      audit('scope-dropped', req, { scope });
+      res.json({ dropped: scope, scopes: remaining });
+    } catch (err) { sendError(res, err); }
+  });
+
+  // ---------- Selbst-Widerruf („Zephyr, Zugang sperren") ----------
   router.post('/revoke', async (req, res) => {
     try {
       await revokeCredential(prisma, { id: req.integration.credentialId, userId: req.integration.userId });
@@ -364,19 +378,12 @@ function createRouter(limiters) {
   return router;
 }
 
-function replayOf(prior, requestHash, ctx) {
-  if (prior.requestHash !== requestHash) {
-    throw new IntegrationError(409, 'IDEMPOTENCY_CONFLICT', 'Dieser Idempotency-Key wurde bereits für eine andere Bestätigung verwendet.');
-  }
-  const stored = JSON.parse(decryptStrict(prior.result, ctx.key));
-  return { status: 200, body: { ...stored.body, replayed: true }, replayed: true, action: prior.action };
-}
-
 function createIntegrationApp() {
   const app = express();
   app.disable('x-powered-by');
   app.use(loopbackOnly);
-  app.use(express.json({ limit: '16kb' }));
+  // Notizen können lang sein (bis 100.000 Zeichen Text); sonst kleine Bodies.
+  app.use(express.json({ limit: '256kb' }));
   app.use('/v1', createRouter(makeLimiters()));
   app.use((req, res) => res.status(404).json({ error: 'NOT_FOUND', message: 'Unbekannter Endpunkt.' }));
   // eslint-disable-next-line no-unused-vars
@@ -405,4 +412,4 @@ function startIntegrationServer() {
   return server;
 }
 
-module.exports = { createIntegrationApp, startIntegrationServer };
+module.exports = { createIntegrationApp, startIntegrationServer, sendError };

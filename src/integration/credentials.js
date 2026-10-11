@@ -13,6 +13,7 @@
 const crypto = require('crypto');
 const { wrapKeyWithSecret, unwrapKeyWithSecret } = require('../utils/encryption');
 const { normalizeStartDay } = require('../utils/budgetPeriod');
+const { DEFAULT_SCOPES, normalizeScopes, effectiveScopes } = require('./scopes');
 
 const TOKEN_RE = /^tbxi_([0-9a-f-]{36})\.([A-Za-z0-9_-]{43})$/;
 const MAX_ACTIVE_PER_USER = 3;
@@ -26,7 +27,7 @@ function sha256(value) {
  * angemeldete Sitzung) — die Kopie wird nur hier erzeugt.
  * @returns {{ credential, token }} token NUR in dieser Rückgabe
  */
-async function createCredential(db, { userId, encryptionKey, name = 'Hermes' }) {
+async function createCredential(db, { userId, encryptionKey, name = 'Hermes', scopes = DEFAULT_SCOPES }) {
   const id = crypto.randomUUID();
   const secret = crypto.randomBytes(32).toString('base64url');
   const credential = await db.integrationCredential.create({
@@ -35,6 +36,7 @@ async function createCredential(db, { userId, encryptionKey, name = 'Hermes' }) 
       userId,
       name,
       scope: 'finance',
+      scopes: normalizeScopes(scopes),
       secretHash: sha256(secret),
       wrappedKey: wrapKeyWithSecret(encryptionKey, secret, id),
       lastUsedAt: null,
@@ -54,12 +56,40 @@ async function revokeCredential(db, { id, userId }) {
   return res.count > 0;
 }
 
+/**
+ * Rotation: neuer Token mit gleichem Namen und gleichen Berechtigungen, der
+ * alte ist im SELBEN Schritt widerrufen. Braucht den User-Key (Sitzung).
+ * @returns {{ credential, token } | null} null = alter Zugang nicht aktiv
+ */
+async function rotateCredential(db, { id, userId, encryptionKey }) {
+  return db.$transaction(async (tx) => {
+    const old = await tx.integrationCredential.findFirst({ where: { id, userId, revokedAt: null } });
+    if (!old || !old.wrappedKey) return null;
+    const res = await tx.integrationCredential.updateMany({
+      where: { id, userId, revokedAt: null },
+      data: { wrappedKey: null, revokedAt: new Date() },
+    });
+    if (res.count !== 1) return null;
+    await tx.integrationDraft.deleteMany({ where: { credentialId: id } });
+    return createCredential(tx, { userId, encryptionKey, name: old.name, scopes: normalizeScopes(old.scopes) });
+  });
+}
+
+/** Berechtigungen setzen (Prüfung auf Rolle/Passwort macht der Aufrufer). */
+async function setScopes(db, { id, userId, scopes }) {
+  const res = await db.integrationCredential.updateMany({
+    where: { id, userId, revokedAt: null },
+    data: { scopes: normalizeScopes(scopes) },
+  });
+  return res.count > 0;
+}
+
 /** Öffentliche Sicht auf einen Zugang — ohne Hash, ohne Schlüsselkopie. */
 function publicCredential(c) {
   return {
     id: c.id,
     name: c.name,
-    scope: c.scope,
+    scopes: normalizeScopes(c.scopes),
     createdAt: c.createdAt,
     lastUsedAt: c.lastUsedAt,
     revokedAt: c.revokedAt,
@@ -90,7 +120,7 @@ async function authenticate(db, token) {
 
   const user = await db.user.findUnique({
     where: { id: cred.userId },
-    select: { suspended: true, budgetStartDay: true },
+    select: { suspended: true, budgetStartDay: true, role: true },
   });
   if (!user) return { ok: false, status: 401, code: 'UNAUTHORIZED' };
   if (user.suspended) return { ok: false, status: 403, code: 'ACCOUNT_SUSPENDED' };
@@ -108,12 +138,18 @@ async function authenticate(db, token) {
     userId: cred.userId,
     key,
     startDay: normalizeStartDay(user.budgetStartDay),
+    role: user.role || 'user',
+    // Rolle wird bei JEDER Anfrage neu gelesen: verliert das Konto die
+    // Admin-Rolle, verfallen Foto-/Server-Rechte sofort.
+    scopes: effectiveScopes(cred.scopes, user.role || 'user'),
   };
 }
 
 module.exports = {
   MAX_ACTIVE_PER_USER,
   createCredential,
+  rotateCredential,
+  setScopes,
   revokeCredential,
   publicCredential,
   authenticate,

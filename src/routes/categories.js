@@ -9,6 +9,8 @@ const { validateCategory, sanitize } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
 const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
 
+const finance = require('../services/finance');
+
 const router = express.Router();
 
 router.use(requireAuth);
@@ -113,57 +115,19 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/categories/:id
+// Logik (Ausgaben wandern nach "Sonstiges") seit 2026-10-12 in
+// services/finance.js deleteCategory — gemeinsam mit der Zephyr-Integration.
 router.delete('/:id', async (req, res) => {
   try {
     const category = await prisma.category.findFirst({
       where: { id: req.params.id, userId: req.userId },
-      include: { _count: { select: { expenses: true } } },
     });
     if (!category) return res.status(404).json({ error: 'Kategorie nicht gefunden.' });
 
-    if (category._count.expenses > 0) {
-      const allCats = await prisma.category.findMany({
-        where: { userId: req.userId },
-        orderBy: { createdAt: 'asc' },
-      });
-      // Gross-/Kleinschreibung ignorieren: Anlegen und Umbenennen prüfen
-      // ebenfalls case-insensitiv auf Duplikate. Wer seine Kategorie
-      // "sonstiges" genannt hat, bekam sonst eine ZWEITE namens "Sonstiges"
-      // und konnte danach keine der beiden mehr umbenennen.
-      const istSonstiges = c =>
-        entschaerfe(decrypt(c.name, req.encryptionKey))?.trim().toLowerCase() === 'sonstiges';
+    const result = await finance.deleteCategory(prisma, { userId: req.userId, key: req.encryptionKey }, category);
+    if (result.error) return res.status(400).json({ error: result.error });
 
-      // Ziel ist immer ein ANDERES "Sonstiges" als die zu löschende
-      // Kategorie, bei mehreren das älteste. Vorher nahm find() das erstbeste
-      // in beliebiger DB-Reihenfolge: Gab es (aus Altlasten) zwei "Sonstiges",
-      // war das mal die zu löschende selbst — das Löschen wurde verweigert
-      // und das Duplikat ließ sich nicht zusammenführen.
-      let fallback = allCats.find(c => c.id !== category.id && istSonstiges(c));
-
-      if (!fallback) {
-        if (istSonstiges(category)) {
-          return res.status(400).json({
-            error: '"Sonstiges" kann nicht gelöscht werden, solange Ausgaben zugeordnet sind.',
-          });
-        }
-        fallback = await prisma.category.create({
-          data: {
-            name: encrypt('Sonstiges', req.encryptionKey),
-            color: encrypt('#8E8E93', req.encryptionKey),
-            userId: req.userId,
-          },
-        });
-      }
-
-      await prisma.expense.updateMany({
-        where: { categoryId: category.id },
-        data: { categoryId: fallback.id },
-      });
-    }
-
-    await prisma.category.delete({ where: { id: req.params.id } });
-
-    res.json({ message: 'Kategorie gelöscht.', movedExpenses: category._count.expenses });
+    res.json({ message: 'Kategorie gelöscht.', movedExpenses: result.movedExpenses });
 
   } catch (error) {
     console.error('Kategorie löschen fehlgeschlagen:', error.message);
