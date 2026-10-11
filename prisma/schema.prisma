@@ -74,6 +74,7 @@ model User {
   ownedVaults      Vault[]          @relation("VaultOwner")
   vaultMemberships VaultMember[]
   invites          Invite[]
+  integrationCredentials IntegrationCredential[]
 
   @@map("users")
 }
@@ -415,4 +416,75 @@ model Invite {
 
   @@index([createdById])
   @@map("invites")
+}
+
+// ============================================================
+// INTEGRATIONEN — Dauer-Zugang für den lokalen Hermes-Agenten (2026-10-11)
+// ============================================================
+// Token-Format: tbxi_<id>.<secret>. In der DB liegen nur der SHA-256-Hash
+// des Secrets und eine Kopie des User-Keys, verschlüsselt mit einem aus dem
+// Secret abgeleiteten Schlüssel (HKDF). Ohne Token ist die Kopie wertlos.
+// Widerruf = wrappedKey auf null + revokedAt setzen: danach ist der Token
+// sofort und endgültig unbrauchbar. Erreichbar ist die Integration nur
+// über einen eigenen Listener auf 127.0.0.1 (nicht über nginx).
+// Siehe docs/hermes-integration.md.
+model IntegrationCredential {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String    @default("Hermes")
+  scope      String    @default("finance")
+  secretHash String    @unique
+  wrappedKey String?   @db.Text // null = widerrufen
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  drafts IntegrationDraft[]
+  writes IntegrationWrite[]
+
+  @@index([userId])
+  @@map("integration_credentials")
+}
+
+// Entwurf einer Schreibaktion. Inhalt mit dem User-Key verschlüsselt,
+// contentHash bindet die Bestätigung an genau diesen Inhalt.
+// Einmalig verwendbar (usedAt), läuft nach 10 Minuten ab.
+model IntegrationDraft {
+  id           String                @id @default(uuid())
+  credentialId String
+  credential   IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  userId       String
+  action       String
+  payload      String                @db.Text // VERSCHLÜSSELT (JSON)
+  contentHash  String
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime              @default(now())
+
+  @@index([credentialId])
+  @@map("integration_drafts")
+}
+
+// Ausgeführte Schreibaktion: Idempotenz (ein Key = höchstens ein Eintrag)
+// und Audit-Spur. Enthält KEINE Klartext-Beträge oder -Namen; die Antwort
+// für Wiederholungen liegt verschlüsselt in `result`.
+model IntegrationWrite {
+  id             String                @id @default(uuid())
+  credentialId   String
+  credential     IntegrationCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  userId         String
+  idempotencyKey String
+  requestHash    String
+  draftId        String                @unique
+  action         String
+  targetType     String
+  targetId       String?
+  month          String?
+  result         String                @db.Text // VERSCHLÜSSELT (JSON)
+  createdAt      DateTime              @default(now())
+
+  @@unique([credentialId, idempotencyKey])
+  @@index([userId])
+  @@map("integration_writes")
 }

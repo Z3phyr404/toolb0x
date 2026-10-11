@@ -353,6 +353,31 @@
       </form>
     </div>
 
+    <!-- Hermes-Zugang (Integration) -->
+    <div class="ob-card form-card" data-reveal data-reveal-index="5">
+      <h2>Hermes-Zugang</h2>
+      <p class="export-desc" style="margin-bottom:10px;">
+        Damit kann dein Hermes-Agent auf diesem Server deine Finanzen lesen und
+        &mdash; nach deiner Best&auml;tigung im Chat &mdash; Ausgaben, Buchungen und
+        Einnahmen anlegen, &auml;ndern oder l&ouml;schen. Der Zugang funktioniert
+        auch, wenn du abgemeldet bist, und ist nur lokal auf dem Server erreichbar.
+      </p>
+      <p class="export-desc" style="margin-bottom:14px;font-size:12px;color:var(--text-3);">
+        Wichtig: Wer den Zugang hat, kann deine Finanzdaten entschl&uuml;sseln.
+        Passw&ouml;rter, Notizen und Tresore sind davon nicht betroffen.
+        Widerrufen wirkt sofort.
+      </p>
+      <div id="integrationList" style="margin-bottom:14px;"></div>
+      <form id="integrationForm">
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label" for="integrationPassword">Aktuelles Passwort (zur Best&auml;tigung)</label>
+          <input class="ob-input" id="integrationPassword" type="password" placeholder="Passwort eingeben" autocomplete="current-password">
+        </div>
+        <div class="profile-error" id="integrationError"></div>
+        <button class="btn-primary" type="submit" id="integrationBtn">Hermes-Zugang erzeugen</button>
+      </form>
+    </div>
+
     <!-- Datenexport -->
     <div class="ob-card export-card" data-reveal data-reveal-index="6">
       <h2>Datenexport</h2>
@@ -431,6 +456,21 @@
   </div>
 </div>
 
+<!-- HERMES-ZUGANG ANZEIGE (einmalig) -->
+<div class="ob-modal-overlay" id="mIntegrationToken">
+  <div class="ob-modal" style="text-align:center;">
+    <h2 style="font-size:20px;margin-bottom:10px;">Dein Hermes-Zugang</h2>
+    <p style="font-size:13px;color:var(--text-2);line-height:1.55;margin-bottom:18px;">
+      Diesen Schl&uuml;ssel tr&auml;gst du auf dem Server in Hermes ein (Anleitung:
+      <code>docs/hermes-integration.md</code>). Er wird nur <strong>einmal</strong>
+      angezeigt. Nicht in Chats, E-Mails oder Notizen kopieren.
+    </p>
+    <div class="recovery-code" id="integrationTokenText" style="word-break:break-all;font-size:13px;">&mdash;</div>
+    <button class="btn-primary" id="copyIntegrationBtn" style="width:100%;margin-bottom:10px;background:rgba(255,255,255,0.08);color:var(--text);">Schl&uuml;ssel kopieren</button>
+    <button class="btn-primary" id="integrationDoneBtn" style="width:100%;">Ich habe ihn eingetragen</button>
+  </div>
+</div>
+
 <div class="ob-toast-box" id="toasts"></div>
 
 <script nonce="__CSP_NONCE__" src="/shared/session-timeout.js"></script>
@@ -471,6 +511,7 @@ async function checkAuth() {
     var data = await res.json();
     currentUser = data.user;
     populateProfile(data.user);
+    loadIntegrations();
     SessionTimeout.start(function() {
       window.location.href = '/portal';
     });
@@ -620,6 +661,119 @@ document.getElementById('recoveryDoneBtn').addEventListener('click', function() 
   document.getElementById('recoveryCodeText').textContent = '—';
   document.getElementById('mRecoveryCode').classList.remove('active');
   toast('Recovery-Code gespeichert? Gut aufbewahren!');
+});
+
+// ---- Hermes-Zugang ----
+function fmtZeitpunkt(iso) {
+  if (!iso) return 'nie';
+  var d = new Date(iso);
+  return d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadIntegrations() {
+  var list = document.getElementById('integrationList');
+  try {
+    var res = await fetch(API + '/integrations', { credentials: 'include' });
+    if (!res.ok) throw new Error();
+    var data = await res.json();
+    list.textContent = '';
+    var aktive = data.credentials.filter(function(c) { return c.active; });
+    if (!aktive.length) {
+      var leer = document.createElement('p');
+      leer.className = 'export-desc';
+      leer.style.margin = '0';
+      leer.textContent = 'Kein aktiver Zugang.';
+      list.appendChild(leer);
+    }
+    aktive.forEach(function(c) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.08);';
+      var info = document.createElement('div');
+      var name = document.createElement('div');
+      name.style.fontWeight = '600';
+      name.textContent = c.name;
+      var meta = document.createElement('div');
+      meta.style.cssText = 'font-size:12px;color:var(--text-3);';
+      meta.textContent = 'Erstellt ' + fmtZeitpunkt(c.createdAt) + ' · zuletzt benutzt ' + fmtZeitpunkt(c.lastUsedAt);
+      info.appendChild(name);
+      info.appendChild(meta);
+      var btn = document.createElement('button');
+      btn.className = 'ob-btn-danger';
+      btn.type = 'button';
+      btn.textContent = 'Widerrufen';
+      btn.addEventListener('click', function() { revokeIntegration(c.id, btn); });
+      row.appendChild(info);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  } catch (e) {
+    list.textContent = 'Zugänge konnten nicht geladen werden.';
+  }
+}
+
+// Zweistufig: erster Klick fragt nach, zweiter widerruft.
+async function revokeIntegration(id, btn) {
+  if (btn.dataset.armed !== '1') {
+    btn.dataset.armed = '1';
+    btn.textContent = 'Wirklich widerrufen?';
+    setTimeout(function() { btn.dataset.armed = ''; btn.textContent = 'Widerrufen'; }, 4000);
+    return;
+  }
+  btn.disabled = true;
+  try {
+    var res = await fetch(API + '/integrations/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'include', headers: { 'X-CSRF-Token': getCsrfToken() },
+    });
+    if (!res.ok) throw await res.json();
+    toast('Hermes-Zugang widerrufen');
+  } catch (err) {
+    toast((err && (err.error || (err.errors && err.errors.join(', ')))) || 'Widerrufen fehlgeschlagen', 'error');
+  }
+  loadIntegrations();
+}
+
+document.getElementById('integrationForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var errEl = document.getElementById('integrationError');
+  errEl.classList.remove('show');
+  var password = document.getElementById('integrationPassword').value;
+  if (!password) {
+    errEl.textContent = 'Bitte gib dein aktuelles Passwort ein.';
+    errEl.classList.add('show');
+    return;
+  }
+  var btn = document.getElementById('integrationBtn');
+  btn.disabled = true;
+  try {
+    var res = await fetch(API + '/integrations', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+      body: JSON.stringify({ password: password, name: 'Hermes' }),
+    });
+    var data = await res.json();
+    if (!res.ok) throw data;
+    document.getElementById('integrationPassword').value = '';
+    document.getElementById('integrationTokenText').textContent = data.token;
+    document.getElementById('mIntegrationToken').classList.add('active');
+    loadIntegrations();
+  } catch (err) {
+    errEl.textContent = (err.errors && err.errors.join(', ')) || err.error || 'Ein Fehler ist aufgetreten.';
+    errEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('copyIntegrationBtn').addEventListener('click', function() {
+  navigator.clipboard.writeText(document.getElementById('integrationTokenText').textContent)
+    .then(function() { toast('Schlüssel kopiert'); })
+    .catch(function() { toast('Kopieren fehlgeschlagen — bitte manuell markieren.', 'error'); });
+});
+
+document.getElementById('integrationDoneBtn').addEventListener('click', function() {
+  // Schlüssel sofort wieder aus der Seite entfernen
+  document.getElementById('integrationTokenText').textContent = '—';
+  document.getElementById('mIntegrationToken').classList.remove('active');
 });
 
 // ---- Logout ----

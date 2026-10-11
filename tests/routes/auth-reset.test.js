@@ -174,6 +174,8 @@ describe('POST /api/auth/reset-with-token (Admin-Fallback, mit Datenverlust)', (
     mockPrisma._store.expenses.push({ id: 'e1', userId: user.id, name: 'x', amount: 'y', month: '2026-07' });
     mockPrisma._store.notes.push({ id: 'n1', userId: user.id, title: 'x' });
     mockPrisma._store.storedPasswords.push({ id: 's1', userId: user.id, vaultId: null, name: 'x' });
+    // Hermes-Zugang mit Kopie des ALTEN Keys — muss mit weg
+    mockPrisma._store.integrationCredentials.push({ id: 'c1', userId: user.id, wrappedKey: 'alt', secretHash: 'h' });
 
     const token = armResetToken(user.id);
     const res = await request(app).post('/api/auth/reset-with-token')
@@ -186,6 +188,7 @@ describe('POST /api/auth/reset-with-token (Admin-Fallback, mit Datenverlust)', (
     assert.equal(mockPrisma._store.expenses.length, 0);
     assert.equal(mockPrisma._store.notes.length, 0);
     assert.equal(mockPrisma._store.storedPasswords.length, 0);
+    assert.equal(mockPrisma._store.integrationCredentials.length, 0);
     assert.equal(mockPrisma._store.categories.length, oldCategories.length);
     assert.notDeepEqual(mockPrisma._store.categories.map(c => c.name), oldCategories);
 

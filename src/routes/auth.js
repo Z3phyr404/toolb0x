@@ -433,6 +433,9 @@ router.post('/reset-with-token', async (req, res) => {
       await tx.vault.deleteMany({ where: { ownerId: user.id } });
       await tx.vaultMember.deleteMany({ where: { userId: user.id } });
       await tx.server.deleteMany({ where: { userId: user.id } });
+      // Integrations-Zugänge (Hermes) halten eine Kopie des ALTEN Keys —
+      // damit verschlüsselte Einträge wären mit dem neuen Key unlesbar.
+      await tx.integrationCredential.deleteMany({ where: { userId: user.id } });
       await tx.category.createMany({ data: categories });
       return true;
     });

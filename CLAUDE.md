@@ -36,19 +36,26 @@ toolb0x/
 │   ├── middleware/
 │   │   ├── auth.js                      # requireAuth + requireAdmin: JWT prüfen + Enc-Key aus RAM holen
 │   │   └── security.js                  # Helmet, CORS, Rate-Limiting, HPP, Body-Parser
-│   └── routes/
-│       ├── auth.js                      # /api/auth/* (login, register, logout, me, password, profile)
-│       ├── categories.js                # /api/categories CRUD
-│       ├── expenses.js                  # /api/expenses CRUD + summary
-│       ├── income.js                    # /api/income CRUD
-│       ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
-│       ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
-│       ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
-│       ├── passwords.js                 # /api/passwords CRUD (privat + Tresor-Einträge)
-│       ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
-│       ├── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
-│       ├── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
-│       └── hermes.js                    # /api/hermes/* — Chat mit dem Hermes Agent (Proxy auf 127.0.0.1:8642, requireAdmin)
+│   ├── routes/
+│   │   ├── auth.js                      # /api/auth/* (login, register, logout, me, password, profile)
+│   │   ├── categories.js                # /api/categories CRUD
+│   │   ├── expenses.js                  # /api/expenses CRUD + summary
+│   │   ├── income.js                    # /api/income CRUD
+│   │   ├── reminders.js                 # /api/reminders CRUD + upcoming (Kündigungserinnerungen)
+│   │   ├── admin.js                     # /api/admin/* — Admin-Statistiken, Nutzerliste, Sperren (requireAdmin)
+│   │   ├── export.js                    # /api/export/pdf + /pdf-all — PDF-Export (Monat & Gesamt)
+│   │   ├── passwords.js                 # /api/passwords CRUD (privat + Tresor-Einträge)
+│   │   ├── vaults.js                    # /api/vaults/* — Geteilte Tresore (Mitglieder, Key-Wrapping)
+│   │   ├── share.js                     # /api/share/* — Zero-Knowledge Secret-Sharing per Link
+│   │   ├── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
+│   │   ├── hermes.js                    # /api/hermes/* — Chat mit dem Hermes Agent (Proxy auf 127.0.0.1:8642, requireAdmin)
+│   │   └── integrations.js              # /api/integrations — Hermes-Zugang erzeugen/widerrufen (requireAuth)
+│   ├── services/
+│   │   └── finance.js                   # Gemeinsame Finanzlogik (App-Routen + Integration)
+│   └── integration/                     # Lokaler Hermes-Zugang (eigener Listener 127.0.0.1:3001)
+│       ├── app.js                       # Express-App /v1, Auth, Entwurf/Bestätigung
+│       ├── actions.js                   # Erlaubte Schreibaktionen (prepare/execute)
+│       └── credentials.js               # Token, Schlüsselkopie, Widerruf
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -103,6 +110,8 @@ toolb0x/
 | `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
 | `/api/fotos/edit-request` | POST `{ id \| ids: [...], rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange (ids[] max. 500, je Foto ein Marker), GET = offene Anzahl (requireAdmin) |
 | `/api/hermes/*` | Hermes-Chat: status, sessions (CRUD + messages), `POST sessions/:id/chat` (SSE), runs/:runId/approval\|stop (requireAdmin) |
+| `/api/integrations` | Hermes-Zugang verwalten: GET Liste, POST `{password}` (Token einmalig), DELETE `/:id` widerrufen |
+| `127.0.0.1:3001/v1/*` | **Eigener Listener, NICHT über nginx:** Hermes-Finanzzugang per Bearer-Token (siehe Abschnitt „Hermes-Finanzzugang“) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -952,6 +961,55 @@ eingerichtet", die Route macht dann keine Upstream-Anfrage.
 - Tests: `tests/routes/hermes.test.js` (globalThis.fetch gestubbt, nie echte
   Upstream-Anfragen). Der Layout-Stub fakt Chatliste, Verlauf und einen
   Stream mit Werkzeug-Chip + Freigabe-Karte.
+
+## Hermes-Finanzzugang (2026-10-11)
+
+Hermes darf die Finanz-App lesen und — nach Michaels Bestätigung im Chat —
+Ausgaben, Sammelposten-Buchungen und Einnahmen anlegen/ändern/löschen. Es
+funktioniert IMMER (auch abgemeldet, nach Neustart, nach Passwortwechsel).
+Vollständige Doku: `docs/hermes-integration.md`, Text für Hermes:
+`docs/hermes-uebergabe.md`.
+
+- **Bewusste Änderung am Sicherheitsmodell (Michaels Entscheidung):** In
+  `integration_credentials.wrappedKey` liegt eine Kopie des User-Keys,
+  verschlüsselt mit HKDF(Token-Secret). Wer den Token hat, kann die
+  Finanzdaten entschlüsseln. Server speichert nur SHA-256 des Secrets.
+  Widerruf = `wrappedKey` auf null. Admin-Reset (`reset-with-token`) löscht
+  Zugänge mit (alter Key).
+- **Eigener Listener `127.0.0.1:3001`** (`INTEGRATION_PORT`, `0` = aus) in
+  `src/integration/app.js`, gestartet aus server.js. Hart an Loopback
+  gebunden, weist Proxy-Header ab — nginx (proxy_pass :3000) erreicht ihn
+  nicht. Kein Cookie/CSRF/Admin.
+- **Schreiben nur zweistufig:** `POST /v1/drafts` (prüft, normalisiert,
+  speichert verschlüsselten Entwurf, `contentHash`, 10 Min gültig) →
+  `POST /v1/drafts/:id/confirm` mit `contentHash` + `Idempotency-Key`.
+  Bestätigung einmalig (bedingtes updateMany auf `usedAt`), Ändern/Löschen
+  an Fingerabdruck des Zustands gebunden (`TARGET_CHANGED`), alles in EINER
+  Transaktion inkl. Rücklesen; `integration_writes` (Unique
+  credentialId+idempotencyKey) = Idempotenz + Audit ohne Klartext.
+- **Gemeinsame Logik:** `src/services/finance.js` enthält Auto-Kopie,
+  Propagation, Löschschutz, Sammelposten-Summen — App-Routen UND
+  Integration rufen dieselben Funktionen (Änderungen dort wirken auf beide).
+  Funktionen bekommen `db` (Client oder Transaktion), öffnen selbst keine.
+- **Summen der Sammelposten** werden seit 2026-10-11 in ganzen Cent und unter
+  `SELECT … FOR UPDATE` auf dem Posten berechnet; App-Buchungsrouten laufen
+  in `prisma.$transaction`. Der Mock kennt `$queryRawUnsafe` als No-Op.
+- **Beträge der Integration:** `parseCents()` in validation.js — nur
+  `12`, `12,5`, `12.50`; gespeichert als `"12.50"`. Die App-Routen nutzen
+  weiterhin `parseFloat` (unverändert).
+- **Integration schreibt in nie geöffneten Monat:** initialisiert ihn vorher
+  in derselben Transaktion (`ensureMonthForWrite`, Advisory-Lock), sonst
+  fehlten Miete & Co. Lesen initialisiert NIE (`initialized: false`).
+- **Migrationshistorie baut keine DB von Null** (Basistabellen entstanden
+  per `db push`). PG-Tests: altes Schema `db push`en, alte Migrationen per
+  `migrate resolve --applied` markieren, dann `migrate deploy` — siehe
+  Kopf von `tests/routes/integration.pg.test.js`.
+- **API-Grenzen ≠ Isolation:** Hermes läuft als `michael` und kann `.env`,
+  DB und Code direkt erreichen. Offener Punkt: eigener Unix-User für Hermes.
+- Tests: `tests/routes/integration.test.js`, `integrations-manage.test.js`,
+  `integration.pg.test.js`, `tests/utils/integration-crypto.test.js`. UI:
+  Profil → Karte „Hermes-Zugang“ (Token einmalig im Modal); Layout-Stub fakt
+  `/api/integrations` zustandsbehaftet.
 
 ## Wichtige Designentscheidungen
 

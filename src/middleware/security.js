@@ -163,6 +163,8 @@ function setupSecurity(app) {
   // … Passwort ändern und Konto löschen bleiben eng.
   app.use('/api/auth/password', sensitiveLimiter(5));
   app.use('/api/auth/account', sensitiveLimiter(5));
+  // Hermes-Zugang erzeugen/widerrufen (Passwort-Bestätigung beim Anlegen)
+  app.use('/api/integrations', sensitiveLimiter(10));
 
   // 4. HPP
   app.use(hpp());

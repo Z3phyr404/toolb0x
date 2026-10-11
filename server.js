@@ -131,6 +131,7 @@ const fotoRoutes = require('./src/routes/fotos');
 const shareRoutes = require('./src/routes/share');
 const vaultRoutes = require('./src/routes/vaults');
 const hermesRoutes = require('./src/routes/hermes');
+const integrationRoutes = require('./src/routes/integrations');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -146,6 +147,9 @@ app.use('/api/fotos', fotoRoutes);
 app.use('/api/share', shareRoutes);
 app.use('/api/vaults', vaultRoutes);
 app.use('/api/hermes', hermesRoutes);
+// Verwaltung des Hermes-Zugangs (angemeldet). Der Zugang selbst läuft
+// über einen eigenen, nur lokalen Listener — siehe unten.
+app.use('/api/integrations', integrationRoutes);
 
 // ============================================================
 // FRONTEND-ROUTING
@@ -240,3 +244,8 @@ const server = app.listen(PORT, HOST, () => {
 // 600 s aus nginx (deploy/nginx-fotos.conf) greifen. Wert bewusst über dem
 // nginx-Timeout, damit immer nginx zuerst sauber abbricht.
 server.requestTimeout = 660_000;
+
+// Lokaler Integrations-Listener für Hermes (2026-10-11): eigener Port,
+// IMMER 127.0.0.1, von nginx nicht erreichbar (proxy_pass zeigt nur auf
+// PORT). INTEGRATION_PORT=0 schaltet ihn ab. Doku: docs/hermes-integration.md
+require('./src/integration/app').startIntegrationServer();

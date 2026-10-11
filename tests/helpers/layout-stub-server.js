@@ -270,6 +270,27 @@ http.createServer((req, res) => {
     });
   }
 
+  // Hermes-Zugang im Profil (2026-10-11): Liste, Anlegen (Fake-Token, nur
+  // Anzeige) und Widerrufen — mit Zustand, damit sich der Ablauf durchklicken lässt.
+  if (url === '/api/integrations' || url.startsWith('/api/integrations/')) {
+    const stubCreds = API.__integrations || (API.__integrations = [
+      { id: '11111111-2222-4333-8444-555555555555', name: 'Hermes', scope: 'finance', createdAt: '2026-10-11T08:00:00.000Z', lastUsedAt: new Date(Date.now() - 3600000).toISOString(), revokedAt: null, active: true },
+    ]);
+    res.writeHead(req.method === 'POST' ? 201 : 200, { 'Content-Type': 'application/json' });
+    if (req.method === 'POST') {
+      const c = { id: 'aaaaaaaa-bbbb-4ccc-8ddd-' + String(Date.now()).slice(-12).padStart(12, '0'), name: 'Hermes', scope: 'finance', createdAt: new Date().toISOString(), lastUsedAt: null, revokedAt: null, active: true };
+      stubCreds.push(c);
+      return res.end(JSON.stringify({ credential: c, token: 'tbxi_' + c.id + '.STUB-nur-zur-Anzeige-kein-echter-Schluessel-xx' }));
+    }
+    if (req.method === 'DELETE') {
+      const id = url.split('/').pop();
+      const c = stubCreds.find(x => x.id === id);
+      if (c) { c.active = false; c.revokedAt = new Date().toISOString(); }
+      return res.end(JSON.stringify({ message: 'Zugang widerrufen.' }));
+    }
+    return res.end(JSON.stringify({ credentials: stubCreds }));
+  }
+
   // Hermes-Chat: Verlauf, neuer Chat und ein gefakter SSE-Stream mit
   // Werkzeug-Chip, Freigabe-Abfrage und Markdown-Antwort.
   if (/^\/api\/hermes\/sessions\/[^/]+\/messages$/.test(url)) {
