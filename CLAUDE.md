@@ -50,12 +50,18 @@ toolb0x/
 │   │   ├── fotos.js                     # /api/fotos — geteilte fotob0x-Galerien listen (read-only, requireAdmin)
 │   │   ├── hermes.js                    # /api/hermes/* — Chat mit dem Hermes Agent (Proxy auf 127.0.0.1:8642, requireAdmin)
 │   │   └── integrations.js              # /api/integrations — Hermes-Zugang erzeugen/widerrufen (requireAuth)
-│   ├── services/
-│   │   └── finance.js                   # Gemeinsame Finanzlogik (App-Routen + Integration)
-│   └── integration/                     # Lokaler Hermes-Zugang (eigener Listener 127.0.0.1:3001)
-│       ├── app.js                       # Express-App /v1, Auth, Entwurf/Bestätigung
-│       ├── actions.js                   # Erlaubte Schreibaktionen (prepare/execute)
-│       └── credentials.js               # Token, Schlüsselkopie, Widerruf
+│   ├── services/                        # Gemeinsame Logik für App-Routen UND Integration
+│   │   ├── finance.js                   # Ausgaben/Einnahmen/Buchungen/Kategorien, Summary, Verlauf
+│   │   ├── photos.js                    # Alben, Manifest, KI-Suche, Lösch-/Änderungs-Warteschlange
+│   │   └── servers.js                   # Feste SSH-Befehle (keine freien Kommandos)
+│   └── integration/                     # Lokaler Zephyr/Hermes-Zugang (eigener Listener 127.0.0.1:3001)
+│       ├── app.js                       # Express-App /v1, Auth, need(scope), Entwurf/Bestätigung
+│       ├── scopes.js                    # Einzeln schaltbare Berechtigungen (neue = aus)
+│       ├── actions.js                   # Finanz-Schreibaktionen (prepare/execute), Stufe auto
+│       ├── actions-extra.js             # Kategorien, Kontostand, Erinnerungen, Notizen, Fotos, Server
+│       ├── execute.js                   # Gemeinsamer Ausführungsweg (Zephyr-Confirm + App-Freigabe)
+│       ├── reads.js                     # Lese-Endpunkte Erinnerungen/Notizen/Fotos/Server/Kontostand
+│       └── credentials.js               # Token, Schlüsselkopie, Rotation, Widerruf
 └── public/
     ├── portal/
     │   ├── index.html                   # Tool-Übersicht (Auth + Portal in einer Datei)
@@ -110,8 +116,8 @@ toolb0x/
 | `/api/fotos/search` | POST `{ q }` — semantische KI-Suche über „Alle Fotos" (requireAdmin) |
 | `/api/fotos/edit-request` | POST `{ id \| ids: [...], rating?, addTags?, removeTags? }` = Bewertung/Tags als Marker in die Änderungs-Warteschlange (ids[] max. 500, je Foto ein Marker), GET = offene Anzahl (requireAdmin) |
 | `/api/hermes/*` | Hermes-Chat: status, sessions (CRUD + messages), `POST sessions/:id/chat` (SSE), runs/:runId/approval\|stop (requireAdmin) |
-| `/api/integrations` | Hermes-Zugang verwalten: GET Liste, POST `{password}` (Token einmalig), DELETE `/:id` widerrufen |
-| `127.0.0.1:3001/v1/*` | **Eigener Listener, NICHT über nginx:** Hermes-Finanzzugang per Bearer-Token (siehe Abschnitt „Hermes-Finanzzugang“) |
+| `/api/integrations` | Hermes-Zugang verwalten: Liste, anlegen (Token einmalig), `PUT /:id/scopes`, `POST /:id/rotate`, `DELETE /:id`, `GET/POST /approvals[/:id/approve\|reject]` |
+| `127.0.0.1:3001/v1/*` | **Eigener Listener, NICHT über nginx:** Zephyr/Hermes-Zugang per Bearer-Token (siehe Abschnitt „Hermes-Finanzzugang“ und „Zephyr-Ausbau“) |
 | `/api/export/pdf?month=YYYY-MM` | PDF-Export der Monatsübersicht |
 | `/api/export/pdf-all` | PDF-Export aller Finanzdaten (alle Monate) |
 
@@ -1010,6 +1016,56 @@ Vollständige Doku: `docs/hermes-integration.md`, Text für Hermes:
   `integration.pg.test.js`, `tests/utils/integration-crypto.test.js`. UI:
   Profil → Karte „Hermes-Zugang“ (Token einmalig im Modal); Layout-Stub fakt
   `/api/integrations` zustandsbehaftet.
+
+## Zephyr-Ausbau: Berechtigungen und Freigabestufen (2026-10-12)
+
+Zephyr = der Hermes-Agent. Der Integrationszugang deckt jetzt (fast) alle
+Bereiche ab, aber nur über **einzeln schaltbare Berechtigungen**
+(`src/integration/scopes.js`). Vollständige Matrix:
+`docs/hermes-integration.md`.
+
+- **Berechtigungen:** `IntegrationCredential.scopes` (String[]). Neue
+  Zugänge: nur `finance.read` und `finance.write`. Einschalten nur in der App
+  mit Passwort (`PUT /api/integrations/:id/scopes`), Abschalten ohne.
+  Zephyr kann nur abgeben (`POST /v1/scopes/drop`). `admin: true`-Rechte
+  (Fotos, Server) wirken nur bei Rolle admin, geprüft je Anfrage in
+  `authenticate()` (`effectiveScopes`).
+- **Freigabestufen je Aktion** (`level`): `auto` (nur Finanzbuchhaltung,
+  Zephyr bestätigt selbst), `chat` (Zephyr muss vorher fragen, Regel),
+  `app` (technisch: nur `POST /api/integrations/approvals/:id/approve` mit
+  Michaels Sitzung führt aus; Zephyr-Confirm → 403 APP_APPROVAL_REQUIRED).
+  `app` = Löschungen außerhalb der Finanzen, Kategorie löschen,
+  Foto-Löschwunsch, alle Server-Aktionen.
+- **`execute.js` ist der einzige Ausführungsweg** und prüft bei der
+  Ausführung erneut Zugang, Sperre, Berechtigung, Hash, Einmaligkeit,
+  Version. Abwahl einer Berechtigung macht auch alte Entwürfe unbrauchbar.
+  Externe Aktionen (Server-SSH) laufen nach dem Commit, Ergebnis wird im
+  Write nachgetragen (`state` running → done/failed).
+- **Ausgeschlossen (Michael 2026-10-12):** Passwörter, Tresore,
+  Freigabe-Links, Admin, Konto, Exporte, freie Shell/SQL/Proxy. Neue
+  Endpunkte/Aktionen IMMER mit `need(scope)` bzw. `scope` + `level`
+  versehen, neue Berechtigungen nie in `DEFAULT_SCOPES` aufnehmen.
+- **Notizen:** Integration nimmt nur Text an (`textToHtml` escaped), damit
+  kein Skript-HTML in den Editor gelangt. Fotoalben ohne Link-Token,
+  Server ohne Host/IP, SSH-Fehler nur allgemein (`SSH_FAILED`).
+- **Erinnerungen:** `dueDate` = `reminderDate` als UTC-Kalendertag,
+  „heute“ in Europe/Berlin (`todayBerlin`), `recurrence: null` (App kennt
+  keine Wiederholung). `GET /v1/reminders/upcoming?days=2` für Zephyrs
+  Telegram-Hinweise; Lesen ändert nichts.
+- **Services:** Foto- und Server-Logik liegen jetzt in `services/photos.js`
+  bzw. `services/servers.js` (App-Routen nutzen dieselben Funktionen),
+  `finance.deleteCategory` ebenso.
+- **Profil-UI:** Karte „Hermes-Zugang“ mit offenen Freigaben, Häkchen je
+  Berechtigung, „Schlüssel erneuern“ (Rotation, alter sofort ungültig).
+- **Isolation offen:** `docs/zephyr-linux-benutzer.md` (eigener Benutzer
+  `zephyr`, braucht sudo → Michael). Bis dahin begrenzen die Berechtigungen
+  nur die API, nicht Hermes' Shell.
+- Migration `20261012120000_integration_scopes`. Tests:
+  `integration-scopes.test.js` (SSH via require.cache gestubbt, Foto-Ordner
+  per Env auf tmp), `integration-scopes.pg.test.js`. Lokal liegt ein leerer,
+  nicht versionierter Ordner `prisma/migrations/20260524_add_shares_and_suggestions`,
+  der `migrate deploy` lokal stört (P3015). Für PG-Tests eine Kopie des
+  Prisma-Ordners nur mit versionierten Migrationen verwenden.
 
 ## Wichtige Designentscheidungen
 
