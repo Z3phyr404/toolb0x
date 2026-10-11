@@ -1,29 +1,26 @@
 // ============================================================
 // EINNAHMEN-ROUTEN — mit Verschlüsselung
 // ============================================================
+// Logik (Auto-Kopie, Propagation, Löschschutz) seit 2026-10-11 in
+// ../services/finance.js — gemeinsam mit der Hermes-Integration.
+// ============================================================
 
 const express = require('express');
 const prisma = require('../utils/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { validateIncome, sanitize } = require('../utils/validation');
-const { encrypt, decrypt } = require('../utils/encryption');
-const { entschaerfe, entschaerfeListe } = require('../utils/legacyText');
-const { prevMonth, currentPeriod } = require('../utils/budgetPeriod');
+const { currentPeriod } = require('../utils/budgetPeriod');
+const finance = require('../services/finance');
+
+const { decryptIncome } = finance;
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-function decryptIncome(inc, key) {
-  return {
-    ...inc,
-    name: entschaerfe(decrypt(inc.name, key)),
-    amount: decrypt(inc.amount, key),
-  };
+function ctxOf(req) {
+  return { userId: req.userId, key: req.encryptionKey, startDay: req.budgetStartDay };
 }
-
-// prevMonth und currentPeriod liegen in ../utils/budgetPeriod (dort steckt
-// auch die Logik für einen verschobenen Monatsanfang).
 
 // ============================================================
 // GET /api/income
@@ -44,59 +41,12 @@ router.get('/', async (req, res) => {
 
     // Wenn keine Einnahmen: nur kopieren wenn der Monat noch NICHT initialisiert wurde
     if (raw.length === 0) {
-      const alreadyInit = await prisma.monthInit.findUnique({
-        where: { userId_month_type: { userId: req.userId, month, type: 'income' } },
-      });
-
-      if (alreadyInit) {
-        return res.json({ incomes: [], total: 0, month });
-      }
-
-      // Letzten Monat mit Einnahmen finden (max. 24 Monate zurück).
-      // Stoppt wenn ein Monat gefunden wird, der vom User explizit bearbeitet
-      // wurde (monthInit vorhanden) — auch wenn er leer ist.
-      let sourceMonth = prevMonth(month);
-      let sourceIncomes = [];
-
-      for (let i = 0; i < 24; i++) {
-        const found = await prisma.income.findMany({
-          where: { userId: req.userId, month: sourceMonth, isRecurring: true },
-        });
-        if (found.length > 0) {
-          sourceIncomes = found;
-          break;
-        }
-        const wasModified = await prisma.monthInit.findUnique({
-          where: { userId_month_type: { userId: req.userId, month: sourceMonth, type: 'income' } },
-        });
-        if (wasModified) break;
-        sourceMonth = prevMonth(sourceMonth);
-      }
-
-      // Wiederkehrende in den neuen Monat kopieren
-      if (sourceIncomes.length > 0) {
-        await prisma.income.createMany({
-          data: sourceIncomes.map(i => ({
-            name: i.name,       // bleibt verschlüsselt
-            amount: i.amount,   // bleibt verschlüsselt
-            userId: i.userId,
-            month,
-            isRecurring: true,
-          })),
-        });
-
-        // Neu erstellte laden
+      const kopiert = await finance.initIncomeMonth(prisma, ctxOf(req), month);
+      if (kopiert) {
         raw = await prisma.income.findMany({
           where: { userId: req.userId, month },
         });
       }
-
-      // Monat als initialisiert markieren
-      await prisma.monthInit.upsert({
-        where: { userId_month_type: { userId: req.userId, month, type: 'income' } },
-        create: { userId: req.userId, month, type: 'income' },
-        update: {},
-      });
     }
 
     const incomes = raw.map(i => decryptIncome(i, req.encryptionKey));
@@ -117,38 +67,14 @@ router.post('/', async (req, res) => {
     const errors = validateIncome(req.body);
     if (errors.length > 0) return res.status(400).json({ errors });
 
-    const key = req.encryptionKey;
-    const month = req.body.month || currentPeriod(req.budgetStartDay);
-
-    const income = await prisma.income.create({
-      data: {
-        name: encrypt(sanitize(req.body.name), key),
-        amount: encrypt(String(parseFloat(req.body.amount)), key),
-        userId: req.userId,
-        month,
-        isRecurring: req.body.isRecurring !== false,
-      },
+    const income = await finance.createIncome(prisma, ctxOf(req), {
+      name: sanitize(req.body.name),
+      amount: String(parseFloat(req.body.amount)),
+      month: req.body.month || currentPeriod(req.budgetStartDay),
+      isRecurring: req.body.isRecurring !== false,
     });
 
-    // Neue wiederkehrende Einnahme in bereits initialisierte Zukunftsmonate kopieren.
-    if (income.isRecurring) {
-      const futureInits = await prisma.monthInit.findMany({
-        where: { userId: req.userId, type: 'income', month: { gt: month } },
-      });
-      if (futureInits.length > 0) {
-        await prisma.income.createMany({
-          data: futureInits.map(fi => ({
-            name: income.name,
-            amount: income.amount,
-            userId: income.userId,
-            month: fi.month,
-            isRecurring: true,
-          })),
-        });
-      }
-    }
-
-    res.status(201).json({ income: decryptIncome(income, key) });
+    res.status(201).json({ income: decryptIncome(income, req.encryptionKey) });
 
   } catch (error) {
     console.error('Einnahme erstellen fehlgeschlagen:', error.message);
@@ -167,45 +93,14 @@ router.put('/:id', async (req, res) => {
     });
     if (!existing) return res.status(404).json({ error: 'Einnahme nicht gefunden.' });
 
-    const key = req.encryptionKey;
-
-    const income = await prisma.income.update({
-      where: { id: req.params.id },
-      data: {
-        name: encrypt(sanitize(req.body.name), key),
-        amount: encrypt(String(parseFloat(req.body.amount)), key),
-        month: req.body.month || existing.month,
-        isRecurring: req.body.isRecurring ?? existing.isRecurring,
-      },
+    const income = await finance.updateIncome(prisma, ctxOf(req), existing, {
+      name: sanitize(req.body.name),
+      amount: String(parseFloat(req.body.amount)),
+      month: req.body.month,
+      isRecurring: req.body.isRecurring,
     });
 
-    // Änderungen an wiederkehrenden Einnahmen in Zukunftsmonate propagieren.
-    if (income.isRecurring && existing.isRecurring) {
-      await prisma.income.updateMany({
-        where: {
-          userId: req.userId,
-          name: existing.name,
-          isRecurring: true,
-          month: { gt: existing.month },
-        },
-        data: {
-          name: income.name,
-          amount: income.amount,
-        },
-      });
-    } else if (existing.isRecurring && !income.isRecurring) {
-      // Wiederkehrend abgeschaltet → Auto-Kopien in Zukunftsmonaten entfernen.
-      await prisma.income.deleteMany({
-        where: {
-          userId: req.userId,
-          name: existing.name,
-          isRecurring: true,
-          month: { gt: existing.month },
-        },
-      });
-    }
-
-    res.json({ income: decryptIncome(income, key) });
+    res.json({ income: decryptIncome(income, req.encryptionKey) });
 
   } catch (error) {
     console.error('Einnahme bearbeiten fehlgeschlagen:', error.message);
@@ -221,27 +116,7 @@ router.delete('/:id', async (req, res) => {
     });
     if (!existing) return res.status(404).json({ error: 'Einnahme nicht gefunden.' });
 
-    await prisma.income.delete({ where: { id: req.params.id } });
-
-    // Auto-Kopien in bereits initialisierten Zukunftsmonaten mitlöschen
-    // (gleiche Logik wie bei Ausgaben, siehe expenses.js).
-    if (existing.isRecurring) {
-      await prisma.income.deleteMany({
-        where: {
-          userId: req.userId,
-          name: existing.name,
-          isRecurring: true,
-          month: { gt: existing.month },
-        },
-      });
-    }
-
-    // Monat als initialisiert markieren → verhindert Auto-Copy beim nächsten Laden
-    await prisma.monthInit.upsert({
-      where: { userId_month_type: { userId: req.userId, month: existing.month, type: 'income' } },
-      create: { userId: req.userId, month: existing.month, type: 'income' },
-      update: {},
-    });
+    await finance.deleteIncome(prisma, ctxOf(req), existing);
 
     res.json({ message: 'Einnahme gelöscht.' });
 

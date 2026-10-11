@@ -340,7 +340,73 @@ function normalizeRecoveryCode(input) {
   return String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+// ============================================================
+// SCHLÜSSELKOPIE FÜR INTEGRATIONEN (Hermes-Zugang, 2026-10-11)
+// ============================================================
+// Damit ein lokaler Agent auch ohne angemeldete Sitzung ver- und
+// entschlüsseln kann, liegt eine Kopie des User-Keys in der DB —
+// verschlüsselt mit einem Schlüssel, der aus dem Integrations-Token
+// abgeleitet wird. Den Token selbst speichert der Server NICHT (nur
+// dessen Hash). Ohne Token ist die Kopie wertlos; beim Widerruf wird
+// sie gelöscht.
+// HKDF statt PBKDF2: das Token-Secret hat 256 Bit Zufall, Strecken
+// würde nur Zeit kosten, ohne Sicherheit zu bringen.
+// ============================================================
+
+function deriveKeyFromSecret(secret, salt) {
+  return Buffer.from(crypto.hkdfSync('sha256', secret, String(salt), 'toolb0x-integration-key-v1', KEY_LENGTH));
+}
+
+/**
+ * Verschlüsselt den User-Key mit einem hochentropischen Secret.
+ * @returns {string} "iv:authTag:ciphertext" (Base64)
+ */
+function wrapKeyWithSecret(encryptionKey, secret, salt) {
+  const wrappingKey = deriveKeyFromSecret(secret, salt);
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, wrappingKey, iv);
+  const encrypted = Buffer.concat([cipher.update(encryptionKey), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  wrappingKey.fill(0);
+  return [iv.toString('base64'), authTag.toString('base64'), encrypted.toString('base64')].join(':');
+}
+
+/**
+ * Gegenstück zu wrapKeyWithSecret. Liefert null bei falschem Secret oder
+ * manipulierter Kopie (GCM-Auth-Tag) — wirft nie.
+ */
+function unwrapKeyWithSecret(wrapped, secret, salt) {
+  if (!wrapped || typeof wrapped !== 'string') return null;
+  const wrappingKey = deriveKeyFromSecret(secret, salt);
+  try {
+    const [ivB64, tagB64, encB64] = wrapped.split(':');
+    const decipher = crypto.createDecipheriv(ALGORITHM, wrappingKey, Buffer.from(ivB64, 'base64'));
+    decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+    const key = Buffer.concat([decipher.update(Buffer.from(encB64, 'base64')), decipher.final()]);
+    return key.length === KEY_LENGTH ? key : null;
+  } catch {
+    return null;
+  } finally {
+    wrappingKey.fill(0);
+  }
+}
+
+/**
+ * Wie decrypt(), aber WIRFT bei defektem Ciphertext statt einen
+ * Platzhalter-String zu liefern. Für Stellen, an denen ein stiller
+ * Fehlwert gefährlich wäre (gespeicherte Entwürfe der Integration).
+ */
+function decryptStrict(ciphertext, key) {
+  const [ivB64, tagB64, encB64] = String(ciphertext).split(':');
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, 'base64'));
+  decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+  return Buffer.concat([decipher.update(Buffer.from(encB64, 'base64')), decipher.final()]).toString('utf8');
+}
+
 module.exports = {
+  wrapKeyWithSecret,
+  unwrapKeyWithSecret,
+  decryptStrict,
   generateEncryptionKey,
   wrapEncryptionKey,
   unwrapEncryptionKey,

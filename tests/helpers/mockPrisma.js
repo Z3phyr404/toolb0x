@@ -268,6 +268,9 @@ function createMockPrisma() {
     shares: [],
     expenseBookings: [],
     invites: [],
+    integrationCredentials: [],
+    integrationDrafts: [],
+    integrationWrites: [],
   };
 
   const client = {
@@ -286,6 +289,12 @@ function createMockPrisma() {
     share: createCollection(store, 'shares'),
     expenseBooking: createCollection(store, 'expenseBookings'),
     invite: createCollection(store, 'invites'),
+    integrationCredential: createCollection(store, 'integrationCredentials'),
+    integrationDraft: createCollection(store, 'integrationDrafts'),
+    integrationWrite: createCollection(store, 'integrationWrites'),
+    // Zeilen-/Advisory-Sperren (SELECT … FOR UPDATE) sind im Mock No-Ops —
+    // $transaction serialisiert ohnehin. Echte Sperren prüft der PG-Test.
+    $queryRawUnsafe: async () => [],
   };
   // Serialize interactive transactions and restore all tables on failure.
   // This models atomicity for route tests, not PostgreSQL isolation or FK rules.

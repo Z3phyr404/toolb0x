@@ -435,7 +435,39 @@ function validateServer(data) {
   return errors;
 }
 
+// --------------------------------------------------------
+// Betrag centgenau lesen (Integrationen, 2026-10-11)
+// --------------------------------------------------------
+// parseFloat ist für maschinelle Eingaben zu gutmütig: "12abc" wird 12,
+// "12.345" rutscht durch, "1e3" wird 1000. Hier gilt nur die eindeutige
+// Form "123", "123.4", "123,45" (Komma oder Punkt, max. 2 Nachkommastellen).
+// Rückgabe: ganze Cent (> 0, max. 99.999.999) oder null.
+const BETRAG_RE = /^(0|[1-9]\d{0,5})(?:[.,](\d{1,2}))?$/;
+
+function parseCents(value) {
+  if (typeof value !== 'string') return null;
+  const m = BETRAG_RE.exec(value.trim());
+  if (!m) return null;
+  const cents = Number(m[1]) * 100 + Number((m[2] || '').padEnd(2, '0'));
+  if (cents <= 0 || cents > 99999999) return null;
+  return cents;
+}
+
+// Ganze Cent -> gespeicherte Form "12.30"
+function centsToAmount(cents) {
+  return (cents / 100).toFixed(2);
+}
+
+// Echtes Kalenderdatum "YYYY-MM-DD"?
+function isValidDate(value) {
+  return istText(value) && DATUM_RE.test(value) && istEchtesDatum(value);
+}
+const DATUM_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
 module.exports = {
+  parseCents,
+  centsToAmount,
+  isValidDate,
   validateRegistration,
   validateLogin,
   validateExpense,
