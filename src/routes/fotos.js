@@ -13,23 +13,14 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const path = require('path');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { loadSearchIndex, rankPhotos, trimToRelevant } = require('../utils/fotoSearch');
-// Encoder bewusst als eigenes Modul: Tests stubben es über require.cache,
-// damit nie ein echtes Modell heruntergeladen wird.
-const fotoEmbedder = require('../utils/fotoEmbedder');
+// Logik (Alben, Manifest, KI-Suche, Lösch-/Änderungs-Warteschlange) seit
+// 2026-10-12 in ../services/photos.js — gemeinsam mit der Zephyr-Integration.
+const photos = require('../services/photos');
 
 const router = express.Router();
 
 // Alle Foto-Routen erfordern Auth + Admin-Rolle
 router.use(requireAuth, requireAdmin);
-
-// Auf dem Server /var/www/fotos; lokal per Env übersteuerbar (Dev/Tests).
-const FOTOS_DIR = process.env.FOTOS_DIR || '/var/www/fotos';
-
-// Privater Bibliotheks-Mirror („Alle Fotos", fotob0x Web-Sync).
-// WICHTIG: Dieses Verzeichnis wird bewusst NICHT von nginx ausgeliefert -
-// die Bilder gibt es nur über die Routen unten, und die verlangen Admin.
-const PRIVAT_DIR = process.env.FOTOS_PRIVAT_DIR || '/var/www/fotos-privat';
 
 // Upload-Posteingang (2026-08-07): Transit-Ordner für Fotos von iPad/Mac.
 // fotob0x auf dem Windows-Rechner (der SSOT bleibt) holt die Dateien per
@@ -37,168 +28,40 @@ const PRIVAT_DIR = process.env.FOTOS_PRIVAT_DIR || '/var/www/fotos-privat';
 // Auch dieses Verzeichnis liefert nginx bewusst NICHT aus.
 const INBOX_DIR = process.env.FOTOS_INBOX_DIR || '/var/www/fotos-inbox';
 
-// Mirror-Dateinamen sind "<assetId>.jpg" (numerische fotob0x-IDs).
-const PHOTO_NAME_RE = /^\d{1,12}\.jpg$/;
-
-// Galerie-Tokens aus fotob0x sind 24 Zeichen base64url — alles andere
-// (versteckte Dateien, Fremdordner) wird ignoriert.
-const TOKEN_RE = /^[A-Za-z0-9_-]{6,64}$/;
-
-// Galerie-Titel steht HTML-escaped im <title> der index.html —
-// die fünf Entities von escapeHtml (fotob0x share.ts) zurückwandeln.
-function unescapeHtml(str) {
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&');
+function sendPhotoError(res, error, logLabel) {
+  if (error instanceof photos.PhotoError) return res.status(error.status).json({ error: error.message });
+  console.error(logLabel, error.message);
+  res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
 }
 
-// ============================================================
 // GET /api/fotos — Liste der geteilten Alben
-// ============================================================
 router.get('/', async (req, res) => {
   try {
-    let entries;
-    try {
-      entries = await fs.readdir(FOTOS_DIR, { withFileTypes: true });
-    } catch (err) {
-      // Verzeichnis fehlt (z.B. lokale Entwicklung) → leere Liste, kein Fehler
-      if (err.code === 'ENOENT') return res.json({ albums: [] });
-      throw err;
-    }
-
-    const albums = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !TOKEN_RE.test(entry.name)) continue;
-      const dir = path.join(FOTOS_DIR, entry.name);
-      const album = {
-        token: entry.name,
-        title: entry.name,
-        photoCount: 0,
-        sharedAt: null,
-        thumb: null,
-      };
-
-      try {
-        album.sharedAt = (await fs.stat(dir)).mtime.toISOString();
-      } catch {
-        // Ordner zwischenzeitlich gelöscht ("Teilen beenden") — überspringen
-        continue;
-      }
-
-      try {
-        const html = await fs.readFile(path.join(dir, 'index.html'), 'utf8');
-        const m = html.match(/<title>([^<]*)<\/title>/i);
-        if (m && m[1].trim()) album.title = unescapeHtml(m[1].trim());
-      } catch {
-        // Ohne index.html bleibt der Token als Titel stehen
-      }
-
-      try {
-        const thumbs = (await fs.readdir(path.join(dir, 'thumb')))
-          .filter((f) => /\.jpe?g$/i.test(f))
-          .sort();
-        album.photoCount = thumbs.length;
-        if (thumbs.length > 0) album.thumb = thumbs[0];
-      } catch {
-        // Kein thumb-Ordner → Anzahl 0, Karte ohne Vorschaubild
-      }
-
-      albums.push(album);
-    }
-
-    // Neueste zuerst
-    albums.sort((a, b) => String(b.sharedAt).localeCompare(String(a.sharedAt)));
-
-    res.json({ albums });
+    res.json({ albums: await photos.listSharedAlbums() });
   } catch (error) {
-    console.error('Foto-Übersicht fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Foto-Übersicht fehlgeschlagen:');
   }
 });
 
-// Alben (fotob0x, 2026-08-07): {n, ids}-Objekte für die Album-Auswahl in
-// "Alle Fotos" - gleiche billige Validierung wie bei den Events, Cap bei 200.
-function sanitizeAlbums(albums) {
-  if (!Array.isArray(albums)) return [];
-  const out = [];
-  for (const album of albums) {
-    if (out.length >= 200) break;
-    if (!album || typeof album !== 'object') continue;
-    if (typeof album.n !== 'string' || album.n.length === 0) continue;
-    if (!Array.isArray(album.ids)) continue;
-    const ids = album.ids.filter((id) => typeof id === 'number' && Number.isFinite(id));
-    if (ids.length === 0) continue;
-    out.push({ n: album.n, ids });
-  }
-  return out;
-}
-
-// Events (fotob0x Etappe 6, "Ereignisse") kommen als eigenes Manifest-Feld -
-// billige Validierung statt Schema-Lib, weil wir dem Client nur simple
-// {n, s, e, ids}-Objekte weiterreichen (nie mehr als 500, sonst Cap).
-function sanitizeEvents(events) {
-  if (!Array.isArray(events)) return [];
-  const out = [];
-  for (const ev of events) {
-    if (out.length >= 500) break;
-    if (!ev || typeof ev !== 'object') continue;
-    if (typeof ev.n !== 'string') continue;
-    if (!Array.isArray(ev.ids)) continue;
-    const s = typeof ev.s === 'string' || ev.s === null ? ev.s : null;
-    const e = typeof ev.e === 'string' || ev.e === null ? ev.e : null;
-    const ids = ev.ids.filter((id) => typeof id === 'number' && Number.isFinite(id));
-    out.push({ n: ev.n, s, e, ids });
-  }
-  return out;
-}
-
-// ============================================================
 // GET /api/fotos/library — Manifest der privaten Bibliothek
-// ============================================================
-// library.json schreibt fotob0x beim Web-Sync (Dateiname + Aufnahme-
-// datum; die Web-Kopien selbst sind bewusst EXIF-frei).
 router.get('/library', async (req, res) => {
   try {
-    const raw = await fs.readFile(path.join(PRIVAT_DIR, 'library.json'), 'utf8');
-    const manifest = JSON.parse(raw);
-    res.json({
-      generatedAt: typeof manifest.generatedAt === 'string' ? manifest.generatedAt : null,
-      photoCount: Number.isInteger(manifest.photoCount) ? manifest.photoCount : 0,
-      // Benannte Personen (fotob0x KI Etappe 5) für den Personen-Filter
-      persons: Array.isArray(manifest.persons) ? manifest.persons : [],
-      // Ereignisse (fotob0x Etappe 6) für die Event-Gruppierung in "Alle Fotos"
-      events: sanitizeEvents(manifest.events),
-      // Alben (2026-08-07) für die Album-Auswahl in "Alle Fotos"
-      albums: sanitizeAlbums(manifest.albums),
-      photos: Array.isArray(manifest.photos) ? manifest.photos : [],
-    });
+    res.json(await photos.readLibrary());
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      // Noch nie gesynct → leere Bibliothek, kein Fehler
-      return res.json({ generatedAt: null, photoCount: 0, persons: [], events: [], albums: [], photos: [] });
-    }
-    console.error('Bibliotheks-Manifest fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Bibliotheks-Manifest fehlgeschlagen:');
   }
 });
 
-// ============================================================
 // GET /api/fotos/library/(img|thumb)/:name — Bild ausliefern
-// ============================================================
-// Streamt genau eine Datei aus dem privaten Mirror. Der Name wird
-// streng geprüft (nur "<zahl>.jpg") und sendFile bekommt ein root -
-// Pfad-Ausbrüche sind damit doppelt ausgeschlossen.
+// Name streng geprüft (nur "<zahl>.jpg"), sendFile mit root — Pfad-Ausbrüche
+// sind damit doppelt ausgeschlossen.
 function servePrivatePhoto(subdir) {
   return (req, res) => {
     const name = req.params.name;
-    if (!PHOTO_NAME_RE.test(name)) {
-      return res.status(400).json({ error: 'Ungültiger Bildname.' });
-    }
+    const root = photos.privatePhotoRoot(subdir, name);
+    if (!root) return res.status(400).json({ error: 'Ungültiger Bildname.' });
     res.sendFile(name, {
-      root: path.join(PRIVAT_DIR, subdir),
+      root,
       dotfiles: 'deny',
       headers: {
         'Content-Type': 'image/jpeg',
@@ -217,251 +80,67 @@ function servePrivatePhoto(subdir) {
 router.get('/library/img/:name', servePrivatePhoto('img'));
 router.get('/library/thumb/:name', servePrivatePhoto('thumb'));
 
-// ============================================================
-// KI-Suche in „Alle Fotos" (2026-08-09) — semantisch wie in fotob0x
-// ============================================================
-// fotob0x lädt beim Web-Sync die SigLIP2-Bildvektoren nach
-// <fotos-privat>/search/ hoch (index.json + vectors.bin, Int8-quantisiert).
-// Hier läuft nur noch der TEXT-Teil derselben Pipeline: Anfrage einbetten
-// (fotoEmbedder: Kleinschreibung, de->en-Zusatzvariante, Prompt-Ensemble)
-// und gegen die Vektoren ranken (fotoSearch: bester Wert je Foto, relative
-// Schwelle 0.55 wie trimToRelevant in fotob0x ai.ts).
-// Eigener Rate-Limiter in security.js — jede Suche kostet echte CPU-Inferenz.
-
-// Obergrenze wie MAX_QUERY_LENGTH in fotob0x ai.ts.
-const SEARCH_MAX_QUERY_LENGTH = 300;
-
-// So lange darf eine Suchanfrage auf das (noch) ladende Modell warten.
-// Liegen die Modelldateien schon auf der Platte, reicht das locker; beim
-// allerersten Aufruf (Download von Hugging Face, Minuten!) antworten wir
-// stattdessen 503 — der Download läuft im Hintergrund weiter.
-const SEARCH_MODEL_WAIT_MS = 25_000;
-
-// GET /api/fotos/search/status — gibt es Suchvektoren? (Die UI blendet das
-// Suchfeld nur ein, wenn ja.) modelReady sagt zusätzlich, ob der Text-Tower
-// schon im RAM ist — rein informativ, die UI braucht nur `available`.
+// KI-Suche (2026-08-09) — Details in services/photos.js. Eigener
+// Rate-Limiter in security.js, jede Suche kostet echte CPU-Inferenz.
 router.get('/search/status', async (req, res) => {
   try {
-    const index = await loadSearchIndex(PRIVAT_DIR);
-    res.json({
-      available: !!index,
-      count: index ? index.count : 0,
-      model: index ? index.model : null,
-      modelReady: index ? fotoEmbedder.isReady(index.model) : false,
-    });
+    res.json(await photos.searchStatus());
   } catch (error) {
-    console.error('KI-Suche-Status fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'KI-Suche-Status fehlgeschlagen:');
   }
 });
 
-// POST /api/fotos/search  { q: "sonnenuntergang am see" }
-// Antwort: { ids: [assetId, …], scores: [0.31, …] } — absteigend nach Score.
+// POST /api/fotos/search  { q } → { ids, scores }
 router.post('/search', async (req, res) => {
   try {
-    const raw = req.body && req.body.q;
-    if (typeof raw !== 'string' || raw.trim().length === 0) {
-      return res.status(400).json({ error: 'Bitte einen Suchtext eingeben.' });
-    }
-    const query = raw.trim();
-    if (query.length > SEARCH_MAX_QUERY_LENGTH) {
-      return res.status(400).json({
-        error: `Der Suchtext ist zu lang (maximal ${SEARCH_MAX_QUERY_LENGTH} Zeichen).`,
-      });
-    }
-
-    const index = await loadSearchIndex(PRIVAT_DIR);
-    if (!index) {
-      return res.status(404).json({
-        error: 'Die App hat noch keine Suchvektoren hochgeladen — einmal Websync laufen lassen.',
-      });
-    }
-
-    let variants;
-    try {
-      variants = await fotoEmbedder.embedQueryVariants(query, index.model, {
-        maxWaitMs: SEARCH_MODEL_WAIT_MS,
-      });
-    } catch (err) {
-      if (err && err.code === 'MODEL_LOADING') {
-        return res.status(503).json({
-          error: 'Das KI-Modell wird gerade geladen (beim ersten Mal einige Minuten) — bitte gleich noch einmal versuchen.',
-        });
-      }
-      throw err;
-    }
-
-    // Passt der Text-Tower nicht zu den Vektoren (sollte nie passieren,
-    // beide kommen aus index.json), lieber laut scheitern als Unsinn ranken.
-    if (variants.some((v) => v.length !== index.dims)) {
-      console.error(`KI-Suche: Vektorlänge passt nicht (Modell ${index.model}, erwartet ${index.dims}).`);
-      return res.status(500).json({ error: 'Der Suchindex passt nicht zum KI-Modell — bitte in fotob0x den Websync erneut laufen lassen.' });
-    }
-
-    const results = trimToRelevant(rankPhotos(index, variants));
-    res.json({
-      ids: results.map((r) => r.id),
-      // 4 Nachkommastellen reichen der UI und halten die Antwort klein.
-      scores: results.map((r) => Math.round(r.score * 10000) / 10000),
-    });
+    res.json(await photos.searchPhotos(req.body && req.body.q));
   } catch (error) {
+    if (error instanceof photos.PhotoError) return res.status(error.status).json({ error: error.message });
     console.error('KI-Suche fehlgeschlagen:', error.message);
     res.status(500).json({ error: 'Die KI-Suche ist fehlgeschlagen. Bitte später erneut versuchen.' });
   }
 });
 
-// ============================================================
-// Lösch-Warteschlange (2026-08-07) — online löschen -> PC-Papierkorb
-// ============================================================
-// „Alle Fotos" ist eine schreibgeschützte Kopie; der PC bleibt die Wahrheit.
-// Ein Löschen online legt hier nur einen MARKER an (leere Datei je Asset-ID
-// unter fotos-privat/delete-queue). fotob0x holt die Marker per SFTP ab
-// (wie den Upload-Posteingang, aber umgekehrt), verschiebt die Fotos lokal
-// in den Papierkorb (wiederherstellbar!) und löscht die Marker. Beim
-// nächsten Websync verschwindet das Foto dann auch aus dieser Ansicht.
-const QUEUE_DIR = path.join(PRIVAT_DIR, 'delete-queue');
-
-// POST /api/fotos/delete-request  { ids: [123, 456, ...] }
+// POST /api/fotos/delete-request  { ids: [123, 456, ...] } — Marker für fotob0x
 router.post('/delete-request', async (req, res) => {
   try {
-    const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
-    const clean = [];
-    for (const id of ids) {
-      const n = Number(id);
-      if (Number.isInteger(n) && n > 0 && n < 1e12) clean.push(String(n));
-      if (clean.length >= 500) break;
-    }
-    if (clean.length === 0) return res.status(400).json({ error: 'Keine gültigen Foto-IDs.' });
-    await fs.mkdir(QUEUE_DIR, { recursive: true });
-    for (const id of clean) {
-      // wx: nur anlegen, doppelte Anfragen sind harmlos (schon markiert).
-      await fs.writeFile(path.join(QUEUE_DIR, id), '', { flag: 'wx' }).catch((e) => {
-        if (e.code !== 'EEXIST') throw e;
-      });
-    }
-    res.json({ queued: clean.length });
+    res.json(await photos.queueDelete(photos.cleanPhotoIds(req.body.ids)));
   } catch (error) {
-    console.error('Lösch-Warteschlange fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Lösch-Warteschlange fehlgeschlagen:');
   }
 });
 
 // GET /api/fotos/delete-request — offene Anzahl (für die UI)
 router.get('/delete-request', async (req, res) => {
   try {
-    const entries = await fs.readdir(QUEUE_DIR).catch((e) => {
-      if (e.code === 'ENOENT') return [];
-      throw e;
-    });
-    res.json({ pending: entries.filter((n) => /^\d{1,12}$/.test(n)).length });
+    res.json({ pending: await photos.pendingDeletes() });
   } catch (error) {
-    console.error('Warteschlangen-Status fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Warteschlangen-Status fehlgeschlagen:');
   }
 });
 
-// ============================================================
-// Änderungs-Warteschlange (2026-08-22) — Bewerten/Taggen im Web -> PC
-// ============================================================
-// Gleiche Idee wie die Lösch-Warteschlange: „Alle Fotos" bleibt eine
-// schreibgeschützte Kopie, der PC ist die Wahrheit. Bewertungen und Tags
-// aus der Lightbox landen als Marker-Datei "<assetId>.json" unter
-// fotos-privat/edit-queue ({ r: 0-5, add: [...], del: [...] }); fotob0x
-// holt die Marker per SFTP ab, schreibt Bewertung/Stichwörter in seine
-// Datenbank und löscht die Marker. Mehrere Änderungen am selben Foto
-// werden hier in EINEN Marker gemischt (letzte Bewertung gewinnt,
-// add/del heben sich gegenseitig auf).
-const EDIT_QUEUE_DIR = path.join(PRIVAT_DIR, 'edit-queue');
-
-// Tags: sichtbare Zeichen, keine Steuerzeichen/Pfade, wie fotob0x sie kennt.
-const EDIT_TAG_MAX_LEN = 60;
-const EDIT_TAGS_MAX = 20;
-
-function cleanEditTags(value) {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const raw of value) {
-    if (typeof raw !== 'string') continue;
-    const tag = raw.replace(/\s+/g, ' ').trim();
-    if (!tag || tag.length > EDIT_TAG_MAX_LEN) continue;
-    // eslint-disable-next-line no-control-regex
-    if (/[\x00-\x1f\x7f/\\]/.test(tag)) continue;
-    const key = tag.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(tag);
-    if (out.length >= EDIT_TAGS_MAX) break;
-  }
-  return out;
-}
-
 // POST /api/fotos/edit-request  { id | ids: [...], rating?, addTags?, removeTags? }
-// Seit 2026-08-22 auch mit ids[] (Mehrfachauswahl, max. 500 wie delete-request) —
-// dieselbe Änderung wird dann als Marker für JEDES Foto abgelegt.
 router.post('/edit-request', async (req, res) => {
   try {
-    const ids = [];
-    const pushId = (raw) => {
-      const n = Number(raw);
-      if (Number.isInteger(n) && n > 0 && n < 1e12 && ids.length < 500 && !ids.includes(n)) ids.push(n);
-    };
-    if (Array.isArray(req.body.ids)) req.body.ids.forEach(pushId);
-    else pushId(req.body.id);
-    if (ids.length === 0) return res.status(400).json({ error: 'Keine gültige Foto-ID.' });
-
+    const ids = photos.cleanPhotoIds(Array.isArray(req.body.ids) ? req.body.ids : [req.body.id]);
     const hasRating = req.body.rating !== undefined && req.body.rating !== null;
-    const rating = hasRating ? Number(req.body.rating) : null;
-    if (hasRating && (!Number.isInteger(rating) || rating < 0 || rating > 5)) {
-      return res.status(400).json({ error: 'Die Bewertung muss zwischen 0 und 5 Sternen liegen.' });
-    }
-    const addTags = cleanEditTags(req.body.addTags);
-    const removeTags = cleanEditTags(req.body.removeTags);
-    if (!hasRating && addTags.length === 0 && removeTags.length === 0) {
-      return res.status(400).json({ error: 'Keine Änderung angegeben.' });
-    }
-
-    await fs.mkdir(EDIT_QUEUE_DIR, { recursive: true });
-    for (const id of ids) {
-      const file = path.join(EDIT_QUEUE_DIR, id + '.json');
-
-      // Bestehenden Marker einmischen (Read-Modify-Write; ein Nutzer, kein Lock).
-      let marker = {};
-      try {
-        marker = JSON.parse(await fs.readFile(file, 'utf8')) || {};
-      } catch (e) {
-        marker = {};
-      }
-      const add = new Set(cleanEditTags(marker.add));
-      const del = new Set(cleanEditTags(marker.del));
-      for (const tag of addTags) { add.add(tag); del.delete(tag); }
-      for (const tag of removeTags) { del.add(tag); add.delete(tag); }
-      const next = {};
-      if (hasRating) next.r = rating;
-      else if (Number.isInteger(marker.r) && marker.r >= 0 && marker.r <= 5) next.r = marker.r;
-      if (add.size > 0) next.add = [...add];
-      if (del.size > 0) next.del = [...del];
-
-      await fs.writeFile(file, JSON.stringify(next));
-    }
-    res.json({ queued: ids.length });
+    res.json(await photos.queueEdit({
+      ids,
+      rating: hasRating ? Number(req.body.rating) : null,
+      addTags: photos.cleanEditTags(req.body.addTags),
+      removeTags: photos.cleanEditTags(req.body.removeTags),
+    }));
   } catch (error) {
-    console.error('Änderungs-Warteschlange fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Änderungs-Warteschlange fehlgeschlagen:');
   }
 });
 
 // GET /api/fotos/edit-request — offene Anzahl (für die UI)
 router.get('/edit-request', async (req, res) => {
   try {
-    const entries = await fs.readdir(EDIT_QUEUE_DIR).catch((e) => {
-      if (e.code === 'ENOENT') return [];
-      throw e;
-    });
-    res.json({ pending: entries.filter((n) => /^\d{1,12}\.json$/.test(n)).length });
+    res.json({ pending: await photos.pendingEdits() });
   } catch (error) {
-    console.error('Änderungs-Warteschlangen-Status fehlgeschlagen:', error.message);
-    res.status(500).json({ error: 'Ein Fehler ist aufgetreten.' });
+    sendPhotoError(res, error, 'Änderungs-Warteschlangen-Status fehlgeschlagen:');
   }
 });
 

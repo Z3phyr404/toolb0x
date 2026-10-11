@@ -8,7 +8,7 @@ const prisma = require('../utils/prisma');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { validateServer } = require('../utils/validation');
 const { encrypt, decrypt } = require('../utils/encryption');
-const { execSSH, HOST_KEY_MISMATCH } = require('../utils/ssh');
+const serverOps = require('../services/servers');
 
 const router = express.Router();
 
@@ -17,39 +17,8 @@ router.use(requireAdmin);
 
 const ENCRYPTED_FIELDS = ['host', 'port', 'username', 'password', 'privateKey', 'passphrase', 'notes'];
 
-// Hardcoded SSH-Befehle — kein User-Input in Commands
-const COMMANDS = {
-  status: "hostname && uptime -p && (cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"')",
-  stats: [
-    "top -bn1 | grep 'Cpu(s)' | awk '{print $2}'",
-    "free -m | awk '/Mem:/ {printf \"%d %d %d\", $2, $3, $7}'",
-    "df -h / | awk 'NR==2 {printf \"%s %s %s %s\", $2, $3, $4, $5}'",
-    "cat /proc/loadavg | awk '{print $1, $2, $3}'",
-    "cat /proc/net/dev | awk '/eth0:|ens[0-9]/ {printf \"%s %s\", $2, $10}' | head -1",
-    "cat /proc/uptime | awk '{print $1}'",
-  ].join(' && echo "---SEP---" && '),
-  update: 'sudo DEBIAN_FRONTEND=noninteractive apt-get update -y && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y 2>&1',
-  restart: 'sudo reboot',
-  test: 'echo "OK" && hostname',
-  services: "systemctl list-units --type=service --state=running --no-pager --no-legend | awk '{print $1}' | sed 's/\\.service$//'",
-};
-
-// Hetzner Storage Box (serverType "storage"): eingeschränkte Shell,
-// verlässlich verfügbar ist df — mehr braucht die Anzeige auch nicht.
-const STORAGE_DF = 'df -h';
-
-/** df-h-Ausgabe der Storage Box -> {total, used, free, percent}. */
-function parseStorageDf(stdout) {
-  var lines = stdout.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-  var line = lines[lines.length - 1] || '';
-  var cols = line.split(/\s+/);
-  return {
-    total: cols[1] || '0',
-    used: cols[2] || '0',
-    free: cols[3] || '0',
-    percent: cols[4] || '0%',
-  };
-}
+// Feste SSH-Befehle und deren Ausführung liegen seit 2026-10-12 in
+// ../services/servers.js (gemeinsam mit der Zephyr-Integration).
 
 const sshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -72,44 +41,8 @@ function decryptServerSafe(entry, key) {
   };
 }
 
-function getSSHConfig(entry, key) {
-  var host = entry.host ? decrypt(entry.host, key) : '';
-  var port = entry.port ? decrypt(entry.port, key) : '22';
-  var username = entry.username ? decrypt(entry.username, key) : '';
-  var password = entry.password ? decrypt(entry.password, key) : '';
-  var privateKey = entry.privateKey ? decrypt(entry.privateKey, key) : '';
-  var passphrase = entry.passphrase ? decrypt(entry.passphrase, key) : '';
-
-  var config = { host: host, port: port, username: username };
-  if (entry.authType === 'key' && privateKey) {
-    config.privateKey = privateKey;
-    if (passphrase) config.passphrase = passphrase;
-  } else {
-    config.password = password;
-  }
-  return config;
-}
-
-async function findServer(id, userId) {
-  return prisma.server.findFirst({ where: { id: id, userId: userId } });
-}
-
-// SSH-Befehl mit Host-Key-Pinning ausführen.
-// Erster erfolgreicher Connect speichert den Fingerprint (Trust-on-first-use),
-// danach wird jede Verbindung dagegen verifiziert (Schutz vor MITM).
-async function runServerSSH(server, encryptionKey, command, timeout) {
-  var config = getSSHConfig(server, encryptionKey);
-  config.hostKeyFingerprint = server.hostKeyFingerprint || '';
-
-  var result = await execSSH(config, command, timeout);
-
-  if (!server.hostKeyFingerprint && result.hostKeyFingerprint) {
-    await prisma.server.update({
-      where: { id: server.id },
-      data: { hostKeyFingerprint: result.hostKeyFingerprint },
-    });
-  }
-  return result;
+function findServer(id, userId) {
+  return serverOps.findServer(prisma, id, userId);
 }
 
 // ============================================================
@@ -219,184 +152,25 @@ router.delete('/:id', async (req, res) => {
 // SSH-AKTIONEN
 // ============================================================
 
-// POST /api/servers/:id/test
-router.post('/:id/test', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') {
-      await runServerSSH(server, req.encryptionKey, STORAGE_DF, 10000);
-      return res.json({ success: true, hostname: 'Storage Box' });
-    }
-    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.test, 10000);
-    var lines = result.stdout.split('\n');
-    res.json({ success: true, hostname: lines[1] || lines[0] });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// POST /api/servers/:id/status
-router.post('/:id/status', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') {
-      await runServerSSH(server, req.encryptionKey, STORAGE_DF, 30000);
-      return res.json({ online: true, hostname: 'Storage Box', uptime: '', os: 'Hetzner Storage Box' });
-    }
-    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.status, 30000);
-    var lines = result.stdout.split('\n');
-    res.json({
-      online: true,
-      hostname: lines[0] || '',
-      uptime: lines[1] || '',
-      os: lines[2] || '',
-    });
-  } catch (error) {
-    res.json({ online: false, error: error.message });
-  }
-});
-
-// POST /api/servers/:id/stats
-router.post('/:id/stats', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') {
-      var dfResult = await runServerSSH(server, req.encryptionKey, STORAGE_DF, 30000);
-      var d = parseStorageDf(dfResult.stdout);
-      return res.json({
-        // storage: die UI zeigt dann NUR die Disk (CPU/RAM/Load gibt es
-        // auf einer Storage Box nicht - eingeschränkte Shell).
-        storage: true,
-        cpu: 0,
-        ram: { total: 0, used: 0 },
-        disk: { total: d.total, used: d.used, free: d.free, percent: d.percent },
-        load: { l1: '0', l5: '0', l15: '0' },
-        network: { rx: 0, tx: 0 },
-        uptime: 0,
-      });
-    }
-    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.stats, 30000);
-    var parts = result.stdout.split('---SEP---');
-
-    var cpu = parseFloat(parts[0]) || 0;
-
-    var ramParts = (parts[1] || '').trim().split(' ');
-    var ramTotal = parseInt(ramParts[0]) || 0;
-    var ramUsed = parseInt(ramParts[1]) || 0;
-
-    var diskParts = (parts[2] || '').trim().split(' ');
-    var diskTotal = diskParts[0] || '0';
-    var diskUsed = diskParts[1] || '0';
-    var diskFree = diskParts[2] || '0';
-    var diskPercent = diskParts[3] || '0%';
-
-    var loadParts = (parts[3] || '').trim().split(' ');
-    var load1 = loadParts[0] || '0';
-    var load5 = loadParts[1] || '0';
-    var load15 = loadParts[2] || '0';
-
-    var netParts = (parts[4] || '').trim().split(' ');
-    var netRx = parseInt(netParts[0]) || 0;
-    var netTx = parseInt(netParts[1]) || 0;
-
-    var uptimeSeconds = parseFloat((parts[5] || '').trim()) || 0;
-
-    res.json({
-      cpu: cpu,
-      ram: { total: ramTotal, used: ramUsed },
-      disk: { total: diskTotal, used: diskUsed, free: diskFree, percent: diskPercent },
-      load: { l1: load1, l5: load5, l15: load15 },
-      network: { rx: netRx, tx: netTx },
-      uptime: uptimeSeconds,
-    });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// POST /api/servers/:id/update
-router.post('/:id/update', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') {
-      return res.status(400).json({ error: 'Auf einer Storage Box gibt es keine System-Updates.' });
-    }
-    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.update, 300000);
-    res.json({ success: result.code === 0, output: result.stdout, stderr: result.stderr });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// POST /api/servers/:id/restart
-router.post('/:id/restart', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') {
-      return res.status(400).json({ error: 'Eine Storage Box lässt sich nicht neu starten.' });
-    }
+// Antwortet wie bisher: Fehler aus SSH/Validierung als 400 mit Meldung.
+function sshAction(fn) {
+  return async (req, res) => {
     try {
-      await runServerSSH(server, req.encryptionKey, COMMANDS.restart, 10000);
+      const server = await findServer(req.params.id, req.userId);
+      if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
+      res.json(await fn(server, req));
     } catch (error) {
-      // reboot trennt die SSH-Verbindung — das ist normal.
-      // Host-Key-Fehler aber NICHT verschlucken (möglicher MITM).
-      if (error.message === HOST_KEY_MISMATCH) {
-        return res.status(400).json({ error: error.message });
-      }
+      res.status(error.status || 400).json({ error: error.message });
     }
-    res.json({ success: true, message: 'Server wird neu gestartet...' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
+  };
+}
 
-// POST /api/servers/:id/services
-router.post('/:id/services', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    if (server.serverType === 'storage') return res.json({ services: [] });
-    var result = await runServerSSH(server, req.encryptionKey, COMMANDS.services, 30000);
-    var services = result.stdout.split('\n').filter(function (s) { return s.trim().length > 0; });
-    res.json({ services: services });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// POST /api/servers/:id/service-restart
-router.post('/:id/service-restart', sshLimiter, async (req, res) => {
-  try {
-    var server = await findServer(req.params.id, req.userId);
-    if (!server) return res.status(404).json({ error: 'Server nicht gefunden.' });
-
-    var serviceName = req.body.service;
-    if (!serviceName || typeof serviceName !== 'string') {
-      return res.status(400).json({ error: 'Bitte gib einen Service-Namen an.' });
-    }
-
-    // Schutz gegen Command-Injection: nur alphanumerisch, Bindestrich, Unterstrich, Punkt
-    if (!/^[a-zA-Z0-9._-]{1,50}$/.test(serviceName)) {
-      return res.status(400).json({ error: 'Ungültiger Service-Name.' });
-    }
-
-    var command = 'sudo systemctl restart ' + serviceName;
-    var result = await runServerSSH(server, req.encryptionKey, command, 60000);
-    res.json({ success: result.code === 0, message: serviceName + ' wurde neu gestartet.' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
+router.post('/:id/test', sshLimiter, sshAction((s, req) => serverOps.testServer(s, req.encryptionKey)));
+router.post('/:id/status', sshLimiter, sshAction((s, req) => serverOps.serverStatus(s, req.encryptionKey)));
+router.post('/:id/stats', sshLimiter, sshAction((s, req) => serverOps.serverStats(s, req.encryptionKey)));
+router.post('/:id/update', sshLimiter, sshAction((s, req) => serverOps.serverUpdate(s, req.encryptionKey)));
+router.post('/:id/restart', sshLimiter, sshAction((s, req) => serverOps.serverRestart(s, req.encryptionKey)));
+router.post('/:id/services', sshLimiter, sshAction((s, req) => serverOps.serverServices(s, req.encryptionKey)));
+router.post('/:id/service-restart', sshLimiter, sshAction((s, req) => serverOps.serviceRestart(s, req.encryptionKey, req.body.service)));
 
 module.exports = router;
