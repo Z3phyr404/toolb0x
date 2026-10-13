@@ -315,7 +315,7 @@ def firewall_commands():
                           '169.254.0.0/16', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/4', '240.0.0.0/4')),
         ('fd78:78:78::/64', ('::/128', '::1/128', 'fc00::/7', 'fe80::/10', 'ff00::/8'))):
         for destination in destinations:
-            commands.append(['/usr/sbin/ufw', 'route', 'insert', '1', 'deny', 'in', 'on', 'tunovpn',
+            commands.append(['/usr/sbin/ufw', 'route', 'prepend', 'deny', 'in', 'on', 'tunovpn',
                              'out', 'on', 'eth0', 'from', source, 'to', destination, 'comment', TAG])
         commands.append(['/usr/sbin/ufw', 'route', 'allow', 'in', 'on', 'tunovpn', 'out', 'on', 'eth0',
                          'from', source, 'to', 'any', 'comment', TAG])
@@ -519,17 +519,25 @@ def install():
     backup = backup_baseline(baseline)
     state = prepare()
     firewall_attempted = start_attempted = enable_attempted = reload_attempted = False
+    stage = 'firewall rules'
     try:
-        for args in firewall_commands():
+        for index, args in enumerate(firewall_commands(), 1):
+            stage = 'firewall rule ' + str(index)
             firewall_attempted = True
             run(args)
+        stage = 'firewall readback'
         verify_firewall()
+        stage = 'systemd reload'
         reload_attempted = True
         run(['/usr/bin/systemctl', 'daemon-reload'])
+        stage = 'service start'
         start_attempted = True
         run(['/usr/bin/systemctl', 'start', UNIT])
+        stage = 'listener and addresses'
         verify_active()
+        stage = 'protected baseline verification'
         verify_unchanged(baseline)
+        stage = 'service enable'
         enable_attempted = True
         run(['/usr/bin/systemctl', 'enable', UNIT])
         if service_state(UNIT)[:2] != ['active', 'enabled']:
@@ -563,7 +571,7 @@ def install():
         attempt(lambda: verify_unchanged(baseline))
         if errors:
             raise RuntimeError('Rollback incomplete; retained private backup: ' + str(backup)) from None
-        raise RuntimeError('Installation failed; own attempted changes rolled back. Backup: ' + str(backup)) from None
+        raise RuntimeError('Installation failed at ' + stage + '; own attempted changes rolled back. Backup: ' + str(backup)) from None
 
 
 PKI = Path('/etc/openvpn/private-toolbox-pki')

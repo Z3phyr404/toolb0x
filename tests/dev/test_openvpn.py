@@ -183,6 +183,16 @@ class NetworkTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 m.verify_firewall()
 
+    def test_ipv6_denies_prepend_instead_of_invalid_global_position_one(self):
+        # UFW 0.36 frontend rejects IPv6 insert positions <= existing IPv4 count.
+        # prepend=-1 selects the beginning of the matching family's rules instead.
+        m = load('private-openvpn-setup')
+        commands = m.firewall_commands()
+        ipv6_denies = [c for c in commands if 'deny' in c and ':' in c[c.index('from') + 1]]
+        self.assertTrue(ipv6_denies)
+        for command in ipv6_denies:
+            self.assertEqual(command[1:4], ['route', 'prepend', 'deny'])
+
     def test_firewall_rollback_descending_both_families_and_residual_fail(self):
         m = load('private-openvpn-setup')
         self.assertTrue(hasattr(m, 'cleanup_firewall'), 'UFW transaction missing')
@@ -272,7 +282,7 @@ class TransactionTests(unittest.TestCase):
              patch.object(m, 'verify_unchanged') as verify, \
              patch.object(m, 'run', side_effect=lambda args: calls.append(args) or (_ for _ in ()).throw(RuntimeError('partial'))):
             fake = prepare.return_value
-            with self.assertRaises(RuntimeError):
+            with self.assertRaisesRegex(RuntimeError, 'firewall rule 1'):
                 m.install()
             firewall.assert_called_once()
             fake.cleanup.assert_called_once()
