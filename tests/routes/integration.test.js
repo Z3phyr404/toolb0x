@@ -500,6 +500,172 @@ describe('Integration — Sammelposten-Buchungen', () => {
 });
 
 // ------------------------------------------------------------
+describe('Integration — Collector reconciliation', () => {
+  beforeEach(() => setup());
+
+  it('rejects reconcileBookings for ordinary expenses and non-boolean flags', async () => {
+    const normal = addExpense(user, { name: 'Rent', amount: '800', categoryId: catFood.id, month: '2026-10' });
+    for (const reconcileBookings of [true, false]) {
+      const res = await draft('expense.update', { id: normal.id, reconcileBookings });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error, 'NOT_A_COLLECTOR');
+    }
+    for (const reconcileBookings of ['true', 1, null, {}, []]) {
+      const res = await draft('expense.update', { id: collector.id, reconcileBookings });
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error, 'VALIDATION');
+    }
+  });
+
+  it('fails closed for corrupt encrypted or malformed stored amounts', async () => {
+    for (const bad of ['12abc', 'Infinity', '1e3', '-1', '0.001', '', '[Entschlüsselung fehlgeschlagen]']) {
+      collector.amount = encrypt('50', user.key);
+      S.expenseBookings.length = 0;
+      S.expenseBookings.push({ id: crypto.randomUUID(), expenseId: collector.id, userId: user.id,
+        amount: encrypt(bad, user.key), note: '', bookedOn: '2026-10-01' });
+      const res = await draft('expense.update', { id: collector.id, reconcileBookings: true });
+      assert.equal(res.status, 422, bad);
+      assert.equal(res.body.error, 'CORRUPT_ENTRY');
+      assert.equal(decrypt(collector.amount, user.key), '50');
+    }
+    S.expenseBookings[0].amount = 'broken-ciphertext';
+    assert.equal((await draft('expense.update', { id: collector.id, reconcileBookings: true })).status, 422);
+    S.expenseBookings.length = 0;
+    for (const field of ['amount', 'plannedAmount']) {
+      const saved = collector[field];
+      collector[field] = encrypt('12oops', user.key);
+      assert.equal((await draft('expense.update', { id: collector.id, reconcileBookings: true })).status, 422, field);
+      collector[field] = saved;
+    }
+  });
+
+  function addBooking(amount = '0.10') {
+    const b = { id: crypto.randomUUID(), expenseId: collector.id, userId: user.id,
+      amount: encrypt(amount, user.key), note: encrypt('real purchase', user.key), bookedOn: '2026-10-01' };
+    S.expenseBookings.push(b);
+    return b;
+  }
+
+  it('preserves genuine bookings and derives only the target total, without the flag behavior changing', async () => {
+    addBooking('0.10');
+    addBooking('0.20');
+    S.expenseBookings.push({ id: crypto.randomUUID(), expenseId: otherCollector.id, userId: other.id,
+      amount: encrypt('600', other.key), note: '', bookedOn: '2026-10-01' });
+    collector.amount = encrypt('88', user.key);
+    const bookings = JSON.stringify(S.expenseBookings);
+    for (const extra of [{}, { reconcileBookings: false }]) {
+      const d = await draftOk('expense.update', { id: collector.id, ...extra });
+      assert.equal(d.summary.after.amount, '88.00');
+      assert.equal((await confirm(d)).body.entry.amount, '88');
+    }
+    const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+    assert.equal(d.summary.after.amount, '0.30');
+    const res = await confirm(d);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(Number(res.body.entry.amount), 0.3);
+    assert.equal(Number(res.body.entry.plannedAmount), 400);
+    assert.equal(JSON.stringify(S.expenseBookings), bookings);
+  });
+
+  for (const mutation of ['add', 'delete', 'amount', 'note', 'actual', 'corrupt']) {
+    it(`rejects changed ${mutation} since draft with 409 before writing`, async () => {
+      const b = addBooking('10');
+      collector.amount = encrypt('99', user.key);
+      const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+      if (mutation === 'add') addBooking('2');
+      if (mutation === 'delete') S.expenseBookings.length = 0;
+      if (mutation === 'amount') b.amount = encrypt('11', user.key);
+      if (mutation === 'note') b.note = encrypt('corrected note', user.key);
+      if (mutation === 'actual') collector.amount = encrypt('55', user.key);
+      if (mutation === 'corrupt') b.amount = 'broken';
+      const before = JSON.stringify([S.expenses, S.expenseBookings]);
+      const res = await confirm(d);
+      assert.equal(res.status, 409, JSON.stringify(res.body));
+      assert.equal(res.body.error, 'TARGET_CHANGED');
+      assert.equal(JSON.stringify([S.expenses, S.expenseBookings]), before);
+      assert.equal(S.integrationWrites.length, 0);
+    });
+  }
+
+  it('reloads target after acquiring the row lock before validating its state', async () => {
+    const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+    const original = mockPrisma.$queryRawUnsafe;
+    let locked = false;
+    mockPrisma.$queryRawUnsafe = async (sql, id) => {
+      if (sql.includes('FOR UPDATE') && id === collector.id) {
+        locked = true;
+        S.expenses.find(e => e.id === collector.id).plannedAmount = encrypt('500', user.key);
+      }
+      return [];
+    };
+    try {
+      const res = await confirm(d);
+      assert.equal(locked, true);
+      assert.equal(res.status, 409, JSON.stringify(res.body));
+    } finally { mockPrisma.$queryRawUnsafe = original; }
+  });
+
+  it('rolls back when reconciliation readback is corrupt rather than accepting parseFloat prefixes', async () => {
+    addBooking('10');
+    const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+    const before = JSON.stringify([S.expenses, S.expenseBookings]);
+    const original = mockPrisma.expense.update;
+    mockPrisma.expense.update = async args => {
+      const row = await original(args);
+      if (Object.keys(args.data).length === 1 && args.data.amount) row.amount = encrypt('10oops', user.key);
+      return row;
+    };
+    try {
+      const res = await confirm(d);
+      assert.equal(res.status, 422, JSON.stringify(res.body));
+      assert.equal(res.body.error, 'CORRUPT_ENTRY');
+      assert.equal(JSON.stringify([S.expenses, S.expenseBookings]), before);
+    } finally { mockPrisma.expense.update = original; }
+  });
+
+  it('rolls back if reconciliation changes the planned budget', async () => {
+    const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+    const before = JSON.stringify([S.expenses, S.expenseBookings]);
+    const original = mockPrisma.expense.update;
+    mockPrisma.expense.update = async args => {
+      const row = await original(args);
+      if (Object.keys(args.data).length === 1 && args.data.amount) row.plannedAmount = encrypt('400oops', user.key);
+      return row;
+    };
+    try {
+      const res = await confirm(d);
+      assert.ok([422, 500].includes(res.status), JSON.stringify(res.body));
+      assert.equal(JSON.stringify([S.expenses, S.expenseBookings]), before);
+    } finally { mockPrisma.expense.update = original; }
+  });
+
+  it('repairs an empty collector to zero, preserving plan and metadata; replay is idempotent', async () => {
+    collector.amount = encrypt('99.95', user.key);
+    collector.tags = encrypt(JSON.stringify(['essential']), user.key);
+    const d = await draftOk('expense.update', { id: collector.id, reconcileBookings: true });
+    assert.equal(d.summary.reconcileBookings, true);
+    assert.equal(d.summary.before.amount, '99.95');
+    assert.equal(d.summary.after.amount, '0.00');
+    assert.equal(d.summary.after.plannedAmount, '400.00');
+    assert.equal(decrypt(collector.amount, user.key), '99.95', 'prepare is read-only');
+    const key = crypto.randomUUID();
+    const res = await confirm(d, key);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(Number(res.body.entry.amount), 0);
+    assert.equal(Number(res.body.entry.plannedAmount), 400);
+    assert.equal(res.body.entry.name, 'Rewe');
+    assert.equal(res.body.entry.isRecurring, true);
+    assert.deepEqual(res.body.entry.tags, ['essential']);
+    const saved = snapshot();
+    const replay = await confirm(d, key);
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal(snapshot(), saved);
+    assert.equal(S.expenseBookings.length, 0);
+  });
+});
+
+// ------------------------------------------------------------
 describe('Integration — Ändern und Löschen', () => {
   beforeEach(() => setup());
 

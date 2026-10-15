@@ -145,6 +145,116 @@ describe('Integration gegen echtes PostgreSQL', { skip: DB_URL ? false : 'TEST_D
     assert.equal(row.usedAt, null, 'Beanspruchung muss mit zurückgerollt werden');
   });
 
+  it('Sammelposten-Neuberechnung erhält Budget und echte Buchungen in PostgreSQL', async () => {
+    await prisma.expense.update({ where: { id: collector.id }, data: { amount: enc.encrypt('400', key) } });
+    const empty = await draft('expense.update', { id: collector.id, reconcileBookings: true });
+    assert.equal(empty.status, 201);
+    assert.equal(empty.body.summary.after.amount, '0.00');
+    const first = await confirm(empty.body);
+    assert.equal(first.status, 200, JSON.stringify(first.body));
+    let row = await prisma.expense.findUnique({ where: { id: collector.id } });
+    assert.equal(Number(enc.decrypt(row.amount, key)), 0);
+    assert.equal(Number(enc.decrypt(row.plannedAmount, key)), 400);
+    await prisma.expenseBooking.create({ data: {
+      userId: user.id, expenseId: collector.id, amount: enc.encrypt('10.55', key),
+      note: enc.encrypt('Synthetic lunch', key), bookedOn: '2026-10-05',
+    } });
+    const bookingsBefore = await prisma.expenseBooking.findMany({ where: { expenseId: collector.id } });
+    const withBookings = await draft('expense.update', { id: collector.id, reconcileBookings: true });
+    assert.equal(withBookings.status, 201);
+    assert.equal(withBookings.body.summary.after.amount, '10.55');
+    const repaired = await confirm(withBookings.body);
+    assert.equal(repaired.status, 200, JSON.stringify(repaired.body));
+    row = await prisma.expense.findUnique({ where: { id: collector.id } });
+    assert.equal(enc.decrypt(row.amount, key), '10.55');
+    assert.equal(Number(enc.decrypt(row.plannedAmount, key)), 400);
+    assert.deepEqual(await prisma.expenseBooking.findMany({ where: { expenseId: collector.id } }), bookingsBefore);
+  });
+
+  it('Neuberechnung verwirft den Entwurf nach einer echten zwischenzeitlichen Buchung', async () => {
+    const repair = await draft('expense.update', { id: collector.id, reconcileBookings: true });
+    assert.equal(repair.status, 201);
+    const booking = await draft('booking.create', { expenseId: collector.id, amount: '3.25', date: '2026-10-05' });
+    assert.equal(booking.status, 201);
+    assert.equal((await confirm(booking.body)).status, 201);
+    const conflict = await confirm(repair.body);
+    assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+    assert.equal(conflict.body.error, 'TARGET_CHANGED');
+    const row = await prisma.expense.findUnique({ where: { id: collector.id } });
+    assert.equal(enc.decrypt(row.amount, key), '3.25');
+    assert.equal(await prisma.expenseBooking.count({ where: { expenseId: collector.id } }), 1);
+  });
+
+  it('future conversion rereads type under the booking row lock in PostgreSQL', { timeout: 15000 }, async () => {
+    const finance = require('../../src/services/finance');
+    const ctx = { userId: user.id, key, startDay: 1 };
+    const source = await prisma.expense.create({ data: {
+      userId: user.id, categoryId: cat.id, month: '2026-09', isRecurring: true,
+      name: collector.name, amount: enc.encrypt('123', key),
+    } });
+    let releaseWriter, writerReady;
+    const release = new Promise(resolve => { releaseWriter = resolve; });
+    const ready = new Promise(resolve => { writerReady = resolve; });
+    const writer = prisma.$transaction(async tx => {
+      await finance.lockRow(tx, 'expenses', collector.id);
+      await tx.expense.update({ where: { id: collector.id }, data: {
+        isCollector: false, amount: enc.encrypt('88', key), plannedAmount: null,
+      } });
+      writerReady();
+      await release;
+    }, { timeout: 10000 });
+    try {
+      await ready;
+      await prisma.$transaction(async tx => {
+        await finance.lockRow(tx, 'expenses', source.id);
+        const expense = { ...tx.expense };
+        expense.findMany = async args => {
+          const snapshot = await tx.expense.findMany(args);
+          // Enumeration sees the committed collector; the independent edit
+          // commits before we lock and reload this candidate. No timing sleeps.
+          releaseWriter();
+          await writer;
+          return snapshot;
+        };
+        expense.findFirst = async args => {
+          if (args.where.id === collector.id) {
+            await assert.rejects(
+              prisma.$queryRawUnsafe('SELECT id FROM expenses WHERE id = $1 FOR UPDATE NOWAIT', collector.id),
+              error => error.meta?.code === '55P03',
+              'candidate must already hold the same parent lock used by bookings',
+            );
+          }
+          return tx.expense.findFirst(args);
+        };
+        const bookings = { ...tx.expenseBooking };
+        bookings.findMany = async args => {
+          await assert.rejects(
+            prisma.$queryRawUnsafe('SELECT id FROM expenses WHERE id = $1 FOR UPDATE NOWAIT', args.where.expenseId),
+            error => error.meta?.code === '55P03',
+            'booking sum read must remain protected until commit',
+          );
+          return tx.expenseBooking.findMany(args);
+        };
+        await finance.updateExpense({ ...tx, expense, expenseBooking: bookings }, ctx, source, {
+          name: 'Synthetic recurring expense', amount: '450', categoryId: cat.id,
+          tags: [], isCollector: true, isRecurring: true,
+        });
+      }, { timeout: 10000 });
+    } finally {
+      releaseWriter();
+      await writer;
+    }
+    let future = await prisma.expense.findUnique({ where: { id: collector.id } });
+    assert.equal(future.isCollector, true);
+    assert.equal(enc.decrypt(future.amount, key), '0', 'stale collector snapshot must not retain normal actual 88');
+    await prisma.$transaction(tx => finance.createBooking(tx, ctx, future, {
+      amount: '12.34', note: 'Genuine synthetic booking', bookedOn: null,
+    }));
+    future = await prisma.expense.findUnique({ where: { id: collector.id } });
+    assert.equal(enc.decrypt(future.amount, key), '12.34');
+    assert.equal(await prisma.expenseBooking.count({ where: { expenseId: collector.id } }), 1);
+  });
+
   it('Löschen des Nutzers entfernt Zugänge per Kaskade', async () => {
     await prisma.expense.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });

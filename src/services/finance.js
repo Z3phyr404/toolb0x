@@ -303,6 +303,8 @@ async function createExpense(db, ctx, input) {
  * und Propagation in Zukunftsmonate.
  * input = { name, amount, categoryId, tags[], month, spentOn?, isRecurring?, isCollector? }
  *   spentOn/isRecurring/isCollector: undefined = Bestand behalten.
+ * Caller must supply an actual transaction and hold the source expense-row
+ * lock; this service must not open a nested transaction.
  */
 async function updateExpense(db, ctx, existing, input) {
   const { userId, key, startDay } = ctx;
@@ -359,11 +361,18 @@ async function updateExpense(db, ctx, existing, input) {
       },
       select: { id: true, month: true },
     });
+    kopien.sort((a, b) => a.month.localeCompare(b.month) || a.id.localeCompare(b.id));
     // Einzeln statt updateMany, weil das Tagesdatum je Zielmonat anders
     // ausfällt (carryDayToPeriod). Vorher blieb spentOn in den Kopien auf
     // dem alten Tag stehen: wer den Zahltag einer Abbuchung änderte, hatte
     // ihn in allen Folgemonaten weiter auf dem alten Wert.
-    for (const kopie of kopien) {
+    for (const candidate of kopien) {
+      // Booking writers lock this same parent row. Keep the lock through the
+      // flag change and booking sum, and never trust the enumeration snapshot.
+      await lockRow(db, 'expenses', candidate.id);
+      const kopie = await db.expense.findFirst({ where: { id: candidate.id } });
+      if (!kopie || kopie.userId !== userId || kopie.name !== existing.name ||
+          !kopie.isRecurring || kopie.month !== candidate.month || kopie.month <= existing.month) continue;
       await db.expense.update({
         where: { id: kopie.id },
         data: {
@@ -381,6 +390,11 @@ async function updateExpense(db, ctx, existing, input) {
             : carryDayToPeriod(expense.spentOn, kopie.month, startDay),
         },
       });
+      // Eine bisher normale Zukunftskopie hat noch ihren alten Ist-Betrag.
+      // Beim Typwechsel nur aus IHREN Buchungen ableiten, nie aus der Quelle.
+      if (expense.isCollector && !kopie.isCollector) {
+        await summeNeuBerechnen(db, key, kopie.id);
+      }
     }
   } else if (existing.isRecurring && !expense.isRecurring) {
     // Wiederkehrend abgeschaltet → die Auto-Kopien in Zukunftsmonaten sind

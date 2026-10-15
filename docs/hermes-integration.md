@@ -140,7 +140,8 @@ aufgelöst). Fehler haben die Form `{ "error": "CODE", "message": "…", "errors
 | Aktion | Stufe | Pflicht | Optional |
 |---|---|---|---|
 | `expense.create` | auto | `name`, `amount`, `categoryId`, `date` (bzw. bei `isCollector: true` statt `date` den `month`) | `tags[]`, `isRecurring` (Standard `false`; `true` = **ohne Ende**), `month` (Kontrolle) |
-| `expense.update` / `.delete` | auto | `id` | `name`, `amount`, `categoryId`, `date`, `tags[]`, `isRecurring` |
+| `expense.update` | auto | `id` | `name`, `amount`, `categoryId`, `date`, `tags[]`, `isRecurring`, `reconcileBookings` (Boolean, nur bestehende Sammelposten) |
+| `expense.delete` | auto | `id` | – |
 | `booking.create` | auto | `expenseId`, `amount`, `date` | `note` |
 | `booking.update` / `.delete` | auto | `expenseId`, `bookingId` | `amount`, `date`, `note` |
 | `income.create` | auto | `name`, `amount`, `month` | `isRecurring` (Standard `false`) |
@@ -162,6 +163,33 @@ aufgelöst). Fehler haben die Form `{ "error": "CODE", "message": "…", "errors
 
 Beträge immer als Text in eindeutiger Cent-Form (`"12"`, `"12,5"`,
 `"12.50"`). Unbekannte Felder führen zu `400`, nichts wird geraten.
+
+**Sammelposten-Istwert gezielt reparieren:**
+`expense.update { id: <bestehender Sammelposten>, reconcileBookings: true }`
+berechnet ausschließlich dessen gespeicherten Istwert aus seinen eigenen echten
+Buchungen neu (keine Buchungen → `0.00`). Der Entwurf zeigt ausdrücklich
+`summary.reconcileBookings: true`, `summary.before.amount` und
+`summary.after.amount`. Ein beliebiger Istwert kann nicht vorgegeben werden:
+`amount` bleibt bei Sammelposten ausschließlich das Budget.
+
+Das Flag allein ändert weder Budget noch Buchungen (kein Anlegen, Löschen oder
+Ändern von Buchungen); Name, Tags und Wiederholung bleiben erhalten. Weitere
+explizit angegebene Änderungsfelder behalten die normale `expense.update`-Semantik,
+einschließlich Budgetänderung über `amount` und Weitergabe an Zukunftskopien.
+Die Neuberechnung selbst betrifft nur die Ziel-ID, nicht die Istwerte anderer
+Monate. Ohne Flag oder mit `false` bleibt das bisherige Verhalten unverändert.
+Auch `false` ist nur bei bestehenden Sammelposten zulässig; andere Typen ergeben
+`400 NOT_A_COLLECTOR`, nicht-boolsche Werte `400 VALIDATION`.
+
+Der Entwurf bindet die Buchungen und den bisherigen Istwert per Fingerabdruck.
+Nach der Zeilensperre wird der Zustand erneut gelesen; zwischenzeitlich
+hinzugefügte, geänderte oder gelöschte Buchungen bzw. ein geänderter Zielzustand
+führen zu `409 TARGET_CHANGED` (neuer Entwurf nötig). Ungültige oder nicht
+entschlüsselbare gespeicherte Beträge führen zu `422 CORRUPT_ENTRY`, niemals
+stillschweigend zu null. Neuberechnung und Prüfung des zurückgelesenen Istwerts
+und Budgets laufen in derselben Transaktion. Die vorhandene Berechtigungsprüfung
+für `expense.update` bleibt unverändert: `finance.write`, Stufe `auto`;
+keine neue Aktion, kein neuer Scope und keine zusätzliche Rechtevergabe.
 
 **Wiederkehrende Ausgaben haben kein Enddatum.** Beenden geht nur
 nachträglich mit `expense.update { id: <Eintrag im letzten Monat>, isRecurring: false }`.
@@ -308,10 +336,10 @@ Basistabellen entstanden per `db push`). Für Tests deshalb wie in
 `tests/routes/integration.pg.test.js` beschrieben vorgehen.
 
 ## 10. Tests
-- `tests/routes/integration.test.js` (53): Finanzzugang, Authentifizierung, Entwurf/Bestätigung, Idempotenz, Cent-Genauigkeit, Perioden, Fremdzugriffe, Secrets.
+- `tests/routes/integration.test.js` (66): Finanzzugang, Authentifizierung, Entwurf/Bestätigung, Idempotenz, Cent-Genauigkeit, Perioden, Fremdzugriffe, Secrets; zusätzlich 13 Tests zur Sammelposten-Neuberechnung (echte Buchungen/Budget erhalten, beschädigte Beträge, Versionskonflikte, Sperren, Rollback, Replay).
 - `tests/routes/integration-scopes.test.js` (30): Berechtigungen, Admin-Rechte, Abgeben, ausgeschlossene Bereiche, Erinnerungen, Notizen (inkl. Skript-Escaping), Fotos, Server (SSH gestubbt), App-Freigabe, Ablehnen, Abwahl wirkt auf Entwürfe, Rotation, fremde Freigaben, Logs ohne Geheimnisse.
 - `tests/routes/integrations-manage.test.js` (7), `tests/utils/integration-crypto.test.js`.
-- PostgreSQL (`npm run test:pg`, nur mit `TEST_DATABASE_URL`): `integration.pg.test.js` (6), `integration-scopes.pg.test.js` (5: Array-Spalte, parallele Freigaben, FK-Kaskade, Datum, atomare Rotation), `auth-reset.pg.test.js` (7).
+- PostgreSQL (`npm run test:pg`, nur mit `TEST_DATABASE_URL`): `integration.pg.test.js` (9, einschließlich Sammelposten-Neuberechnung, Konflikt nach echter Buchung und Sperre bei Zukunftskonvertierung), `integration-scopes.pg.test.js` (5: Array-Spalte, parallele Freigaben, FK-Kaskade, Datum, atomare Rotation), `auth-reset.pg.test.js` (7).
 
 ## 11. Offene Punkte
 - **Eigener Linux-Benutzer für Zephyr** (vereinbart, Anleitung liegt bei, die Einrichtung braucht sudo und machst du). Erst dann wirken die Berechtigungen als echte Grenze.

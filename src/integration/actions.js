@@ -107,6 +107,31 @@ function storedAmount(plain) {
   return centsToAmount(finance.toCents(plain));
 }
 
+// Reconciliation must not inherit toCents' permissive parseFloat/zero fallback.
+function reconciliationCents(plain) {
+  if (typeof plain !== 'string' || !/^\d+(?:\.\d{1,2})?$/.test(plain)) {
+    fail(422, 'CORRUPT_ENTRY', 'Ungültiger gespeicherter Betrag; es wird nichts verändert.');
+  }
+  const cents = finance.toCents(plain);
+  if (!Number.isSafeInteger(cents)) fail(422, 'CORRUPT_ENTRY', 'Gespeicherter Betrag außerhalb des sicheren Bereichs.');
+  return cents;
+}
+
+async function collectorActual(db, ctx, id, expectedFingerprint) {
+  const bookings = await db.expenseBooking.findMany({ where: { expenseId: id } });
+  const fingerprint = sha256(stableStringify(bookings
+    .map(b => [b.id, b.userId, fpBooking(b)])
+    .sort((a, b) => a[0].localeCompare(b[0]))));
+  if (expectedFingerprint !== undefined && fingerprint !== expectedFingerprint) changed();
+  let cents = 0;
+  for (const b of bookings) {
+    if (b.userId !== ctx.userId) fail(422, 'CORRUPT_ENTRY', 'Ungültige Buchungszuordnung.');
+    cents += reconciliationCents(decrypt(b.amount, ctx.key));
+    if (!Number.isSafeInteger(cents)) fail(422, 'CORRUPT_ENTRY', 'Buchungssumme außerhalb des sicheren Bereichs.');
+  }
+  return { amount: centsToAmount(cents), fingerprint };
+}
+
 function assertReadable(...values) {
   if (values.some(v => v === DECRYPT_FAILED)) {
     fail(422, 'CORRUPT_ENTRY', 'Der Eintrag kann nicht entschlüsselt werden und wird nicht verändert.');
@@ -255,7 +280,7 @@ const ACTIONS = {
 
   'expense.update': {
     async prepare(db, ctx, params) {
-      checkFields(params, ['id', 'name', 'amount', 'categoryId', 'date', 'tags', 'isRecurring'], ['id']);
+      checkFields(params, ['id', 'name', 'amount', 'categoryId', 'date', 'tags', 'isRecurring', 'reconcileBookings'], ['id']);
       const existing = await loadExpense(db, ctx, params.id);
       if (!existing) notFound('Ausgabe');
       const cur = finance.decryptExpense(existing, ctx.key);
@@ -268,6 +293,11 @@ const ACTIONS = {
       const categoryId = params.categoryId !== undefined ? params.categoryId : existing.categoryId;
       const tags = readTags(params.tags, errors) ?? cur.tags;
       const isRecurring = readBool(params, 'isRecurring', existing.isRecurring, errors);
+      readBool(params, 'reconcileBookings', false, errors);
+      if (errors.length) invalid(errors);
+      if (params.reconcileBookings !== undefined && !existing.isCollector) {
+        fail(400, 'NOT_A_COLLECTOR', 'Nur bestehende Sammelposten können neu berechnet werden.');
+      }
       let spentOn = existing.spentOn || null;
       if (params.date !== undefined) {
         if (existing.isCollector) errors.push('date: Ein Sammelposten hat kein Tagesdatum.');
@@ -284,6 +314,15 @@ const ACTIONS = {
       if (!category) invalid(['categoryId: Kategorie nicht gefunden.']);
 
       const normalized = { id: existing.id, name: sanitize(name), amount, categoryId, spentOn, tags, isRecurring };
+      if (params.reconcileBookings === true) {
+        reconciliationCents(cur.amount);
+        reconciliationCents(cur.plannedAmount);
+        normalized.reconcileBookings = true;
+        const actual = await collectorActual(db, ctx, existing.id);
+        normalized.expectedActual = actual.amount;
+        normalized.bookingsFingerprint = actual.fingerprint;
+        normalized.actualFingerprint = sha256(existing.amount);
+      }
       const before = publicExpense({ ...cur, amount: storedAmount(cur.amount), plannedAmount: cur.plannedAmount ? storedAmount(cur.plannedAmount) : null });
       delete before.bookings;
       return {
@@ -291,22 +330,36 @@ const ACTIONS = {
         version: fpExpense(existing),
         summary: {
           before,
+          ...(normalized.reconcileBookings ? { reconcileBookings: true } : {}),
           after: { ...before, name: normalized.name, category, tags, spentOn, isRecurring,
-            ...(existing.isCollector ? { plannedAmount: amount } : { amount }) },
+            ...(existing.isCollector ? { plannedAmount: amount } : { amount }),
+            ...(normalized.reconcileBookings ? { amount: normalized.expectedActual } : {}) },
         },
       };
     },
     async execute(tx, ctx, p, version) {
-      const existing = await loadExpense(tx, ctx, p.id);
+      let existing = await loadExpense(tx, ctx, p.id);
       if (!existing) changed();
       await finance.lockRow(tx, 'expenses', existing.id);
+      if (p.reconcileBookings) {
+        // A concurrent writer may have committed while we waited for the lock.
+        existing = await loadExpense(tx, ctx, p.id);
+        if (!existing || !existing.isCollector || sha256(existing.amount) !== p.actualFingerprint) changed();
+        const actual = await collectorActual(tx, ctx, existing.id, p.bookingsFingerprint);
+        if (actual.amount !== p.expectedActual) changed();
+      }
       if (fpExpense(existing) !== version) changed();
       if (!(await loadCategory(tx, ctx, p.categoryId))) changed();
       await finance.updateExpense(tx, ctx, existing, {
         name: p.name, amount: p.amount, categoryId: p.categoryId, tags: p.tags,
         month: existing.month, spentOn: p.spentOn, isRecurring: p.isRecurring,
       });
+      if (p.reconcileBookings) await finance.summeNeuBerechnen(tx, ctx.key, existing.id);
       const e = await readBackExpense(tx, ctx, existing.id);
+      if (p.reconcileBookings) {
+        verify(centsToAmount(reconciliationCents(e.amount)) === p.expectedActual);
+        verify(centsToAmount(reconciliationCents(e.plannedAmount)) === p.amount);
+      }
       verify(e.name === p.name && e.categoryId === p.categoryId && (e.spentOn || null) === p.spentOn
         && e.isRecurring === p.isRecurring
         && (existing.isCollector ? sameAmount(e.plannedAmount, p.amount) : sameAmount(e.amount, p.amount)));

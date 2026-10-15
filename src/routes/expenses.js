@@ -165,36 +165,38 @@ router.post('/', async (req, res) => {
 // PUT /api/expenses/:id
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await prisma.expense.findFirst({
-      where: { id: req.params.id, userId: req.userId },
-    });
-    if (!existing) return res.status(404).json({ error: 'Ausgabe nicht gefunden.' });
-
-    // Erst laden, dann validieren: der effektive Monat (Body oder Bestand)
-    // wird für die Datumsprüfung gebraucht.
-    const zielMonat = req.body.month || existing.month;
-    const errors = validateExpense({ ...req.body, month: zielMonat }, req.budgetStartDay);
-    if (errors.length > 0) return res.status(400).json({ errors });
-
-    if (req.body.categoryId !== existing.categoryId) {
-      const cat = await prisma.category.findFirst({
-        where: { id: req.body.categoryId, userId: req.userId },
+    const result = await prisma.$transaction(async tx => {
+      // Same expense-row lock as bookings; load only after a waiting writer commits.
+      await finance.lockRow(tx, 'expenses', req.params.id);
+      const existing = await tx.expense.findFirst({
+        where: { id: req.params.id, userId: req.userId },
       });
-      if (!cat) return res.status(400).json({ errors: ['Ungültige Kategorie.'] });
-    }
+      if (!existing) return { status: 404, body: { error: 'Ausgabe nicht gefunden.' } };
 
-    const expense = await finance.updateExpense(prisma, ctxOf(req), existing, {
-      name: sanitize(req.body.name),
-      amount: String(parseFloat(req.body.amount)),
-      categoryId: req.body.categoryId,
-      tags: readTags(req.body),
-      month: req.body.month,
-      spentOn: req.body.spentOn !== undefined ? readSpentOn(req.body) : undefined,
-      isRecurring: req.body.isRecurring,
-      isCollector: req.body.isCollector !== undefined ? req.body.isCollector === true : undefined,
+      const zielMonat = req.body.month || existing.month;
+      const errors = validateExpense({ ...req.body, month: zielMonat }, req.budgetStartDay);
+      if (errors.length > 0) return { status: 400, body: { errors } };
+
+      if (req.body.categoryId !== existing.categoryId) {
+        const cat = await tx.category.findFirst({
+          where: { id: req.body.categoryId, userId: req.userId },
+        });
+        if (!cat) return { status: 400, body: { errors: ['Ungültige Kategorie.'] } };
+      }
+
+      const expense = await finance.updateExpense(tx, ctxOf(req), existing, {
+        name: sanitize(req.body.name),
+        amount: String(parseFloat(req.body.amount)),
+        categoryId: req.body.categoryId,
+        tags: readTags(req.body),
+        month: req.body.month,
+        spentOn: req.body.spentOn !== undefined ? readSpentOn(req.body) : undefined,
+        isRecurring: req.body.isRecurring,
+        isCollector: req.body.isCollector !== undefined ? req.body.isCollector === true : undefined,
+      });
+      return { status: 200, body: { expense: decryptExpense(expense, req.encryptionKey) } };
     });
-
-    res.json({ expense: decryptExpense(expense, req.encryptionKey) });
+    res.status(result.status).json(result.body);
 
   } catch (error) {
     console.error('Ausgabe bearbeiten fehlgeschlagen:', error.message);

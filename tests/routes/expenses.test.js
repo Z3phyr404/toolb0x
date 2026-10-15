@@ -265,6 +265,56 @@ describe('PUT /api/expenses — Edit-Propagation', () => {
 
   after(() => cleanupAuth());
 
+  it('validates against the source month reloaded under its transaction row lock', async () => {
+    const source = seedExpense({ name: 'Moved', amount: 123, month: '2026-03', isRecurring: false });
+    const transaction = mockPrisma.$transaction;
+    let locks = 0;
+    const tx = { ...mockPrisma, $queryRawUnsafe: async (sql, id) => {
+      assert.equal(id, source.id);
+      assert.match(sql, /expenses.*FOR UPDATE/);
+      locks++;
+      source.month = '2026-04'; // writer committed while this request waited
+    } };
+    mockPrisma.$transaction = callback => callback(tx);
+    try {
+      const res = await request(app).put(`/api/expenses/${source.id}`).set('Cookie', auth.cookie)
+        .send({ name: 'Moved', amount: 450, categoryId: testCategoryId, spentOn: '2026-03-20' });
+      assert.equal(res.status, 400, 'March date must be rejected after source moved to April');
+      assert.equal(locks, 1);
+      assert.equal(decrypt(source.amount, auth.encryptionKey), '123');
+    } finally { mockPrisma.$transaction = transaction; }
+  });
+
+  it('rolls back source and future conversion when recomputing actuals fails', async () => {
+    const source = seedExpense({ name: 'Atomic', amount: 123, month: '2026-03' });
+    const future = { ...source, id: crypto.randomUUID(), month: '2026-04' };
+    mockPrisma._store.expenses.push(future);
+    const before = structuredClone(mockPrisma._store.expenses);
+    const transaction = mockPrisma.$transaction;
+    const findBookings = mockPrisma.expenseBooking.findMany;
+    let transactions = 0;
+    mockPrisma.$transaction = async callback => {
+      transactions++;
+      const snapshot = structuredClone(mockPrisma._store.expenses);
+      try { return await callback(mockPrisma); }
+      catch (error) {
+        mockPrisma._store.expenses.splice(0, Infinity, ...snapshot);
+        throw error;
+      }
+    };
+    mockPrisma.expenseBooking.findMany = async () => { throw new Error('synthetic sum failure'); };
+    try {
+      const res = await request(app).put(`/api/expenses/${source.id}`).set('Cookie', auth.cookie)
+        .send({ name: 'Atomic', amount: 450, categoryId: testCategoryId, isCollector: true });
+      assert.equal(res.status, 500);
+      assert.deepEqual(mockPrisma._store.expenses, before, 'type, actuals and source must roll back together');
+      assert.equal(transactions, 1, 'UI update must supply an actual transaction');
+    } finally {
+      mockPrisma.$transaction = transaction;
+      mockPrisma.expenseBooking.findMany = findBookings;
+    }
+  });
+
   it('Namens-/Betrags-Änderung wird in Zukunftsmonate propagiert', async () => {
     // 3 Monate mit der gleichen wiederkehrenden Ausgabe
     const march = seedExpense({ name: 'Miete', amount: 640, month: '2026-03' });
@@ -987,5 +1037,194 @@ describe('Sammelposten', () => {
     assert.equal(res.body.expense.isCollector, false);
     assert.equal(res.body.expense.amount, '400');
     assert.equal(mockPrisma._store.expenseBookings.length, 0);
+  });
+});
+
+// Service-level synthetic regression cases, independent of route fixtures.
+describe('recurring collector conversion', () => {
+  const finance = require('../../src/services/finance');
+
+  function fixture() {
+    const db = createMockPrisma();
+    const key = crypto.randomBytes(32);
+    const ctx = { userId: crypto.randomUUID(), key, startDay: 15 };
+    const name = encrypt('Synthetic recurring expense', key);
+    const categoryId = crypto.randomUUID();
+    // The generic mock ignores select. Honor scalar projection here so a missing
+    // target isCollector selection cannot silently pass these regression tests.
+    const findMany = db.expense.findMany;
+    db.expense.findMany = async (args = {}) => {
+      const rows = await findMany(args);
+      return args.select ? rows.map(row => Object.fromEntries(
+        Object.keys(args.select).filter(field => args.select[field]).map(field => [field, row[field]])
+      )) : rows;
+    };
+    async function expense(month, extra = {}) {
+      return db.expense.create({ data: {
+        userId: ctx.userId, name, amount: encrypt('123', key), categoryId,
+        isRecurring: true, isCollector: false, plannedAmount: null,
+        spentOn: '2026-09-20', tags: '', month, ...extra,
+      } });
+    }
+    const update = (source, extra = {}) => db.$transaction(tx => finance.updateExpense(tx, ctx, { ...source }, {
+      name: 'Synthetic recurring expense', amount: '450', categoryId, tags: [],
+      month: source.month, isRecurring: true, isCollector: true, ...extra,
+    }));
+    const row = id => db._store.expenses.find(e => e.id === id);
+    const plain = (id, field = 'amount') => decrypt(row(id)[field], key);
+    const book = (target, amount) => finance.createBooking(db, ctx, target, {
+      amount, note: 'Synthetic booking', bookedOn: null,
+    });
+    return { db, key, ctx, expense, update, row, plain, book };
+  }
+  it('locks future targets in deterministic month/id order before reading type or summing', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    const late = await f.expense('2026-12', { id: 'late' });
+    const b = await f.expense('2026-10', { id: 'b' });
+    const a = await f.expense('2026-10', { id: 'a' });
+    const locked = [];
+    f.db.$queryRawUnsafe = async (sql, id) => {
+      assert.match(sql, /expenses.*FOR UPDATE/);
+      locked.push(id);
+    };
+    const findFirst = f.db.expense.findFirst;
+    f.db.expense.findFirst = async args => {
+      assert.ok(locked.includes(args.where.id), 'type read requires parent row lock');
+      return findFirst(args);
+    };
+    const bookings = f.db.expenseBooking.findMany;
+    f.db.expenseBooking.findMany = async args => {
+      assert.ok(locked.includes(args.where.expenseId), 'sum read requires same parent row lock');
+      return bookings(args);
+    };
+    await f.update(source);
+    assert.deepEqual(locked, [a.id, b.id, late.id]);
+  });
+
+  it('skips candidates independently edited before their row lock is acquired', async () => {
+    for (const change of [
+      { name: 'independently encrypted name' }, { userId: crypto.randomUUID() },
+      { isRecurring: false }, { month: '2026-08' }, { month: '2026-12' },
+    ]) {
+      const f = fixture();
+      const source = await f.expense('2026-09');
+      const future = await f.expense('2026-10');
+      const findMany = f.db.expense.findMany;
+      let expected;
+      f.db.expense.findMany = async args => {
+        const snapshot = await findMany(args);
+        Object.assign(f.row(future.id), change);
+        expected = structuredClone(f.row(future.id));
+        return snapshot;
+      };
+      await f.update(source);
+      assert.deepEqual(f.row(future.id), expected, JSON.stringify(change));
+    }
+  });
+
+  it('uses the locked current target type rather than the future query snapshot', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    const future = await f.expense('2026-10', { isCollector: true });
+    const findMany = f.db.expense.findMany;
+    f.db.expense.findMany = async args => {
+      const snapshot = await findMany(args);
+      // Another writer converts collector -> normal after candidate enumeration.
+      Object.assign(f.row(future.id), { isCollector: false, amount: encrypt('88', f.key) });
+      return snapshot;
+    };
+    await f.update(source);
+    assert.equal(f.row(future.id).isCollector, true);
+    assert.equal(f.plain(future.id), '0', 'current normal target must derive its own empty booking sum');
+  });
+
+  it('direct normal conversion preserves the budget and starts with no actuals', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    await f.update(source);
+    assert.equal(f.row(source.id).isCollector, true);
+    assert.equal(f.plain(source.id), '0');
+    assert.equal(f.plain(source.id, 'plannedAmount'), '450');
+    assert.equal(f.row(source.id).spentOn, null);
+    assert.equal(f.db._store.expenseBookings.length, 0);
+  });
+
+  it('keeps existing future collector actuals and genuine bookings during source conversion', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    const future = await f.expense('2026-10', { isCollector: true, plannedAmount: encrypt('300', f.key) });
+    await f.book(future, '12.34');
+    await f.book(future, '0.02');
+    const bookings = structuredClone(f.db._store.expenseBookings);
+    const actualCiphertext = f.row(future.id).amount;
+
+    await f.update(source);
+
+    assert.equal(f.plain(source.id), '0');
+    assert.equal(f.row(future.id).amount, actualCiphertext);
+    assert.equal(f.plain(future.id), '12.36');
+    assert.equal(f.plain(future.id, 'plannedAmount'), '450');
+    assert.deepEqual(f.db._store.expenseBookings, bookings);
+  });
+
+  it('derives a converted normal future target from its own bookings, not source spending', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09', { isCollector: true, plannedAmount: encrypt('300', f.key) });
+    await f.book(source, '67.89');
+    const empty = await f.expense('2026-10');
+    const withBookings = await f.expense('2026-11');
+    // Defensive coverage for an inconsistent normal target with existing bookings.
+    await f.book(withBookings, '0.1');
+    await f.book(withBookings, '0.2');
+    const bookings = structuredClone(f.db._store.expenseBookings);
+
+    await f.update(source);
+
+    assert.equal(f.plain(source.id), '67.89');
+    assert.equal(f.plain(empty.id), '0');
+    assert.equal(f.plain(withBookings.id), '0.3');
+    assert.equal(f.plain(empty.id, 'plannedAmount'), '450');
+    assert.equal(f.plain(withBookings.id, 'plannedAmount'), '450');
+    assert.deepEqual(f.db._store.expenseBookings, bookings);
+    await finance.initExpenseMonth(f.db, f.ctx, '2026-12');
+    const next = f.db._store.expenses.find(e => e.month === '2026-12');
+    assert.equal(next.isCollector, true);
+    assert.equal(f.plain(next.id), '0');
+    assert.equal(f.plain(next.id, 'plannedAmount'), '450');
+    assert.equal(f.db._store.expenseBookings.filter(b => b.expenseId === next.id).length, 0);
+  });
+
+  it('preserves genuine future bookings when editing a normal source', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    const future = await f.expense('2026-10', { isCollector: true, plannedAmount: encrypt('300', f.key) });
+    await f.book(future, '12.34');
+    const unrelated = await f.expense('2026-11', { name: encrypt('Independent collector', f.key), isCollector: true });
+    await f.book(unrelated, '9');
+
+    await f.update(source, { isCollector: false, amount: '88' });
+
+    assert.equal(f.row(future.id).isCollector, false);
+    assert.equal(f.plain(future.id), '88');
+    assert.equal(f.row(future.id).plannedAmount, null);
+    assert.equal(f.db._store.expenseBookings.filter(b => b.expenseId === future.id).length, 1);
+    assert.equal(f.db._store.expenseBookings.filter(b => b.expenseId === unrelated.id).length, 1);
+    assert.equal(f.plain(unrelated.id), '9');
+  });
+  it('clears the former normal amount in an already initialized future month', async () => {
+    const f = fixture();
+    const source = await f.expense('2026-09');
+    await finance.initExpenseMonth(f.db, f.ctx, '2026-10');
+    const future = f.db._store.expenses.find(e => e.month === '2026-10');
+    assert.equal(f.plain(future.id), '123');
+
+    await f.update(source);
+
+    assert.equal(f.row(future.id).isCollector, true);
+    assert.equal(f.plain(future.id), '0', 'normal copy has no booked actuals');
+    assert.equal(f.plain(future.id, 'plannedAmount'), '450');
+    assert.equal(f.row(future.id).spentOn, null);
+    assert.equal(f.db._store.expenseBookings.length, 0);
   });
 });
